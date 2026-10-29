@@ -31,13 +31,15 @@ jobs:
           curl -sSL -o lab/models/model_fp16.onnx $B/model_fp16.onnx
           curl -sSL -o lab/models/model.onnx $B/model.onnx
           ls -la lab/models
-      - name: Прогон
+      - name: Поиск NaN
         run: |
           mkdir -p lab-out
-          ls node_modules/onnxruntime-web/dist/ | tee lab-out/dist.txt
-          LAB_CASES=lab/cases_emu.json node lab/run.mjs lab-out/results_node.json 2>&1 | tail -20
-          LAB_CASES=lab/cases_emu.json LAB_ORT=ort.min.mjs node lab/run.mjs lab-out/results_ortmin.json 2>&1 | tail -20 || true
-          LAB_CASES=lab/cases_emu.json LAB_ORT=ort.wasm.min.mjs node lab/run.mjs lab-out/results_ortwasm.json 2>&1 | tail -20 || true
+          pip install onnx==1.17.0 >/dev/null
+          node lab/surg.mjs lab/models/model_fp16.onnx lab/models/surg_fp16.onnx
+          python3 lab/augment.py lab/models/surg_fp16.onnx lab/models/aug_fp16.onnx lab-out/order.json
+          node lab/nanfind.mjs lab/models/aug_fp16.onnx lab-out/order.json lab/cases_emu.json 2 lab-out/nan_all.json 2>&1 | tail -5 || true
+          OPT=disabled node lab/nanfind.mjs lab/models/aug_fp16.onnx lab-out/order.json lab/cases_emu.json 2 lab-out/nan_noopt.json 2>&1 | tail -5 || true
+          LAB_CASES=lab/cases_emu.json node lab/run.mjs lab-out/results_node.json 2>&1 | tail -5
       - name: Ветка lab-out
         if: always()
         run: |
