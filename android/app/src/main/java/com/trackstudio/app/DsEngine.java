@@ -138,7 +138,9 @@ public class DsEngine {
         env = OrtEnvironment.getEnvironment();
         OrtSession.SessionOptions so = new OrtSession.SessionOptions();
         so.setIntraOpNumThreads(Math.max(1, Math.min(4, Runtime.getRuntime().availableProcessors())));
-        so.setOptimizationLevel(OrtSession.SessionOptions.OptLevel.ALL_OPT);
+        so.setOptimizationLevel(OrtSession.SessionOptions.OptLevel.BASIC_OPT);   /* меньше пиковой памяти при загрузке */
+        so.setMemoryPatternOptimization(false);
+        android.util.Log.i("TrackStudio", "ds load, free mem " + (Runtime.getRuntime().maxMemory() >> 20) + " MB");
         ac = env.createSession(new File(dir, "acoustic.onnx").getAbsolutePath(), so);
         vc = env.createSession(new File(dir, "vocoder.onnx").getAbsolutePath(), so);
         try (BufferedReader r = new BufferedReader(new FileReader(new File(dir, "phonemes.txt")))) {
@@ -158,6 +160,7 @@ public class DsEngine {
             emb.put(key, v);
         }
         state = "ready";
+        android.util.Log.i("TrackStudio", "ds ready");
     }
 
     synchronized String submit(String json) {
@@ -174,7 +177,7 @@ public class DsEngine {
     }
 
     float[] sing(JSONObject q) throws Exception {
-        load();
+        try { load(); } catch (Throwable t) { android.util.Log.e("TrackStudio", "ds load failed", t); ac = null; throw new Exception("модель не загрузилась: " + t); }
         JSONArray P = q.getJSONArray("ph"), Dd = q.getJSONArray("dur"), F = q.getJSONArray("f0");
         int n = P.length(), T = F.length();
         long[] tok = new long[n], dur = new long[n];

@@ -164,9 +164,7 @@ def voice_track(mode, prompt, name):
         step(name + '_report', ev("""(async()=>{ try { const z=await makeReport(); return await window.__tsSend(z,'report-%s.zip',false); } catch(e){ return 'ERR '+e.message; } })()""" % name))
 
 
-if os.environ.get('VOICE', 'true') == 'true':
-    for mode, prompt, name in TRACKS:
-        voice_track(mode, prompt, name)
+DS_FIRST = True
 
 # 4. певческая модель (DiffSinger, нативно): скачать и спеть
 if os.environ.get('VOICE', 'true') == 'true':
@@ -181,6 +179,9 @@ if os.environ.get('VOICE', 'true') == 'true':
     if st and 'installed' in st:
         voice_track('sing', 'аниме-опенинг, энергично, милый голос, 150 bpm', 'voice_ds')
         step('ds_used', ev("JSON.stringify({used: (globalThis.DSX||{}).used, fail: (globalThis.DSX||{}).fail})"))
+if os.environ.get('VOICE', 'true') == 'true':
+    for mode, prompt, name in TRACKS:
+        voice_track(mode, prompt, name)
 
 step('downloads', subprocess.run(['adb', 'shell', 'ls', '-la', '/sdcard/Download/TrackStudio'], capture_output=True, text=True).stdout)
 R['total_s'] = round(time.time() - T0, 1)

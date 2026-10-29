@@ -20,6 +20,6 @@ adb exec-out screencap -p > ci-out/9_end.png
 adb shell ls -la /sdcard/Download/TrackStudio > ci-out/downloads.txt 2>&1
 adb pull /sdcard/Download/TrackStudio ci-out/downloads 2>&1 | tail -2
 adb logcat -d > ci-out/logcat-full.txt 2>&1
-grep -E "chromium|AndroidRuntime|FATAL|TrackStudio" ci-out/logcat-full.txt | tail -400 > ci-out/logcat.txt
+grep -E "chromium|AndroidRuntime|FATAL|TrackStudio|lowmemory|lmkd|Fatal signal|onnxruntime|trackstudio" ci-out/logcat-full.txt | tail -400 > ci-out/logcat.txt
 rm -f ci-out/logcat-full.txt
 exit 0

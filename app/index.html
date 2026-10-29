@@ -6821,6 +6821,7 @@ self.onmessage = async (e) => { const m = e.data; try {
     const sr = raw.sampleRate, N = raw.length, items = lyricPlan(), prompt = $q('#prompt') ? $q('#prompt').value : '';
     const plan = synthPlan($q('#lyrics').value, prompt, speech ? 'rap' : 'sing'), D = plan.D, LK = lookOf(D, speech), V = VOICES.kru; globalThis.VOXDNA = D;
     dsState(); const dsOn = DSX.ok && !speech && !window.__noDS;   /* пение певческой моделью — Kokoro (163 МБ) не грузим вовсе */
+    if (dsOn && KV2.w && !window.__dbgNotes) { try { kv2Kill(); KV2.initP = null; } catch (e) { } }   /* память телефона — певческой модели (Kokoro понадобится снова только для рэпа) */
     if (!window.__mockTTS && !dsOn && items.some((it) => lineEng(it.tx) !== 'none')) { await ensureVoice((g, t) => dlUI(g, t)); dlUI(1, 1, true); }
     S.voxLangs = [...new Set(items.map((it) => lineLang(it.tx)))];
     const ctxBase = {
