@@ -34,7 +34,7 @@ jobs:
       - name: Прогон
         run: |
           mkdir -p lab-out
-          node lab/run.mjs lab-out/results.json 2>&1 | tail -80
+          LAB_CASES=${LAB_CASES:-lab/cases_emu.json} node lab/run.mjs lab-out/results.json 2>&1 | tail -80
       - name: Ветка lab-out
         if: always()
         run: |

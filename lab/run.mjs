@@ -21,7 +21,7 @@ const fb = new Float32Array(1), ib = new Uint32Array(fb.buffer);
 const f2h = (arr) => { const o = new Uint16Array(arr.length); for (let i = 0; i < arr.length; i++) { fb[0] = arr[i]; const x = ib[0], sg = (x >>> 16) & 0x8000; let e = ((x >>> 23) & 0xff) - 112, m = x & 0x7fffff; if (e <= 0) o[i] = sg; else if (e >= 31) o[i] = sg | 0x7c00; else o[i] = sg | (e << 10) | ((m + 0x1000) >> 13); } return o; };
 
 ort.env.wasm.numThreads = 1;
-const cases = JSON.parse(fs.readFileSync('lab/cases.json', 'utf8'));
+const cases = JSON.parse(fs.readFileSync(process.env.LAB_CASES || 'lab/cases.json', 'utf8'));
 const variants = JSON.parse(fs.readFileSync('lab/variants.json', 'utf8'));
 const out = { started: new Date().toISOString(), ort: ort.env.versions, results: [] };
 const save = () => fs.writeFileSync(process.argv[2] || 'lab-out/results.json', JSON.stringify(out, null, 1));
@@ -37,20 +37,20 @@ async function session(model) {
 const wavs = fs.existsSync('lab-out') ? 'lab-out' : null;
 for (const v of variants) {
   const S = await session(v.model);
-  for (const c of cases) {
+  for (const c of cases) for (let rep = 0; rep < (v.rep || 1); rep++) {
     if (v.only && !v.only.includes(c.mode)) continue;
     const ids = [0]; for (const ch of c.ipa) { const q = KVOCAB[ch]; if (q != null) ids.push(q); } ids.push(0); const T = ids.length;
     const i64 = (a, d) => new ort.Tensor('int64', BigInt64Array.from(a, (x) => BigInt(Math.round(x))), d);
     const fT = (arr, d) => (S.elem === 10 ? new ort.Tensor('float16', f2h(arr), d) : new ort.Tensor('float32', Float32Array.from(arr), d));
     const f0 = c.f0.map((x) => x * 2 ** ((v.up || 0) / 12));
-    const feeds = { input_ids: i64(ids, [1, T]), style: new ort.Tensor('float32', style(v.tim, v.pro, T - 2), [1, 256]), speed: new ort.Tensor('float32', [1], [1]),
+    const feeds = { input_ids: i64(ids, [1, T]), style: new ort.Tensor('float32', style(c.tim && !v.forceTim ? c.tim : v.tim, c.pro && !v.forceTim ? c.pro : v.pro, T - 2), [1, 256]), speed: new ort.Tensor('float32', [1], [1]),
       dur_in: i64(c.dur, [1, T]), dur_mix: i64([1], [1]), f0_in: fT(f0, [1, 1, f0.length]), f0_mix: fT([c.f0mix], [1]) };
     if (S.nMix) feeds.n_mix = fT([v.nmix || 0], [1]);
     const t0 = Date.now(); let res;
     try {
       const o = await S.s.run(feeds), w = o.waveform, d = w.data;
       let nf = 0, e = 0; const x = new Float32Array(d.length); for (let i = 0; i < d.length; i++) { const y = w.type === 'float16' ? h2f(d[i]) : d[i]; x[i] = y; if (!Number.isFinite(y)) nf++; else e += y * y; }
-      res = { name: v.name, mode: c.mode, tx: c.tx, n: d.length, nf, rms: +Math.sqrt(e / d.length).toFixed(5), ms: Date.now() - t0 };
+      res = { name: v.name, mode: c.mode, tx: c.tx, rep, n: d.length, nf, rms: +Math.sqrt(e / d.length).toFixed(5), ms: Date.now() - t0 };
       if (wavs && v.wav) { const pcm = Buffer.alloc(x.length * 2); for (let i = 0; i < x.length; i++) pcm.writeInt16LE(Math.max(-32767, Math.min(32767, Math.round((Number.isFinite(x[i]) ? x[i] : 0) * 32767))), i * 2);
         const hdr = Buffer.alloc(44); hdr.write('RIFF', 0); hdr.writeUInt32LE(36 + pcm.length, 4); hdr.write('WAVEfmt ', 8); hdr.writeUInt32LE(16, 16); hdr.writeUInt16LE(1, 20); hdr.writeUInt16LE(1, 22); hdr.writeUInt32LE(24000, 24); hdr.writeUInt32LE(48000, 28); hdr.writeUInt16LE(2, 32); hdr.writeUInt16LE(16, 34); hdr.write('data', 36); hdr.writeUInt32LE(pcm.length, 40);
         fs.mkdirSync('lab-out/wav', { recursive: true }); fs.writeFileSync(`lab-out/wav/${v.name}__${c.mode}__${c.tx.replace(/[^a-z]+/gi, '_').slice(0, 30)}.wav`, Buffer.concat([hdr, pcm])); }
