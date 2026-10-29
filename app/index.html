@@ -5024,8 +5024,13 @@ self.onmessage = (e) => { try { const r = analyze(e.data.L, e.data.R, e.data.sr)
   /* САМ ИЩЕТ ЭТАЛОНЫ в свободной музыке с открытыми лицензиями: Openverse (Jamendo, ccMixter, Freesound), Internet Archive, Wikimedia Commons.
      Ищет по стилю текущего трека, качает до 16 МБ, слушает тем же ухом, что и твои файлы. Не больше 6 треков в день. */
   const NET_Q = { techno: 'techno', house: 'house music', ambient: 'ambient', dnb: 'drum and bass', dub: 'dub', trap: 'trap beat', lofi: 'lofi hip hop', synthwave: 'synthwave', industrial: 'industrial', glitch: 'idm glitch',
-    cinematic: 'cinematic', trance: 'trance', hardstyle: 'hardstyle', hardtekk: 'hardtek', jumpstyle: 'jumpstyle', gabber: 'gabber', rage: 'rage beat', melancore: 'emo rap', hoodtrap: 'trap', phonk: 'phonk', drill: 'drill', jersey: 'jersey club', dubstep: 'dubstep' };
-  const netQuery = () => { const pr = ($q('#prompt') && $q('#prompt').value) || '', sp = (typeof S !== 'undefined' && S.spec) || {};
+    cinematic: 'cinematic', trance: 'trance', hardstyle: 'hardstyle', hardtekk: 'hardtek', jumpstyle: 'jumpstyle', gabber: 'gabber', rage: 'opium rage', melancore: 'melancore', hoodtrap: 'hoodtrap', phonk: 'phonk', drill: 'drill', jersey: 'jersey club', dubstep: 'dubstep' };
+  /* учится по жанровым тегам (как ищут на SoundCloud/Audius), а не по «free beat»: тег из промпта → тег стиля; в фоне обходит любимые теги по очереди */
+  const NET_TAGS = ['melancore', 'opium rage', 'hardtekk', 'jumpstyle', 'hoodtrap', 'hardstyle', 'digicore', 'breakcore', 'phonk', 'hyperpop', 'jersey club', 'drum and bass'];
+  const TAG_RE = [[/меланкор|melan.?core/, 'melancore'], [/опиум|opium|рейдж|rage/, 'opium rage'], [/хард.?тек|hard.?tekk?/, 'hardtekk'], [/джамп|jump.?style/, 'jumpstyle'], [/худ.?тр[эе]п|hood.?trap/, 'hoodtrap'],
+    [/хард.?стайл|hard.?style/, 'hardstyle'], [/диджи.?кор|digi.?core/, 'digicore'], [/брейк.?кор|break.?core/, 'breakcore'], [/хайпер.?поп|hyper.?pop/, 'hyperpop'], [/фонк|phonk/, 'phonk'], [/джерси|jersey/, 'jersey club']];
+  const netQuery = () => { const pr = (($q('#prompt') && $q('#prompt').value) || '').toLowerCase(), sp = (typeof S !== 'undefined' && S.spec) || {};
+    for (const [re, t] of TAG_RE) if (re.test(pr)) return t;
     if (/аниме|anime|j-?rock|j-?pop|опенинг/i.test(pr)) return /rock|рок/i.test(pr) ? 'j-rock' : 'j-pop'; return NET_Q[sp.style] || 'electronic'; };
   const tmo = (ms) => { const c = new AbortController(); setTimeout(() => c.abort(), ms); return c.signal; };
   const AUD_APP = 'app_name=TrackStudio';
@@ -5047,8 +5052,8 @@ self.onmessage = (e) => { try { const r = analyze(e.data.L, e.data.R, e.data.sr)
       return Object.values((j.query && j.query.pages) || {}).map((p) => ({ p, i: p.imageinfo && p.imageinfo[0] })).filter((x) => x.i && x.i.size > 8e5 && x.i.size < 16e6 && /ogg|mpeg|mp3|opus|flac|wav/i.test(x.i.mime || ''))
         .map((x) => ({ url: x.i.url, name: x.p.title.replace(/^File:/, '').replace(/\.[a-z0-9]+$/i, ''), lic: x.i.extmetadata && x.i.extmetadata.LicenseShortName ? x.i.extmetadata.LicenseShortName.value : '', page: 'https://commons.wikimedia.org/wiki/' + encodeURIComponent(x.p.title.replace(/ /g, '_')), from: 'wikimedia' })); }],
   ];
-  async function autoNet(n) {
-    if (T.netBusy || T.busy) return 0; T.netBusy = true; const d = load(); d.netSeen = d.netSeen || []; let got = 0; const miss = [], q = netQuery();
+  async function autoNet(n, qo) {
+    if (T.netBusy || T.busy) return 0; T.netBusy = true; const d = load(); d.netSeen = d.netSeen || []; let got = 0; const miss = [], q = qo || netQuery();
     try {
       for (const [nm, fn] of NET_SRC) { if (got >= n) break;
         let list = []; try { st('🌐 ' + q + ' · ' + nm); list = (await fn(q)).filter((x) => !d.netSeen.includes(x.url)).slice(0, 10).sort(() => Math.random() - 0.5); } catch (e) { miss.push(nm); continue; }
@@ -5064,8 +5069,12 @@ self.onmessage = (e) => { try { const r = analyze(e.data.L, e.data.R, e.data.sr)
   /* сам, в фоне: после трека, если давно не учился этому стилю; не на медленной сети и не чаще 6 треков в день */
   function autoTick() {
     const d = load(); if (d.autoNet === false || !d.on && d.on !== undefined) return; const c = navigator.connection; if (c && (c.saveData || /2g|3g/.test(c.effectiveType || ''))) return;
-    const q = netQuery(), day = new Date().toDateString(), have = refsFor(q).filter((t) => t.from).length; if (have >= 8) return; if (d.netDay && d.netDay.d === day && d.netDay.n >= 8) return; if (have >= 2 && d.netQ && d.netQ[q] && Date.now() - d.netQ[q] < 12 * 3600e3) return;
-    if (typeof S !== 'undefined' && S.busy) return; autoNet(have < 2 ? 2 : 1).catch((e) => console.warn('автоэталон', e));
+    const day = new Date().toDateString(); if (d.netDay && d.netDay.d === day && d.netDay.n >= 12) return; if (typeof S !== 'undefined' && S.busy) return;
+    /* сначала тег текущего промпта, потом любимые теги — где эталонов меньше всего и давно не искали */
+    const fresh = (q) => !(d.netQ && d.netQ[q] && Date.now() - d.netQ[q] < 12 * 3600e3), cnt = (q) => refsFor(q).filter((t) => t.from).length;
+    const cur = netQuery(), list = [cur].concat(NET_TAGS.filter((t) => t !== cur).sort((a, b) => cnt(a) - cnt(b)));
+    const q = list.find((t) => cnt(t) < 8 && (cnt(t) < 2 || fresh(t))); if (!q) return;
+    autoNet(cnt(q) < 2 ? 2 : 1, q).catch((e) => console.warn('автоэталон', e));
   }
   async function addFiles(files) { for (const fl of files) { try { await learn(await fl.arrayBuffer(), fl.name.replace(/\.[a-z0-9]{2,4}$/i, ''), 'file'); } catch (e) { console.warn('teacher', e); } } }
   async function addUrl(u) {
@@ -6520,20 +6529,25 @@ self.onmessage = async (e) => { const m = e.data; try {
     'A': 'ey', 'I': 'ay', 'W': 'aw', 'Y': 'oy', 'O': 'ow', 'Q': 'ow', 'p': 'p', 'b': 'b', 't': 't', 'd': 'd', 'k': 'k', 'g': 'g', 'ɡ': 'g', 'f': 'f', 'v': 'v', 's': 's', 'z': 'z', 'h': 'hh', 'x': 'hh',
     'm': 'm', 'n': 'n', 'l': 'l', 'ɫ': 'l', 'w': 'w', 'θ': 'th', 'ð': 'dh', 'ʃ': 'sh', 'ʒ': 'zh', 'ŋ': 'ng', 'ɹ': 'r', 'r': 'r', 'j': 'y', 'ɾ': 'dx', 'ʔ': 'q', 'ʤ': 'jh', 'ʧ': 'ch', 'ʣ': 'jh', 'ʦ': 'ch' };
   const DS_V2 = { 'aɪ': 'ay', 'aʊ': 'aw', 'eɪ': 'ey', 'oʊ': 'ow', 'ɔɪ': 'oy', 'tʃ': 'ch', 'dʒ': 'jh', 'əʊ': 'ow' };
-  const DS_FPS = 44100 / 512;
+  /* русский: чистые гласные и раскатистое «р» из испанского/итальянского набора Canary, мягкие л/н/р — свои фонемы (без английского акцента) */
+  const DS_RU1 = { 'a': 'a', 'ɐ': 'ah', 'ə': 'ax', 'o': 'oh', 'ɵ': 'oh', 'u': 'uu', 'ʉ': 'uu', 'i': 'ee', 'ɪ': 'ih', 'ɨ': 'ih', 'e': 'eh', 'ɛ': 'eh', 'r': 'rr', 'ʂ': 'sh', 'ʐ': 'zh', 'ɕ': 'sh', 'x': 'hx', 'j': 'y', 'ʃ': 'sh', 'ʒ': 'zh' };
+  const DS_RU2 = { 'rʲ': 'rj', 'lʲ': 'ly', 'nʲ': 'ny', 'ts': 'ts', 'tɕ': 'ch', 'tʃ': 'ch', 'ɕː': 'sh' };
+  const DS_FPS = 44100 / 512, DS_VOW2 = new Set(['a', 'oh', 'uu', 'ee', 'eh']);
   const DS_VOW = new Set(['aa', 'ae', 'ah', 'ao', 'aw', 'ax', 'ay', 'eh', 'er', 'ey', 'ih', 'iy', 'ow', 'oy', 'uh', 'uw']);
   /* IPA-звуки строки (с длительностями в кадрах Kokoro по 25 мс) → фонемы Canary с кадрами 11.6 мс */
-  function dsPhones(tok, dur) {
+  function dsPhones(tok, dur, lang) {
+    const ru = lang === 'ru', V1 = ru ? Object.assign({}, DS_V1, DS_RU1) : DS_V1, V2 = ru ? Object.assign({}, DS_V2, DS_RU2) : DS_V2;
     const seg = []; let t = dur[0] * 0.025;
     seg.push({ p: 'SP', a: 0, b: t });
     for (let j = 0; j < tok.length; j++) {
       const c = tok[j], d = dur[j + 1] * 0.025, a = t; t += d;
       const two = j + 1 < tok.length ? c + tok[j + 1] : '';
-      if (DS_V2[two]) { const d2 = dur[j + 2] * 0.025; seg.push({ p: DS_V2[two], a, b: t + d2 }); t += d2; j++; continue; }
+      if (V2[two]) { const d2 = dur[j + 2] * 0.025; seg.push({ p: V2[two], a, b: t + d2 }); t += d2; j++; continue; }
+      if (c === 'ʲ' || c === '͡') { const L = seg[seg.length - 1]; L.b = t; continue; }
       if (c === 'ˈ' || c === 'ˌ') { seg.push({ p: '', a, b: t }); continue; }            /* ударение: время — следующему звуку */
       if (c === 'ː') { const L = seg[seg.length - 1]; L.b = t; continue; }               /* долгота: продлеваем прошлый */
       if (c === ' ' || /[,.!?;:—…"“”()]/.test(c)) { if (d >= 0.12) seg.push({ p: 'SP', a, b: t }); else { const L = seg[seg.length - 1]; L.b = t; } continue; }
-      const p = DS_V1[c]; if (p) seg.push({ p, a, b: t }); else { const L = seg[seg.length - 1]; L.b = t; }
+      const p = V1[c]; if (p) seg.push({ p, a, b: t }); else { const L = seg[seg.length - 1]; L.b = t; }
     }
     seg.push({ p: 'SP', a: t, b: t + dur[dur.length - 1] * 0.025 });
     /* пустые «ударения» отдают время следующему */
@@ -6542,7 +6556,7 @@ self.onmessage = async (e) => { const m = e.data; try {
     const ph = [], fr = []; let prev = 0;
     for (const s of S2) { const e = Math.round(s.b * DS_FPS); const n = Math.max(1, e - prev); ph.push(s.p); fr.push(n); prev += n; }
     /* согласная короче ~70 мс в пении глотается (замер: 73% → 82% слов) — добираем время у соседней гласной или паузы (сначала у прошлой: гласная остаётся на доле) */
-    const isV = (p) => DS_VOW.has(p) || p === 'SP';
+    const isV = (p) => DS_VOW.has(p) || DS_VOW2.has(p) || p === 'SP';
     for (let i = 0; i < ph.length; i++) { if (isV(ph[i]) || fr[i] >= 6) continue; let need = 6 - fr[i];
       for (const j of [i - 1, i + 1]) { if (j < 0 || j >= ph.length || !isV(ph[j])) continue; const give = Math.min(need, Math.max(0, fr[j] - 5)); fr[j] -= give; fr[i] += give; need -= give; if (need <= 0) break; } }
     return { ph, fr, T: prev, sec: t + dur[dur.length - 1] * 0.025 };
@@ -6558,7 +6572,7 @@ self.onmessage = async (e) => { const m = e.data; try {
     return out;
   }
   async function dsSing(tok, dur, f0h, spk, opt) {
-    const P = dsPhones(tok, dur), f0 = dsF0(f0h, P.T), A = window.TSAndroid;
+    const P = dsPhones(tok, dur, opt && opt.lang), f0 = dsF0(f0h, P.T), A = window.TSAndroid;
     const id = A.dsSubmit(JSON.stringify({ ph: P.ph, dur: P.fr, f0, spk, steps: (opt && opt.steps) || 10, depth: 0.3, gender: (opt && opt.gender) || 0 }));
     const r = await fetch('https://appassets.androidplatform.net/ds/out/' + id);
     if (!r.ok) throw new Error('певческая модель: ' + (await r.text()).slice(0, 200));
@@ -6646,15 +6660,18 @@ self.onmessage = async (e) => { const m = e.data; try {
     /* пение — настоящей певческой моделью, если она есть (приложение Android) */
     if (!rap && DSX.ok && !window.__noDS) {
       try {
-        const f0d = modelShift ? buildF0('', notes0, 0).f0 : f0, norm = (x) => { let e = 0, n = 0, pk = 0; for (let i = 0; i < x.length; i++) { const a = Math.abs(x[i]); if (a > pk) pk = a; } for (let i = 0; i < x.length; i++) if (Math.abs(x[i]) > 0.02 * pk) { e += x[i] * x[i]; n++; } const r = n ? Math.sqrt(e / n) : 0; return r > 0 ? Math.min(0.95 / pk, 0.22 / r) * 10 ** ((lv.db || 0) / 20) : 1; };
-        const yP = dsSing(tok, dur, f0d, { arc: 0.7, spark: 0.3 });
+        /* аниме-регистр: мелодия выше на ~3–4 полутона (в ладу бита — каждая нота заново подгоняется к гамме) */
+        const top0 = Math.max(...notes0), up = window.__dsUp != null ? window.__dsUp : clamp(77 - top0, 0, 4), nDS = up ? notes0.map((m, k) => fitMidi(m + up, ctx.track, ctx.spec, it.t0 + tV[k], sy[k].stress >= 0.6, 1.5, nl[k])) : notes0;
+        const f0d = buildF0('', nDS, 0).f0, norm = (x) => { let e = 0, n = 0, pk = 0; for (let i = 0; i < x.length; i++) { const a = Math.abs(x[i]); if (a > pk) pk = a; } for (let i = 0; i < x.length; i++) if (Math.abs(x[i]) > 0.02 * pk) { e += x[i] * x[i]; n++; } const r = n ? Math.sqrt(e / n) : 0; return r > 0 ? Math.min(0.95 / pk, 0.22 / r) * 10 ** ((lv.db || 0) / 20) : 1; };
+        const VO = { voltage: 0.7, arc: 0.3 }, GD = 0.08;   /* «Voltage» — самый яркий подголос Canary (замер: центроид 910 Гц против 577), лёгкий сдвиг формант вверх */
+        const yP = dsSing(tok, dur, f0d, VO, { gender: GD, lang });
         let dP = null, hP = null;
         if (hot && S.voxStack !== false && !window.__noStack) {
           const Rd = mulberry32((hashStr(it.tx + '|stk') ^ (ctx.spec.seed & 0xffff)) >>> 0), det = (Rd() < 0.5 ? -1 : 1) * (6 + Rd() * 6);
-          dP = dsSing(tok, dur, buildF0('d', notes0, det).f0, { spark: 0.6, voltage: 0.4 });
-          const hb = notes0.map((m, k) => { const tt = it.t0 + tV[k], w = soundAt(ctx.track, ctx.spec, tt), sc = SCALES[ctx.spec.scale] || SCALES.minor, kk = (((ctx.spec.key + keyOffAt(ctx.track, tt)) % 12) + 12) % 12;
+          dP = dsSing(tok, dur, buildF0('d', nDS, det).f0, { arc: 0.6, voltage: 0.4 }, { gender: GD, lang });
+          const hb = nDS.map((m, k) => { const tt = it.t0 + tV[k], w = soundAt(ctx.track, ctx.spec, tt), sc = SCALES[ctx.spec.scale] || SCALES.minor, kk = (((ctx.spec.key + keyOffAt(ctx.track, tt)) % 12) + 12) % 12;
             let b2 = m - 3, bs = -1; for (const c2 of [m - 3, m - 4, m - 5]) { const pc = ((c2 % 12) + 12) % 12, v = (sc.semis.includes((pc - kk + 12) % 12) ? 1 : 0) + w[pc]; if (v > bs) { bs = v; b2 = c2; } } return b2; });
-          hP = dsSing(tok, dur, buildF0('h', hb, -4).f0, { voltage: 0.7, arc: 0.3 });
+          hP = dsSing(tok, dur, buildF0('h', hb, -4).f0, { spark: 0.5, arc: 0.5 }, { gender: GD, lang });
         }
         let y = await yP; const g = norm(y); for (let i = 0; i < y.length; i++) y[i] *= g;
         const late = (x, sec) => { const n = Math.round(sec * 44100), o = new Float32Array(x.length); o.set(x.subarray(0, Math.max(0, x.length - n)), n); return o; };
@@ -6820,7 +6837,7 @@ self.onmessage = async (e) => { const m = e.data; try {
   async function renderNeural(raw, speech) {
     const sr = raw.sampleRate, N = raw.length, items = lyricPlan(), prompt = $q('#prompt') ? $q('#prompt').value : '';
     const plan = synthPlan($q('#lyrics').value, prompt, speech ? 'rap' : 'sing'), D = plan.D, LK = lookOf(D, speech), V = VOICES.kru; globalThis.VOXDNA = D;
-    dsState(); const dsOn = DSX.ok && !speech && !window.__noDS;   /* пение певческой моделью — Kokoro (163 МБ) не грузим вовсе */
+    dsState(); DSX.used = 0; const dsOn = DSX.ok && !speech && !window.__noDS;   /* пение певческой моделью — Kokoro (163 МБ) не грузим вовсе */
     if (dsOn && KV2.w && !window.__dbgNotes) { try { kv2Kill(); KV2.initP = null; } catch (e) { } }   /* память телефона — певческой модели (Kokoro понадобится снова только для рэпа) */
     if (!window.__mockTTS && !dsOn && items.some((it) => lineEng(it.tx) !== 'none')) { await ensureVoice((g, t) => dlUI(g, t)); dlUI(1, 1, true); }
     S.voxLangs = [...new Set(items.map((it) => lineLang(it.tx)))];
