@@ -1,0 +1,16 @@
+name: ds-model
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  m:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          mkdir -p dl out && cd dl && curl -sSL -o c.zip https://github.com/spicytigermeat/canary_diffsinger/releases/download/v106/Canary_DS_v106_PACK.zip
+          unzip -q c.zip -d canary && find canary -name '*.zip' -exec unzip -q -o {} -d canary/inner \;
+          I=canary/inner; cp $I/dsacoustic/phonemes.txt $I/dsacoustic/*.emb $I/dsdur/dsdict-en.yaml $I/dsconfig.yaml $I/extra/LICENSE.md ../out/
+          cp $I/dsvocoder/*.onnx ../out/vocoder.onnx
+          split -b 90m -d $I/dsacoustic/acoustic.onnx ../out/acoustic.onnx.part
+          cd ../out && sha256sum * > SHA256 && git init -q -b dsmodel && git config user.name gha && git config user.email gha@users.noreply.github.com && git add -A && git commit -q -m model && git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" dsmodel
