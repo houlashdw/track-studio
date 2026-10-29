@@ -6521,6 +6521,11 @@ self.onmessage = async (e) => { const m = e.data; try {
     { const need = (j) => { const c = j > 0 && j <= tok.length ? tok[j - 1] : '$'; return NV_VOW.has(c) ? 2 : nvCons(c) ? 1 : 0; };
       for (let j = 1; j <= tok.length; j++) { let lack = need(j) - dur[j]; if (lack <= 0) continue; dur[j] += lack;
         for (const d of [1, -1, 2, -2, 3, -3, 4, -4]) { const q = j + d; if (q <= 0 || q > tok.length || lack <= 0) continue; const spare = dur[q] - Math.max(need(q), 1); if (spare > 0) { const t = Math.min(spare, lack); dur[q] -= t; lack -= t; } } } }
+    /* у каждого звука хотя бы 1 кадр, как у самой модели (её длительности ≥1): знаки ударения, пробелы и «ː» с нулём кадров — вне её опыта;
+       на телефоне (браузер, wasm) такие строки иногда выходили NaN-тишиной. Кадр берём у соседа с запасом — время строки не меняется */
+    if (!window.__noMin1) for (let j = 1; j <= tok.length; j++) { if (dur[j] > 0) continue;
+      let got = false; for (const d of [1, -1, 2, -2, 3, -3, 4, -4, 5, -5]) { const q = j + d; if (q < 0 || q > tok.length + 1) continue; const c = q > 0 && q <= tok.length ? tok[q - 1] : '$', keep = NV_VOW.has(c) ? 2 : 1; if (dur[q] > keep) { dur[q]--; dur[j] = 1; got = true; break; } }
+      if (!got) dur[j] = 1; }
     const Fn = dur.reduce((a, b) => a + b, 0);
     /* высота по полукадрам (12.5 мс): глухие и паузы — 0, звонкие — нота слога с подъездом, вибрато на долгих */
     const NAT = !window.__oldPitch, toks = ['$'].concat(tok, ['$']);
