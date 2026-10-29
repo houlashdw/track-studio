@@ -1,0 +1,105 @@
+{
+ "dsconfig.yaml": "# Canary DS\n# v102\n\nphonemes: dsacoustic/phonemes.txt\nacoustic: dsacoustic/acoustic.onnx\ndictionary: dsacoustic/dictionary.txt\nvocoder: refinegan\n\nhidden_size: 256\n\nuse_key_shift_embed: true\nuse_speed_embed: true\nuse_energy_embed: false\nuse_breathiness_embed: false\nuse_voicing_embed: false\nuse_tension_embed: false\nuse_continuous_acceleration: true\nuse_variable_depth: true\n\nmax_depth: 0.6\nnum_mel_bins: 128\nmel_fmin: 40\nmel_fmax: 16000\nmel_base: '10'\nmel_scale: slaney\n\nspeakers:\n  - dsacoustic/canary_arc\n  - dsacoustic/canary_spark\n  - dsacoustic/canary_voltage\n\naugmentation_args:\n  random_pitch_shifting:\n    enabled: true\n    range: [-5., 5.]\n    scale: 1.0\n  fixed_pitch_shifting:\n    enabled: true\n    targets: [-5., 5.]\n    scale: 0.75\n  random_time_stretching:\n    enabled: true\n    range: [0.5, 2.]\n    domain: log  # or linear\n    scale: 1.0",
+ "dsvocoder/vocoder.yaml": "name: \"tgm_hifigan\"\nmodel: \"tgm_hifigan_v105.onnx\"\nnum_mel_bins: 128\nhop_size: 512\nsample_rate: 44100",
+ "dsdur/dsconfig.yaml": "# ver b08\nphonemes: files/phonemes.txt\nlinguistic: files/linguistic.onnx\ndur: files/dur.onnx\n\nhop_size: 512\nsample_rate: 44100\n\npredict_dur: true\npredict_pitch: false\nuse_expr: true\nuse_note_rest: true\nuse_continuous_acceleration: true\n\nspeakers:\n  - files/canary_arc\n  - files/canary_spark\n  - files/canary_voltage",
+ "dspitch/dsconfig.yaml": "# ver b08\nphonemes: files/phonemes.txt\nlinguistic: files/linguistic.onnx\npitch: files/pitch.onnx\n\nhop_size: 512\nsample_rate: 44100\n\n# for melody encoder\npredict_dur: false\nuse_note_rest: true\nuse_expr: true\nuse_continuous_acceleration: true\n\nspeakers:\n  - files/canary",
+ "ac_in": [
+  [
+   "tokens",
+   "tensor(int64)",
+   [
+    1,
+    "n_tokens"
+   ]
+  ],
+  [
+   "durations",
+   "tensor(int64)",
+   [
+    1,
+    "n_tokens"
+   ]
+  ],
+  [
+   "f0",
+   "tensor(float)",
+   [
+    1,
+    "n_frames"
+   ]
+  ],
+  [
+   "gender",
+   "tensor(float)",
+   [
+    1,
+    "n_frames"
+   ]
+  ],
+  [
+   "velocity",
+   "tensor(float)",
+   [
+    1,
+    "n_frames"
+   ]
+  ],
+  [
+   "spk_embed",
+   "tensor(float)",
+   [
+    1,
+    "n_frames",
+    256
+   ]
+  ],
+  [
+   "depth",
+   "tensor(float)",
+   []
+  ],
+  [
+   "steps",
+   "tensor(int64)",
+   []
+  ]
+ ],
+ "ac_out": [
+  [
+   "mel",
+   [
+    1,
+    "n_frames",
+    128
+   ]
+  ]
+ ],
+ "vc_in": [
+  [
+   "mel",
+   "tensor(float)",
+   [
+    1,
+    "n_frames",
+    128
+   ]
+  ],
+  [
+   "f0",
+   "tensor(float)",
+   [
+    1,
+    "n_frames"
+   ]
+  ]
+ ],
+ "vc_out": [
+  [
+   "waveform",
+   [
+    1,
+    "n_samples"
+   ]
+  ]
+ ]
+}
