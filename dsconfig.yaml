@@ -1,0 +1,45 @@
+# Canary DS
+# v102
+
+phonemes: dsacoustic/phonemes.txt
+acoustic: dsacoustic/acoustic.onnx
+dictionary: dsacoustic/dictionary.txt
+vocoder: refinegan
+
+hidden_size: 256
+
+use_key_shift_embed: true
+use_speed_embed: true
+use_energy_embed: false
+use_breathiness_embed: false
+use_voicing_embed: false
+use_tension_embed: false
+use_continuous_acceleration: true
+use_variable_depth: true
+
+max_depth: 0.6
+num_mel_bins: 128
+mel_fmin: 40
+mel_fmax: 16000
+mel_base: '10'
+mel_scale: slaney
+
+speakers:
+  - dsacoustic/canary_arc
+  - dsacoustic/canary_spark
+  - dsacoustic/canary_voltage
+
+augmentation_args:
+  random_pitch_shifting:
+    enabled: true
+    range: [-5., 5.]
+    scale: 1.0
+  fixed_pitch_shifting:
+    enabled: true
+    targets: [-5., 5.]
+    scale: 0.75
+  random_time_stretching:
+    enabled: true
+    range: [0.5, 2.]
+    domain: log  # or linear
+    scale: 1.0
