@@ -15,8 +15,10 @@ const U = (() => { const b = Buffer.from(VP.b64, 'base64'); return new Uint16Arr
 const h2f = (h) => { const sg = h & 0x8000 ? -1 : 1, e = (h >> 10) & 31, m = h & 1023; return e === 0 ? sg * m * 2 ** -24 : e === 31 ? sg * Infinity : sg * (1 + m / 1024) * 2 ** (e - 15); };
 const vpack = (id) => { const k = VP.ids.indexOf(id); if (k < 0) throw new Error('голоса нет в паке: ' + id); const n = VP.rows * 256, o = new Float32Array(n); for (let i = 0; i < n; i++) o[i] = h2f(U[k * n + i]); return o; };
 const blend = (mix) => { let o = null, ws = 0; for (const [id, w] of mix) { const v = vpack(id); if (!o) o = new Float32Array(v.length); for (let i = 0; i < v.length; i++) o[i] += v[i] * w; ws += w; } for (let i = 0; i < o.length; i++) o[i] /= ws; return o; };
-const style = (tim, pro, n) => { const t = blend(tim), p = blend(pro), rows = Math.floor(Math.min(t.length, p.length) / 256), off = Math.min(n, rows - 1) * 256, st = new Float32Array(256);
-  for (let i = 0; i < 128; i++) st[i] = t[off + i]; for (let i = 128; i < 256; i++) st[i] = p[off + i]; return st; };
+const CEN = ['af_heart', 'af_bella', 'af_sarah', 'af_nicole', 'if_sara', 'am_michael'];
+const center = (() => { let c = null; return () => { if (c) return c; const vs = CEN.map(vpack); c = new Float32Array(vs[0].length); for (const v of vs) for (let i = 0; i < c.length; i++) c[i] += v[i] / vs.length; return c; }; })();
+const style = (tim, pro, n, a = 1) => { const t = blend(tim), p = blend(pro), c = Math.abs(a - 1) > 0.01 ? center() : null, rows = Math.floor(Math.min(t.length, p.length) / 256), off = Math.min(n, rows - 1) * 256, st = new Float32Array(256);
+  for (let i = 0; i < 128; i++) st[i] = t[off + i]; for (let i = 128; i < 256; i++) { const q = p[off + i]; st[i] = c ? c[off + i] + a * (q - c[off + i]) : q; } return st; };
 const fb = new Float32Array(1), ib = new Uint32Array(fb.buffer);
 const f2h = (arr) => { const o = new Uint16Array(arr.length); for (let i = 0; i < arr.length; i++) { fb[0] = arr[i]; const x = ib[0], sg = (x >>> 16) & 0x8000; let e = ((x >>> 23) & 0xff) - 112, m = x & 0x7fffff; if (e <= 0) o[i] = sg; else if (e >= 31) o[i] = sg | 0x7c00; else o[i] = sg | (e << 10) | ((m + 0x1000) >> 13); } return o; };
 
@@ -43,7 +45,7 @@ for (const v of variants) {
     const i64 = (a, d) => new ort.Tensor('int64', BigInt64Array.from(a, (x) => BigInt(Math.round(x))), d);
     const fT = (arr, d) => (S.elem === 10 ? new ort.Tensor('float16', f2h(arr), d) : new ort.Tensor('float32', Float32Array.from(arr), d));
     const f0 = c.f0.map((x) => x * 2 ** ((v.up || 0) / 12));
-    const feeds = { input_ids: i64(ids, [1, T]), style: new ort.Tensor('float32', style(c.tim && !v.forceTim ? c.tim : v.tim, c.pro && !v.forceTim ? c.pro : v.pro, T - 2), [1, 256]), speed: new ort.Tensor('float32', [1], [1]),
+    const feeds = { input_ids: i64(ids, [1, T]), style: new ort.Tensor('float32', style(c.tim && !v.forceTim ? c.tim : v.tim, c.pro && !v.forceTim ? c.pro : v.pro, T - 2, v.alpha != null ? v.alpha : (c.alpha || 1)), [1, 256]), speed: new ort.Tensor('float32', [1], [1]),
       dur_in: i64(c.dur, [1, T]), dur_mix: i64([1], [1]), f0_in: fT(f0, [1, 1, f0.length]), f0_mix: fT([c.f0mix], [1]) };
     if (S.nMix) feeds.n_mix = fT([v.nmix || 0], [1]);
     const t0 = Date.now(); let res;
