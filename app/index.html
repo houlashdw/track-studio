@@ -6561,9 +6561,11 @@ self.onmessage = async (e) => { const m = e.data; try {
        Проверяем каждую: повтор как есть (в модели есть случайный шум), затем с микросдвигом длительностей; NaN не пускаем дальше */
     const sick = (x) => { let nf = 0, e = 0; for (let i = 0; i < x.length; i++) { const v = x[i]; if (!Number.isFinite(v)) nf++; else e += v * v; } return { nf, rms: Math.sqrt(e / Math.max(1, x.length)) }; };
     let bq = sick(pcm); const diag = { tx: it.tx.slice(0, 40), rms: +bq.rms.toFixed(5), nf: bq.nf }; (S.lineDiag = S.lineDiag || []).push(diag);
-    for (let tr = 0; (bq.nf > 0 || bq.rms < 2e-4 || window.__forceSick === it.tx) && tr < 2; tr++) {
+    /* повторы: в модели случайный шум, и NaN бывает не каждый раз (эмулятор: 1 из 2 повторов проходит) — до 4 попыток как есть, затем с микросдвигом длительностей */
+    for (let tr = 0; (bq.nf > 0 || bq.rms < 2e-4 || window.__forceSick === it.tx) && tr < 6; tr++) {
       console.warn('строка без звука — перепеваю', it.tx, JSON.stringify(bq)); noteCache.delete(key); if (window.__forceSick === it.tx) window.__forceSick = null;
-      let durR = dur; if (tr === 1) { durR = dur.slice(); let jm = 1; for (let j = 1; j < durR.length - 1; j++) if (durR[j] > durR[jm]) jm = j; if (durR[jm] > 3) { durR[jm]--; durR[durR.length - 1]++; } }
+      if (!diag.feed) diag.feed = { ipa, dur: dur.slice(), f0: f0.map((x) => Math.round(x * 10) / 10), f0mix, tim: V.tim, pro: V.pro, alpha: V.alpha };
+      let durR = dur; if (tr >= 4) { durR = dur.slice(); let jm = 1; for (let j = 1; j < durR.length - 1; j++) if (durR[j] > durR[jm]) jm = j; if (durR[jm] > 3) { durR[jm] -= tr - 3; durR[durR.length - 1] += tr - 3; } }
       try { pcm = (await kv2Call({ t: 'gen', ipa, tim: V.tim, pro: V.pro, alpha: V.alpha, speed: 1, dur: durR, f0, f0mix })).pcm.slice(); } catch (er) { console.warn('перепев', er); }
       bq = sick(pcm); diag.retry = tr + 1; diag.rms2 = +bq.rms.toFixed(5); diag.nf2 = bq.nf;
     }
