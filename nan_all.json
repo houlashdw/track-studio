@@ -1,0 +1,277 @@
+{
+ "tx": "Hold me close and never let me go",
+ "wav_nan": 0,
+ "first": {
+  "name": "/decoder/decoder/generator/Div_output_0__raw",
+  "op": "Div",
+  "node": "/decoder/decoder/generator/Div",
+  "n": 125411,
+  "nan": 2,
+  "inf": 8,
+  "max": 43330,
+  "dims": [
+   1,
+   11,
+   11401
+  ]
+ },
+ "firstIdx": 1227,
+ "around": [
+  {
+   "name": "/decoder/decoder/decode.0/norm2/ReduceMean_output_0",
+   "op": "ReduceMean",
+   "node": "/decoder/decoder/decode.0/norm2/ReduceMean",
+   "n": 1024,
+   "nan": 0,
+   "inf": 0,
+   "max": 5.395,
+   "dims": [
+    1,
+    1024,
+    1
+   ]
+  },
+  {
+   "name": "/decoder/decoder/generator/Reshape_3_output_0",
+   "op": "Reshape",
+   "node": "/decoder/decoder/generator/Reshape_3",
+   "n": 57020,
+   "nan": 0,
+   "inf": 0,
+   "max": 0.1448,
+   "dims": [
+    1,
+    57020
+   ]
+  },
+  {
+   "name": "/decoder/decoder/decode.0/norm2/Sub_output_0",
+   "op": "Sub",
+   "node": "/decoder/decoder/decode.0/norm2/Sub",
+   "n": 97280,
+   "nan": 0,
+   "inf": 0,
+   "max": 13.02,
+   "dims": [
+    1,
+    1024,
+    95
+   ]
+  },
+  {
+   "name": "/decoder/decoder/generator/STFT_output_0",
+   "op": "STFT",
+   "node": "/decoder/decoder/generator/STFT",
+   "n": 250822,
+   "nan": 0,
+   "inf": 0,
+   "max": 1.233,
+   "dims": [
+    1,
+    11401,
+    11,
+    2
+   ]
+  },
+  {
+   "name": "/decoder/decoder/decode.0/norm2/Mul_2_output_0",
+   "op": "Mul",
+   "node": "/decoder/decoder/decode.0/norm2/Mul_2",
+   "n": 97280,
+   "nan": 0,
+   "inf": 0,
+   "max": 169.5,
+   "dims": [
+    1,
+    1024,
+    95
+   ]
+  },
+  {
+   "name": "/decoder/decoder/generator/Transpose_3_output_0",
+   "op": "Transpose",
+   "node": "/decoder/decoder/generator/Transpose_3",
+   "n": 250822,
+   "nan": 0,
+   "inf": 0,
+   "max": 1.233,
+   "dims": [
+    1,
+    11,
+    11401,
+    2
+   ]
+  },
+  {
+   "name": "/decoder/decoder/decode.0/norm2/ReduceMean_2_output_0",
+   "op": "ReduceMean",
+   "node": "/decoder/decoder/decode.0/norm2/ReduceMean_2",
+   "n": 1024,
+   "nan": 0,
+   "inf": 0,
+   "max": 19.92,
+   "dims": [
+    1,
+    1024,
+    1
+   ]
+  },
+  {
+   "name": "/decoder/decoder/generator/Gather_4_output_0",
+   "op": "Gather",
+   "node": "/decoder/decoder/generator/Gather_4",
+   "n": 125411,
+   "nan": 0,
+   "inf": 0,
+   "max": 1.233,
+   "dims": [
+    1,
+    11,
+    11401
+   ]
+  },
+  {
+   "name": "/decoder/decoder/generator/Gather_5_output_0",
+   "op": "Gather",
+   "node": "/decoder/decoder/generator/Gather_5",
+   "n": 125411,
+   "nan": 0,
+   "inf": 0,
+   "max": 0.5093,
+   "dims": [
+    1,
+    11,
+    11401
+   ]
+  },
+  {
+   "name": "/decoder/decoder/decode.0/norm2/Add_2_output_0",
+   "op": "Add",
+   "node": "/decoder/decoder/decode.0/norm2/Add_2",
+   "n": 1024,
+   "nan": 0,
+   "inf": 0,
+   "max": 19.92,
+   "dims": [
+    1,
+    1024,
+    1
+   ]
+  },
+  {
+   "name": "/decoder/decoder/generator/Pow_output_0",
+   "op": "Pow",
+   "node": "/decoder/decoder/generator/Pow",
+   "n": 125411,
+   "nan": 0,
+   "inf": 0,
+   "max": 1.521,
+   "dims": [
+    1,
+    11,
+    11401
+   ]
+  },
+  {
+   "name": "/decoder/decoder/generator/Pow_1_output_0",
+   "op": "Pow",
+   "node": "/decoder/decoder/generator/Pow_1",
+   "n": 125411,
+   "nan": 0,
+   "inf": 0,
+   "max": 0.2593,
+   "dims": [
+    1,
+    11,
+    11401
+   ]
+  },
+  {
+   "name": "/decoder/decoder/generator/Div_output_0__raw",
+   "op": "Div",
+   "node": "/decoder/decoder/generator/Div",
+   "n": 125411,
+   "nan": 2,
+   "inf": 8,
+   "max": 43330,
+   "dims": [
+    1,
+    11,
+    11401
+   ]
+  },
+  {
+   "name": "/decoder/decoder/decode.0/norm2/Sqrt_output_0",
+   "op": "Sqrt",
+   "node": "/decoder/decoder/decode.0/norm2/Sqrt",
+   "n": 1024,
+   "nan": 0,
+   "inf": 0,
+   "max": 4.465,
+   "dims": [
+    1,
+    1024,
+    1
+   ]
+  },
+  {
+   "name": "/decoder/decoder/generator/Add_output_0",
+   "op": "Add",
+   "node": "/decoder/decoder/generator/Add",
+   "n": 125411,
+   "nan": 0,
+   "inf": 0,
+   "max": 1.521,
+   "dims": [
+    1,
+    11,
+    11401
+   ]
+  },
+  {
+   "name": "/decoder/decoder/generator/Atan_output_0",
+   "op": "Atan",
+   "node": "/decoder/decoder/generator/Atan",
+   "n": 125411,
+   "nan": 0,
+   "inf": 0,
+   "max": 1.57,
+   "dims": [
+    1,
+    11,
+    11401
+   ]
+  }
+ ],
+ "big": [
+  {
+   "name": "/decoder/decoder/generator/Div_output_0__raw",
+   "op": "Div",
+   "node": "/decoder/decoder/generator/Div",
+   "n": 125411,
+   "nan": 2,
+   "inf": 8,
+   "max": 43330,
+   "dims": [
+    1,
+    11,
+    11401
+   ]
+  },
+  {
+   "name": "/decoder/decoder/generator/Div_output_0",
+   "op": "Where",
+   "node": "sing/nan0_0",
+   "n": 125411,
+   "nan": 0,
+   "inf": 8,
+   "max": 43330,
+   "dims": [
+    1,
+    11,
+    11401
+   ]
+  }
+ ],
+ "n": 2093
+}

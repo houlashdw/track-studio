@@ -1,0 +1,91 @@
+{
+ "started": "2026-10-29T18:06:13.032Z",
+ "ort": {
+  "common": "1.22.0",
+  "web": "1.22.0"
+ },
+ "results": [
+  {
+   "name": "emu_fp16",
+   "mode": "rap",
+   "tx": "Hold me close and never let me go",
+   "rep": 0,
+   "n": 57000,
+   "nf": 0,
+   "rms": 0.06277,
+   "ms": 5322
+  },
+  {
+   "name": "emu_fp16",
+   "mode": "rap",
+   "tx": "Hold me close and never let me go",
+   "rep": 1,
+   "n": 57000,
+   "nf": 0,
+   "rms": 0.06277,
+   "ms": 5227
+  },
+  {
+   "name": "emu_fp16",
+   "mode": "sing",
+   "tx": "City lights are calling out my name toni",
+   "rep": 0,
+   "n": 90000,
+   "nf": 0,
+   "rms": 0.06135,
+   "ms": 8072
+  },
+  {
+   "name": "emu_fp16",
+   "mode": "sing",
+   "tx": "City lights are calling out my name toni",
+   "rep": 1,
+   "n": 90000,
+   "nf": 0,
+   "rms": 0.06135,
+   "ms": 8091
+  },
+  {
+   "name": "emu_fp16",
+   "mode": "rap",
+   "tx": "Hold me close and never let me go",
+   "rep": 0,
+   "n": 57000,
+   "nf": 0,
+   "rms": 0.06209,
+   "ms": 5219
+  },
+  {
+   "name": "emu_fp16",
+   "mode": "rap",
+   "tx": "Hold me close and never let me go",
+   "rep": 1,
+   "n": 57000,
+   "nf": 0,
+   "rms": 0.06209,
+   "ms": 5220
+  },
+  {
+   "name": "emu_fp16",
+   "mode": "sing",
+   "tx": "City lights are calling out my name toni",
+   "rep": 0,
+   "n": 85800,
+   "nf": 0,
+   "rms": 0.06069,
+   "ms": 7709
+  },
+  {
+   "name": "emu_fp16",
+   "mode": "sing",
+   "tx": "City lights are calling out my name toni",
+   "rep": 1,
+   "n": 85800,
+   "nf": 0,
+   "rms": 0.06069,
+   "ms": 7696
+  }
+ ],
+ "emu_fp16_load_ms": 1206,
+ "done": "2026-10-29T18:07:07.381Z"
+}
