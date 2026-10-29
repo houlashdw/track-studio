@@ -51,6 +51,20 @@ jobs:
             TrackStudio.apk
             build-info.txt
 
+  apk:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: apk
+          path: out
+      - name: Ветка apk — APK сразу после сборки (без ожидания эмулятора)
+        run: |
+          cd out && echo "run ${{ github.run_number }} · ${{ github.sha }}" > STATUS.txt
+          git init -q -b apk && git config user.name gha && git config user.email gha@users.noreply.github.com
+          git add -A && git commit -q -m "apk ${{ github.run_number }}" && git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" apk
+
   test:
     needs: build
     runs-on: ubuntu-latest
