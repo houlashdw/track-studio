@@ -131,34 +131,42 @@ step('save_link', ev("""(async()=>{ const a=document.createElement('a'); a.href=
 step('save_wav', ev("""(async()=>{ const b=document.querySelector('#dlWav'); if(!b||b.disabled) return 'нет кнопки'; b.click(); await new Promise(r=>setTimeout(r,8000)); return document.querySelector('#toast') ? document.querySelector('#toast').textContent : ''; })()"""))
 step('downloads_after_beat', subprocess.run(['adb', 'shell', 'ls', '-la', '/sdcard/Download/TrackStudio'], capture_output=True, text=True).stdout)
 
-# 3. трек с голосом (модель голоса качается при первом запуске)
-if os.environ.get('VOICE', 'true') == 'true':
-    LY = ("[Verse]\\nCity lights are calling out my name tonight\\nHold me close and never let me go\\n"
-          "We don't stop, we just turn it up louder\\nEvery heartbeat matching with the drum\\n"
-          "[Chorus]\\nStars are falling, I will sing tonight\\nThis is our song, so sing it loud")
+# 3. треки с голосом (модель голоса качается при первом запуске): рэп и пение
+LY = ("[Verse]\\nCity lights are calling out my name tonight\\nHold me close and never let me go\\n"
+      "We don't stop, we just turn it up louder\\nEvery heartbeat matching with the drum\\n"
+      "[Chorus]\\nStars are falling, I will sing tonight\\nThis is our song, so sing it loud")
+TRACKS = [('rap', 'хардстайл 150 bpm', 'voice'), ('sing', 'аниме-опенинг, энергично, милый голос, 150 bpm', 'voice_sing')]
+
+
+def voice_track(mode, prompt, name):
     t0 = time.time()
-    started = start_build("""(()=>{ document.querySelector('#modeSeg button[data-v="rap"]').click();
+    started = start_build("""(()=>{ document.querySelector('#modeSeg button[data-v="%s"]').click();
       const l=document.querySelector('#lyrics'); l.value="%s"; l.dispatchEvent(new Event('input'));
-      const p=document.querySelector('#prompt'); p.value='хардстайл 150 bpm'; p.dispatchEvent(new Event('input')); return 1; })()""" % LY)
-    step('voice_started', {'attempt': started, 'after_s': round(time.time() - t0, 1), 'snap': snap()})
+      const p=document.querySelector('#prompt'); p.value='%s'; p.dispatchEvent(new Event('input')); return 1; })()""" % (mode, LY, prompt))
+    step(name + '_started', {'attempt': started, 'after_s': round(time.time() - t0, 1), 'snap': snap()})
     took = None
-    R['voice_snaps'] = []
+    snaps = R.setdefault(name + '_snaps', [])
     last = 0
-    while time.time() - t0 < 3000:
+    while time.time() - t0 < 1800:
         if ev("document.querySelector('#player').dataset.ready==='1' && !S.busy") is True:
             took = round(time.time() - t0, 1)
             break
         if time.time() - last > 60:
             last = time.time()
-            R['voice_snaps'].append([round(time.time() - t0), snap()])
+            snaps.append([round(time.time() - t0), snap()])
             save()
         time.sleep(5)
-    step('voice', {'seconds': took, 'status': ev("document.querySelector('#statusText').title || document.querySelector('#statusText').textContent"),
-                   'voxInfo': ev("S.voxInfo || null"), 'voxFail': ev("S.voxFail || null"), 'kv2': ev("JSON.stringify(globalThis.__kv2 || {}).slice(0,600)"),
-                   'dur': ev("S.buffer ? +S.buffer.duration.toFixed(1) : null")})
-    shot('3_voice')
+    step(name, {'seconds': took, 'status': ev(STATUS), 'voxInfo': ev("S.voxInfo || null"), 'voxFail': ev("S.voxFail || null"),
+                'kv2': ev("JSON.stringify(globalThis.__kv2 || {}).slice(0,400)"), 'dur': ev("S.buffer ? +S.buffer.duration.toFixed(1) : null"),
+                'lineDiag': ev("JSON.stringify(S.lineDiag || null)")})
+    shot('3_' + name)
     if took:
-        step('report', ev("""(async()=>{ try { const z=await makeReport(); return await window.__tsSend(z,'report-ci.zip',false); } catch(e){ return 'ERR '+e.message; } })()"""))
+        step(name + '_report', ev("""(async()=>{ try { const z=await makeReport(); return await window.__tsSend(z,'report-%s.zip',false); } catch(e){ return 'ERR '+e.message; } })()""" % name))
+
+
+if os.environ.get('VOICE', 'true') == 'true':
+    for mode, prompt, name in TRACKS:
+        voice_track(mode, prompt, name)
 
 step('downloads', subprocess.run(['adb', 'shell', 'ls', '-la', '/sdcard/Download/TrackStudio'], capture_output=True, text=True).stdout)
 R['total_s'] = round(time.time() - T0, 1)

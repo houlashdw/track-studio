@@ -3952,7 +3952,7 @@ async function init() {
     const kv = globalThis.__kv2 || {}, fit = S.voxFitL ? Array.from(S.voxFitL.values()) : [];
     const info = { app: 'track-studio', at: new Date().toISOString(), ua: navigator.userAgent, prompt: $('#prompt').value, lyrics: $('#lyrics').value, mode: $('#voiceMode').value,
       spec: S.spec ? { style: S.spec.style, bpm: S.spec.bpm, key: S.spec.key, scale: S.spec.scale, seed: S.spec.seed, look: S.spec.look } : null, duration: S.buffer.duration,
-      voice: { info: S.voxInfo, fail: S.voxFail, engine: kv.mode, sing: kv.sing, model: kv.info, from: kv.from, wiped: !!kv.wiped }, studio: S.studio || null, mixStats: S.mixStats || null, voxQA: S.voxQA || null, fit,
+      voice: { info: S.voxInfo, fail: S.voxFail, engine: kv.mode, sing: kv.sing, model: kv.info, from: kv.from, wiped: !!kv.wiped }, studio: S.studio || null, mixStats: S.mixStats || null, voxQA: S.voxQA || null, lineDiag: S.lineDiag || null, fit,
       flow: (S.flowLines || []).map((l) => ({ t0: l.t0, bars: l.bars, end: l.end })), lines: typeof lyricPlan === 'function' ? lyricPlan().map((i) => [i.t0, i.t1, i.tx]) : [],
       track: S.track ? { barDur: S.track.barDur, stepDur: S.track.stepDur, rootOff: S.track.rootOffBars || [], semis: (SCALES[S.spec.scale] || SCALES.minor).semis, sections: (S.track.sections || []).map((x) => [x.role, x.t0, x.t1]) } : null,
       fx: S.fx, vfx: S.vfx, tuner: globalThis.TUNER ? TUNER.load() : null, teacher: globalThis.TEACH ? { skills: TEACH.skillsText(), refs: TEACH.load().tracks.map((t) => t.name) } : null, store: globalThis.STORE_MSG || '', log: globalThis.__logTail || [] };
@@ -6557,6 +6557,17 @@ self.onmessage = async (e) => { const m = e.data; try {
     let pr = noteCache.get(key);
     if (!pr) { pr = kv2Call({ t: 'gen', ipa, tim: V.tim, pro: V.pro, alpha: V.alpha, speed: 1, dur, f0, f0mix }).then((r) => r.pcm); noteCache.set(key, pr); pr.catch(() => noteCache.delete(key)); if (noteCache.size > 80) noteCache.delete(noteCache.keys().next().value); }
     TS.total++; let pcm = await pr; TS.done++; pcm = pcm.slice();
+    /* страховка: на телефоне (wasm, fp16) модель изредка отдаёт строку из NaN или тишины — строка пропадала целиком (эмулятор: 1 строка из ~20).
+       Проверяем каждую: повтор как есть (в модели есть случайный шум), затем с микросдвигом длительностей; NaN не пускаем дальше */
+    const sick = (x) => { let nf = 0, e = 0; for (let i = 0; i < x.length; i++) { const v = x[i]; if (!Number.isFinite(v)) nf++; else e += v * v; } return { nf, rms: Math.sqrt(e / Math.max(1, x.length)) }; };
+    let bq = sick(pcm); const diag = { tx: it.tx.slice(0, 40), rms: +bq.rms.toFixed(5), nf: bq.nf }; (S.lineDiag = S.lineDiag || []).push(diag);
+    for (let tr = 0; (bq.nf > 0 || bq.rms < 2e-4 || window.__forceSick === it.tx) && tr < 2; tr++) {
+      console.warn('строка без звука — перепеваю', it.tx, JSON.stringify(bq)); noteCache.delete(key); if (window.__forceSick === it.tx) window.__forceSick = null;
+      let durR = dur; if (tr === 1) { durR = dur.slice(); let jm = 1; for (let j = 1; j < durR.length - 1; j++) if (durR[j] > durR[jm]) jm = j; if (durR[jm] > 3) { durR[jm]--; durR[durR.length - 1]++; } }
+      try { pcm = (await kv2Call({ t: 'gen', ipa, tim: V.tim, pro: V.pro, alpha: V.alpha, speed: 1, dur: durR, f0, f0mix })).pcm.slice(); } catch (er) { console.warn('перепев', er); }
+      bq = sick(pcm); diag.retry = tr + 1; diag.rms2 = +bq.rms.toFixed(5); diag.nf2 = bq.nf;
+    }
+    if (bq.nf) for (let i = 0; i < pcm.length; i++) if (!Number.isFinite(pcm[i])) pcm[i] = 0;
     /* вокалист проверяет дубль: сорвался на октаву или пропал звук — перепевает строку на кварту ниже */
     let qShift = 0, qA = null, qT = f0; try { const q = await noteQA(pcm, f0); qA = q.A; if (q.oct > 0.15 || q.drop > 0.42) { const f0b = f0.map((x) => (x > 0 ? x * 2 ** (-5 / 12) : 0)); const pcm2 = (await kv2Call({ t: 'gen', ipa, tim: V.tim, pro: V.pro, alpha: V.alpha, speed: 1, dur, f0: f0b, f0mix })).pcm, q2 = await noteQA(pcm2, f0b);
         const fixed = q2.oct + q2.drop < q.oct + q.drop; (S.voxQA = S.voxQA || []).push({ tx: it.tx, oct: q.oct, drop: q.drop, fixed }); if (fixed) { pcm = pcm2; qShift = 5; qA = q2.A; qT = f0b; } } } catch (er) { console.warn('проверка строки', er); }
@@ -6599,8 +6610,8 @@ self.onmessage = async (e) => { const m = e.data; try {
       const lev = (i) => (levEnv ? levEnv[Math.min(i, levEnv.length - 1)] : 1);
       /* живые дубли отстают/спешат на 10–30 мс по-разному в каждой строке — точная копия по времени даёт «фазер» и звук «из-под воды» */
       const late = (x, sec) => { if (window.__noLate) return x; const n = Math.round(sec * 24000), o = new Float32Array(x.length); o.set(x.subarray(0, Math.max(0, x.length - n)), n); return o; };
-      try { db = (await pD).slice(); for (let i = 0; i < db.length; i++) db[i] *= g * lev(i); db = late(db, 0.012 + Rd() * 0.018); } catch (er) { console.warn('дубль', er); }
-      if (pH) { try { hy = (await pH).slice(); for (let i = 0; i < hy.length; i++) hy[i] *= g * lev(i); hy = late(hy, 0.006 + Rd() * 0.012); } catch (er) { console.warn('гармония', er); } }
+      try { db = (await pD).slice(); if (sick(db).nf) { db = null; diag.dbBad = 1; } else { for (let i = 0; i < db.length; i++) db[i] *= g * lev(i); db = late(db, 0.012 + Rd() * 0.018); } } catch (er) { console.warn('дубль', er); }
+      if (pH) { try { hy = (await pH).slice(); if (sick(hy).nf) { hy = null; diag.hyBad = 1; } else { for (let i = 0; i < hy.length; i++) hy[i] *= g * lev(i); hy = late(hy, 0.006 + Rd() * 0.012); } } catch (er) { console.warn('гармония', er); } }
     }
     const shT = modelShift + qShift + tuneC, ga = gritAmt(D, ctx, lv), PS = Math.abs(shT) > 0.05 ? { shift: shT, fmt: (modelShift + qShift) * 0.35, expand: 1, tune: 0, bend: 0, semi: 0, key: ctx.spec.key, scale: ctx.spec.scale } : null;
     if (window.__dbgNotes) { const z = (window.__psDbg = window.__psDbg || { lines: 0, ps: 0, shifts: [] }); z.lines++; if (PS) { z.ps++; z.shifts.push(+shT.toFixed(2)); } }
@@ -6699,7 +6710,7 @@ self.onmessage = async (e) => { const m = e.data; try {
     const ctxBase = {
       mode: speech ? 'rap' : 'sing', spec: S.spec, track: S.track, look: LK, shiftSt: LK.shift, reg: 67,
       tune: (() => { const v = parseFloat($q('#tuneAmt').value); return clamp(isNaN(v) ? 0.35 : v, 0, 1); })(), grid: +($q('#rapGrid') ? $q('#rapGrid').value : 0.9), formant: LK.fmt,
-      spp: 0.072, emo: (S.lineErr = null, emotion)(S.spec, prompt), plan, dna: D,
+      spp: 0.072, emo: (S.lineErr = null, S.lineDiag = [], emotion)(S.spec, prompt), plan, dna: D,
     };
     if (LK.excl) ctxBase.emo = { ...ctxBase.emo, excl: true };
     S.flowEmo = ctxBase.emo; S.flowLines = []; S.choSpans = speech ? [] : items.filter((it) => it.cho).map((it) => [it.t0, it.t1 + 0.6]);
