@@ -1,0 +1,39 @@
+plugins {
+    id 'com.android.application'
+}
+
+def run = (System.getenv('GITHUB_RUN_NUMBER') ?: '1').toInteger()
+
+android {
+    namespace 'com.trackstudio.app'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId 'com.trackstudio.app'
+        minSdk 26
+        targetSdk 34
+        versionCode run
+        versionName "1.${run}"
+    }
+
+    signingConfigs {
+        release {
+            storeFile file('../keystore/release.jks')
+            storePassword 'trackstudio-private'
+            keyAlias 'trackstudio'
+            keyPassword 'trackstudio-private'
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig signingConfigs.release
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}

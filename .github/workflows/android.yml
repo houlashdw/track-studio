@@ -1,0 +1,112 @@
+name: android
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      voice:
+        description: 'Проверять голос на эмуляторе (долго)'
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: android
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+      - name: Студия внутрь приложения
+        run: |
+          mkdir -p android/app/src/main/assets/www
+          cp app/index.html android/app/src/main/assets/www/index.html
+      - name: Сборка APK
+        run: gradle -p android assembleRelease --no-daemon --stacktrace
+      - name: Проверка подписи и манифеста
+        run: |
+          APK=android/app/build/outputs/apk/release/app-release.apk
+          BT=$(ls -d $ANDROID_HOME/build-tools/* | sort -V | tail -1)
+          $BT/apksigner verify --print-certs $APK | tee build-info.txt
+          $BT/aapt2 dump badging $APK | head -20 | tee -a build-info.txt
+          cp $APK TrackStudio.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: apk
+          path: |
+            TrackStudio.apk
+            build-info.txt
+
+  test:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: apk
+      - name: KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - run: pip install websocket-client
+      - name: Эмулятор Android 14
+        uses: reactivecircus/android-emulator-runner@v2
+        env:
+          VOICE: ${{ github.event_name == 'push' && 'true' || inputs.voice }}
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          ram-size: 4096M
+          disk-size: 6000M
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          disable-animations: true
+          script: bash ci/emulator-test.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test
+          path: ci-out
+
+  publish:
+    needs: [build, test]
+    if: always() && needs.build.result == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: apk
+          path: out
+      - uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: test
+          path: out/test
+      - name: Ветка builds — последний APK и результаты проверки
+        env:
+          TEST_RESULT: ${{ needs.test.result }}
+        run: |
+          cd out
+          echo "run ${{ github.run_number }} · ${{ github.sha }} · test: $TEST_RESULT" > STATUS.txt
+          git init -q -b builds
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          git add -A
+          git commit -q -m "build ${{ github.run_number }} (test: $TEST_RESULT)"
+          git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" builds
