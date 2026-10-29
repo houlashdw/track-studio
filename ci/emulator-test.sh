@@ -11,8 +11,9 @@ PID=""
 for i in $(seq 1 30); do PID=$(adb shell pidof com.trackstudio.app | tr -d '\r'); [ -n "$PID" ] && break; sleep 1; done
 echo "pid=$PID" | tee ci-out/pid.txt
 adb shell cat /proc/net/unix 2>/dev/null | grep -o 'webview_devtools_remote_[0-9]*' | sort -u | tee ci-out/sockets.txt
-SOCK=$(head -1 ci-out/sockets.txt)
-[ -z "$SOCK" ] && SOCK="webview_devtools_remote_$PID"
+# сокет отладчика именно нашего процесса (у других приложений с WebView — свои)
+SOCK="webview_devtools_remote_$PID"
+grep -qx "$SOCK" ci-out/sockets.txt || { [ -s ci-out/sockets.txt ] && ! grep -q . <(grep -x "$SOCK" ci-out/sockets.txt) && echo "нет сокета $SOCK, беру по pid"; }
 adb forward tcp:9222 "localabstract:$SOCK"
 timeout 3900 python3 ci/devtools_test.py 2>&1 | tee ci-out/test.log
 adb exec-out screencap -p > ci-out/9_end.png
