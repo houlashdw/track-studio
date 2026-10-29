@@ -1,0 +1,25 @@
+name: ds-proto
+on:
+  push:
+    branches: [main]
+    paths: ['lab/ds_proto.py']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  proto:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - run: pip install onnxruntime pyyaml numpy >/dev/null
+      - name: Canary
+        run: |
+          mkdir -p dl && cd dl && curl -sSL -o c.zip https://github.com/spicytigermeat/canary_diffsinger/releases/download/v106/Canary_DS_v106_PACK.zip
+          unzip -q c.zip -d canary && find canary -name '*.zip' -exec unzip -q -o {} -d canary/inner \;
+      - run: python3 lab/ds_proto.py 2>&1 | tail -60
+      - name: publish
+        if: always()
+        run: |
+          mkdir -p ds-out && cd ds-out && git init -q -b ds-out && git config user.name gha && git config user.email gha@users.noreply.github.com
+          git add -A && git commit -q -m proto && git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" ds-out
