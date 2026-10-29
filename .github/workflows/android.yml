@@ -3,7 +3,7 @@ name: android
 on:
   push:
     branches: [main]
-    paths-ignore: ['lab/**', '.github/workflows/lab.yml']
+    paths-ignore: ['lab/**', '.github/workflows/lab.yml', '.github/workflows/scout.yml', '.github/workflows/dsproto.yml', '.github/workflows/dsmodel.yml']
   workflow_dispatch:
     inputs:
       voice:
@@ -54,7 +54,7 @@ jobs:
   test:
     needs: build
     runs-on: ubuntu-latest
-    timeout-minutes: 75
+    timeout-minutes: 110
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4

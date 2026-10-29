@@ -48,6 +48,7 @@ public class MainActivity extends Activity {
 
     WebView web;
     ValueCallback<Uri[]> pending;
+    DsEngine ds;
 
     @Override
     protected void onCreate(Bundle state) {
@@ -57,6 +58,7 @@ public class MainActivity extends Activity {
         w.setNavigationBarColor(Color.parseColor(BG));
         WebView.setWebContentsDebuggingEnabled(true);
 
+        ds = new DsEngine(getFilesDir());
         web = new WebView(this);
         web.setBackgroundColor(Color.parseColor(BG));
         WebSettings s = web.getSettings();
@@ -106,6 +108,21 @@ public class MainActivity extends Activity {
             Uri u = r.getUrl();
             if (u == null || !HOST.equals(u.getHost())) return null;
             String p = u.getPath();
+            /* певческая модель: готовый звук строки (float32, 44.1 кГц) — запрос ждёт, пока модель досчитает */
+            if (p != null && p.startsWith("/ds/out/")) {
+                Map<String, String> h = new HashMap<>();
+                h.put("Access-Control-Allow-Origin", "*");
+                h.put("Cache-Control", "no-store");
+                try {
+                    float[] w = ds.result(p.substring(8));
+                    java.nio.ByteBuffer bb = java.nio.ByteBuffer.allocate(w.length * 4).order(java.nio.ByteOrder.LITTLE_ENDIAN);
+                    bb.asFloatBuffer().put(w);
+                    return new WebResourceResponse("application/octet-stream", null, 200, "OK", h, new ByteArrayInputStream(bb.array()));
+                } catch (Exception e) {
+                    String m = String.valueOf(e.getCause() != null ? e.getCause().getMessage() : e.getMessage());
+                    return new WebResourceResponse("text/plain", "utf-8", 500, "Error", h, new ByteArrayInputStream(m.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+                }
+            }
             if (p == null || p.isEmpty()) p = "/";
             if (p.endsWith("/")) p = p + "index.html";
             try {
@@ -301,6 +318,21 @@ public class MainActivity extends Activity {
         @JavascriptInterface
         public void toast(final String t) {
             runOnUiThread(() -> Toast.makeText(MainActivity.this, t, Toast.LENGTH_SHORT).show());
+        }
+
+        @JavascriptInterface
+        public String dsStatus() {
+            return ds.status();
+        }
+
+        @JavascriptInterface
+        public void dsInstall() {
+            ds.install();
+        }
+
+        @JavascriptInterface
+        public String dsSubmit(String json) {
+            return ds.submit(json);
         }
 
         @JavascriptInterface

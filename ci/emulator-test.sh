@@ -15,7 +15,7 @@ adb shell cat /proc/net/unix 2>/dev/null | grep -o 'webview_devtools_remote_[0-9
 SOCK="webview_devtools_remote_$PID"
 grep -qx "$SOCK" ci-out/sockets.txt || { [ -s ci-out/sockets.txt ] && ! grep -q . <(grep -x "$SOCK" ci-out/sockets.txt) && echo "нет сокета $SOCK, беру по pid"; }
 adb forward tcp:9222 "localabstract:$SOCK"
-timeout 3900 python3 ci/devtools_test.py 2>&1 | tee ci-out/test.log
+timeout 6000 python3 ci/devtools_test.py 2>&1 | tee ci-out/test.log
 adb exec-out screencap -p > ci-out/9_end.png
 adb shell ls -la /sdcard/Download/TrackStudio > ci-out/downloads.txt 2>&1
 adb pull /sdcard/Download/TrackStudio ci-out/downloads 2>&1 | tail -2

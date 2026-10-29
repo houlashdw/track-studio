@@ -168,6 +168,20 @@ if os.environ.get('VOICE', 'true') == 'true':
     for mode, prompt, name in TRACKS:
         voice_track(mode, prompt, name)
 
+# 4. певческая модель (DiffSinger, нативно): скачать и спеть
+if os.environ.get('VOICE', 'true') == 'true':
+    ev("(()=>{ TSAndroid.dsInstall(); return 1; })()")
+    t0 = time.time(); st = None
+    while time.time() - t0 < 1200:
+        st = ev("TSAndroid.dsStatus()")
+        if st and ('installed' in st or 'error' in st):
+            break
+        time.sleep(10)
+    step('ds_install', {'status': st, 'seconds': round(time.time() - t0)})
+    if st and 'installed' in st:
+        voice_track('sing', 'аниме-опенинг, энергично, милый голос, 150 bpm', 'voice_ds')
+        step('ds_used', ev("JSON.stringify({used: (globalThis.DSX||{}).used, fail: (globalThis.DSX||{}).fail})"))
+
 step('downloads', subprocess.run(['adb', 'shell', 'ls', '-la', '/sdcard/Download/TrackStudio'], capture_output=True, text=True).stdout)
 R['total_s'] = round(time.time() - T0, 1)
 save()

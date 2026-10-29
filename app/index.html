@@ -528,6 +528,7 @@ const VOICE_PACK = { rows: 320, ids: ["af_heart", "jf_alpha", "af_sky", "af_jess
       <div class="seg3 mt" id="modeSeg" data-testid="voice-mode-seg">
         <button type="button" data-v="sing">Пение</button><button type="button" data-v="rap" class="on">Рэп</button><button type="button" data-v="off">Без голоса</button>
       </div>
+      <div id="dsRow" class="aixbox" hidden data-testid="ds-row"><span class="aixmsg" id="dsMsg"></span><button type="button" class="pri ex" id="dsBtn" data-testid="ds-install">Скачать</button><div class="bar aixbar" id="dsBar" hidden><div></div></div></div>
       <select id="voiceMode" hidden=""><option value="sing">Пение</option><option value="rap" selected="">Рэп</option><option value="off">Без голоса</option></select>
       <div id="lyrWrap" class="mt8">
         <textarea id="lyrics" data-testid="lyrics-input" aria-label="Текст песни" placeholder="[Verse]
@@ -3171,6 +3172,18 @@ async function aixRun() {
   } finally { btn.disabled = false; AIX.onP = null; }
 }
 
+/* певческая модель в приложении: строка с кнопкой «Скачать» и прогрессом */
+function dsUI() {
+  const row = $('#dsRow'); if (!row || !window.TSAndroid || !window.TSAndroid.dsStatus) return;
+  const msg = $('#dsMsg'), btn = $('#dsBtn'), bar = $('#dsBar');
+  const draw = () => { let s; try { s = JSON.parse(TSAndroid.dsStatus()); } catch (e) { return; } row.hidden = false;
+    if (s.state === 'installed' || s.state === 'ready') { msg.textContent = '🎤 Пение — певческая модель Canary (DiffSinger) ✓'; btn.hidden = true; bar.hidden = true; if (globalThis.DSX) { DSX.ok = true; } return true; }
+    if (s.state === 'downloading') { msg.textContent = 'Качаю певческую модель… ' + Math.round(s.progress * 100) + '% (один раз, ~520 МБ)'; btn.hidden = true; bar.hidden = false; bar.firstElementChild.style.width = Math.round(s.progress * 100) + '%'; return false; }
+    msg.textContent = (/^error/.test(s.state) ? 'Не скачалось (' + s.state.slice(7, 90) + '). ' : '') + '🎤 Настоящий певческий голос для пения (Canary, без «заиканий»): скачать один раз ~520 МБ'; btn.hidden = false; bar.hidden = true; return true; };
+  btn.onclick = () => { try { TSAndroid.dsInstall(); } catch (e) { } poll(); };
+  const poll = () => { if (!draw()) setTimeout(poll, 1000); };
+  poll();
+}
 /* --- сборка трека --- */
 function setStatus(text, p, busy) {
   /* во время сборки — только значок и полоска; в конце — коротко */
@@ -3917,7 +3930,7 @@ async function init() {
   $('#len').oninput = (e) => { $('#lenOut').textContent = fmtTime(e.target.value); };
   $('#lenOut').textContent = fmtTime($('#len').value);
   $('#make').onclick = makeFromPrompt;
-  $('#aixBtn').onclick = aixRun; $('#prompt').addEventListener('input', updateUnderstood); $('#voiceMode').addEventListener('change', updateUnderstood); $('#modeSeg').addEventListener('click', () => setTimeout(updateUnderstood, 0)); updateUnderstood();
+  $('#aixBtn').onclick = aixRun; dsUI(); $('#prompt').addEventListener('input', updateUnderstood); $('#voiceMode').addEventListener('change', updateUnderstood); $('#modeSeg').addEventListener('click', () => setTimeout(updateUnderstood, 0)); updateUnderstood();
   $('#prompt').addEventListener('keydown', (e) => { if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') makeFromPrompt(); });
   $('#surprise').onclick = () => { $('#prompt').value = EXAMPLES[Math.floor(Math.random() * EXAMPLES.length)]; $('#prompt').dispatchEvent(new Event('input')); makeFromPrompt(); };
   $('#rebuild').onclick = () => { if (S.spec) { initAudio(); buildTrack('Правка · ' + S.spec.title); } };
@@ -5958,6 +5971,7 @@ self.onmessage = async (e) => { const m = e.data; try {
     if (mode === 'off' || !lyr || KRU.failed || window.__mockTTS) { PRE.all = 0; voiceLine(); return; }
     const sig = mode + '|' + rapDelivery() + '|' + prompt + '|' + lyr; if (sig === PRE.sig) return; PRE.sig = sig;
     const g = ++PRE.gen; kwDropStale(g);
+    dsState(); if (DSX.ok && mode !== 'rap' && !window.__noDS) { voiceLine(); return; }   /* поёт певческая модель — Kokoro заранее не нужен */
     try { await ensureVoice((x, t) => dlUI(x, t)); dlUI(1, 1, true); } catch (e) { voiceLine(); return; }
     if (g !== PRE.gen) return;
     const P = synthPlan(lyr, prompt, mode); PRE.done = 0; PRE.all = P.jobs.length; voiceLine();
@@ -6496,6 +6510,61 @@ self.onmessage = async (e) => { const m = e.data; try {
   }
   const nvStyle = () => { try { return localStorage.getItem('ts-nvstyle') || 'vocaloid'; } catch (e) { return 'vocaloid'; } };
   const noteCache = new Map();
+  /* ===== ПЕВЧЕСКАЯ МОДЕЛЬ (DiffSinger «Canary», в приложении Android, нативно) =====
+     Kokoro — речевая модель, петь её заставляем мы (отсюда «заикание» и сип на долгих нотах). Canary обучена на пении: легато, вибрато, 44.1 кГц.
+     Ноты, слоги и тайминг — наши (как для Kokoro), модель только поёт. Рэп остаётся на Kokoro. */
+  const DSX = { ok: false, st: null, last: 0 };
+  globalThis.DSX = DSX;
+  function dsState() { const A = window.TSAndroid; if (!A || !A.dsStatus) return null; try { const s = JSON.parse(A.dsStatus()); DSX.st = s; DSX.ok = s.state === 'installed' || s.state === 'ready'; return s; } catch (e) { return null; } }
+  const DS_V1 = { 'ɑ': 'aa', 'æ': 'ae', 'ʌ': 'ah', 'ɐ': 'ah', 'ə': 'ax', 'ᵊ': 'ax', 'ɔ': 'ao', 'ɛ': 'eh', 'e': 'eh', 'ɜ': 'er', 'ɝ': 'er', 'ɚ': 'er', 'ɪ': 'ih', 'ᵻ': 'ih', 'i': 'iy', 'ʊ': 'uh', 'u': 'uw', 'o': 'ow', 'a': 'aa',
+    'A': 'ey', 'I': 'ay', 'W': 'aw', 'Y': 'oy', 'O': 'ow', 'Q': 'ow', 'p': 'p', 'b': 'b', 't': 't', 'd': 'd', 'k': 'k', 'g': 'g', 'ɡ': 'g', 'f': 'f', 'v': 'v', 's': 's', 'z': 'z', 'h': 'hh', 'x': 'hh',
+    'm': 'm', 'n': 'n', 'l': 'l', 'ɫ': 'l', 'w': 'w', 'θ': 'th', 'ð': 'dh', 'ʃ': 'sh', 'ʒ': 'zh', 'ŋ': 'ng', 'ɹ': 'r', 'r': 'r', 'j': 'y', 'ɾ': 'dx', 'ʔ': 'q', 'ʤ': 'jh', 'ʧ': 'ch', 'ʣ': 'jh', 'ʦ': 'ch' };
+  const DS_V2 = { 'aɪ': 'ay', 'aʊ': 'aw', 'eɪ': 'ey', 'oʊ': 'ow', 'ɔɪ': 'oy', 'tʃ': 'ch', 'dʒ': 'jh', 'əʊ': 'ow' };
+  const DS_FPS = 44100 / 512;
+  const DS_VOW = new Set(['aa', 'ae', 'ah', 'ao', 'aw', 'ax', 'ay', 'eh', 'er', 'ey', 'ih', 'iy', 'ow', 'oy', 'uh', 'uw']);
+  /* IPA-звуки строки (с длительностями в кадрах Kokoro по 25 мс) → фонемы Canary с кадрами 11.6 мс */
+  function dsPhones(tok, dur) {
+    const seg = []; let t = dur[0] * 0.025;
+    seg.push({ p: 'SP', a: 0, b: t });
+    for (let j = 0; j < tok.length; j++) {
+      const c = tok[j], d = dur[j + 1] * 0.025, a = t; t += d;
+      const two = j + 1 < tok.length ? c + tok[j + 1] : '';
+      if (DS_V2[two]) { const d2 = dur[j + 2] * 0.025; seg.push({ p: DS_V2[two], a, b: t + d2 }); t += d2; j++; continue; }
+      if (c === 'ˈ' || c === 'ˌ') { seg.push({ p: '', a, b: t }); continue; }            /* ударение: время — следующему звуку */
+      if (c === 'ː') { const L = seg[seg.length - 1]; L.b = t; continue; }               /* долгота: продлеваем прошлый */
+      if (c === ' ' || /[,.!?;:—…"“”()]/.test(c)) { if (d >= 0.12) seg.push({ p: 'SP', a, b: t }); else { const L = seg[seg.length - 1]; L.b = t; } continue; }
+      const p = DS_V1[c]; if (p) seg.push({ p, a, b: t }); else { const L = seg[seg.length - 1]; L.b = t; }
+    }
+    seg.push({ p: 'SP', a: t, b: t + dur[dur.length - 1] * 0.025 });
+    /* пустые «ударения» отдают время следующему */
+    for (let i = 0; i < seg.length; i++) if (seg[i].p === '' && i + 1 < seg.length) { seg[i + 1].a = seg[i].a; }
+    const S2 = seg.filter((s) => s.p);
+    const ph = [], fr = []; let prev = 0;
+    for (const s of S2) { const e = Math.round(s.b * DS_FPS); const n = Math.max(1, e - prev); ph.push(s.p); fr.push(n); prev += n; }
+    /* согласная короче ~70 мс в пении глотается (замер: 73% → 82% слов) — добираем время у соседней гласной или паузы (сначала у прошлой: гласная остаётся на доле) */
+    const isV = (p) => DS_VOW.has(p) || p === 'SP';
+    for (let i = 0; i < ph.length; i++) { if (isV(ph[i]) || fr[i] >= 6) continue; let need = 6 - fr[i];
+      for (const j of [i - 1, i + 1]) { if (j < 0 || j >= ph.length || !isV(ph[j])) continue; const give = Math.min(need, Math.max(0, fr[j] - 5)); fr[j] -= give; fr[i] += give; need -= give; if (need <= 0) break; } }
+    return { ph, fr, T: prev, sec: t + dur[dur.length - 1] * 0.025 };
+  }
+  /* наша кривая высоты (12.5 мс, 0 = глухой) → непрерывная кривая на кадрах Canary */
+  function dsF0(f0h, T) {
+    const n = f0h.length, filled = new Float32Array(n); let last = 0;
+    for (let i = 0; i < n; i++) if (f0h[i] > 0) { last = f0h[i]; break; }
+    for (let i = 0; i < n; i++) { if (f0h[i] > 0) last = f0h[i]; filled[i] = last || 220; }
+    for (let i = n - 1, nx = 0; i >= 0; i--) { if (f0h[i] > 0) nx = f0h[i]; else if (nx && i > 0 && !(f0h[i - 1] > 0)) filled[i] = filled[i] || nx; }
+    const out = new Array(T);
+    for (let k = 0; k < T; k++) { const x = (k / DS_FPS) / 0.0125, i = Math.min(n - 1, Math.floor(x)), j = Math.min(n - 1, i + 1), w = x - i; out[k] = +(filled[i] * (1 - w) + filled[j] * w).toFixed(2); }
+    return out;
+  }
+  async function dsSing(tok, dur, f0h, spk, opt) {
+    const P = dsPhones(tok, dur), f0 = dsF0(f0h, P.T), A = window.TSAndroid;
+    const id = A.dsSubmit(JSON.stringify({ ph: P.ph, dur: P.fr, f0, spk, steps: (opt && opt.steps) || 8, depth: 0.6, gender: (opt && opt.gender) || 0 }));
+    const r = await fetch('https://appassets.androidplatform.net/ds/out/' + id);
+    if (!r.ok) throw new Error('певческая модель: ' + (await r.text()).slice(0, 200));
+    return new Float32Array(await r.arrayBuffer());
+  }
+  globalThis.dsSing = dsSing; globalThis.dsPhones = dsPhones; globalThis.dsF0 = dsF0;
   async function renderNoteLine(it, ctx, lv, emo) {
     const rap = ctx.mode === 'rap', sd = ctx.track.stepDur, D = ctx.dna, P = ctx.plan, hot = ['peak', 'drop'].includes(ctx.role) || (!!ctx.cho && !window.__noCho);
     let e = P.lineMap.get(it.tx); if (!e) { const P1 = synthPlan(it.tx, $q('#prompt') ? $q('#prompt').value : '', P.mode); e = P1.lineMap.get(it.tx); if (!e) return null; }
@@ -6574,6 +6643,28 @@ self.onmessage = async (e) => { const m = e.data; try {
     return { f0, hk, nat };
     };
     const F0M = buildF0('', notes, 0), f0 = F0M.f0, hk = F0M.hk, nat = F0M.nat;
+    /* пение — настоящей певческой моделью, если она есть (приложение Android) */
+    if (!rap && DSX.ok && !window.__noDS) {
+      try {
+        const f0d = modelShift ? buildF0('', notes0, 0).f0 : f0, norm = (x) => { let e = 0, n = 0, pk = 0; for (let i = 0; i < x.length; i++) { const a = Math.abs(x[i]); if (a > pk) pk = a; } for (let i = 0; i < x.length; i++) if (Math.abs(x[i]) > 0.02 * pk) { e += x[i] * x[i]; n++; } const r = n ? Math.sqrt(e / n) : 0; return r > 0 ? Math.min(0.95 / pk, 0.22 / r) * 10 ** ((lv.db || 0) / 20) : 1; };
+        const yP = dsSing(tok, dur, f0d, { arc: 0.7, spark: 0.3 });
+        let dP = null, hP = null;
+        if (hot && S.voxStack !== false && !window.__noStack) {
+          const Rd = mulberry32((hashStr(it.tx + '|stk') ^ (ctx.spec.seed & 0xffff)) >>> 0), det = (Rd() < 0.5 ? -1 : 1) * (6 + Rd() * 6);
+          dP = dsSing(tok, dur, buildF0('d', notes0, det).f0, { spark: 0.6, voltage: 0.4 });
+          const hb = notes0.map((m, k) => { const tt = it.t0 + tV[k], w = soundAt(ctx.track, ctx.spec, tt), sc = SCALES[ctx.spec.scale] || SCALES.minor, kk = (((ctx.spec.key + keyOffAt(ctx.track, tt)) % 12) + 12) % 12;
+            let b2 = m - 3, bs = -1; for (const c2 of [m - 3, m - 4, m - 5]) { const pc = ((c2 % 12) + 12) % 12, v = (sc.semis.includes((pc - kk + 12) % 12) ? 1 : 0) + w[pc]; if (v > bs) { bs = v; b2 = c2; } } return b2; });
+          hP = dsSing(tok, dur, buildF0('h', hb, -4).f0, { voltage: 0.7, arc: 0.3 });
+        }
+        let y = await yP; const g = norm(y); for (let i = 0; i < y.length; i++) y[i] *= g;
+        const late = (x, sec) => { const n = Math.round(sec * 44100), o = new Float32Array(x.length); o.set(x.subarray(0, Math.max(0, x.length - n)), n); return o; };
+        let db = null, hy = null; const Rl = mulberry32((hashStr(it.tx + '|late') ^ (ctx.spec.seed & 0xffff)) >>> 0);
+        if (dP) { try { db = await dP; for (let i = 0; i < db.length; i++) db[i] *= g; db = late(db, 0.012 + Rl() * 0.018); } catch (er) { console.warn('дубль', er); } }
+        if (hP) { try { hy = await hP; for (let i = 0; i < hy.length; i++) hy[i] *= g; hy = late(hy, 0.006 + Rl() * 0.012); } catch (er) { console.warn('гармония', er); } }
+        TS.total++; TS.done++; DSX.used = (DSX.used || 0) + 1;
+        return { y, sr: 44100, lead: -a0, syl: sy.length, h: hy, d: db, flow: { triplet, n: sy.length, pos: F.pos.map((q) => q.p), U: F.U, tOn: tV, lv, end: NT.vE[NT.vE.length - 1] } };
+      } catch (er) { console.warn('певческая модель — пою Kokoro', er); DSX.fail = String((er && er.message) || er); }
+    }
     const V = e.job.V, f0mix = voc || !rap ? 1 : clamp(0.5 + (D.tune || 0.5) * 0.45 + (hot ? 0.1 : 0), 0.5, 0.95), ipa = tok.join('');
     const key = ipa + '|' + dur.join(',') + '|' + notes.map((m) => m.toFixed(1)).join(',') + '|' + f0mix.toFixed(2) + '|' + JSON.stringify(V) + (rap ? '' : '|s');
     let pr = noteCache.get(key);
@@ -6649,7 +6740,7 @@ self.onmessage = async (e) => { const m = e.data; try {
     const rap = ctx.mode === 'rap', LK = ctx.look, sd = ctx.track.stepDur, lv = lineVariation(it, ctx);
     const TF = globalThis.TEACH ? TEACH.flow() : null, tDens = clamp(SKv('spd', 1), 0.8, 1.35);
     const emo = { ...ctx.emo, dens: (ctx.emo.dens || 1) * lv.dens * tDens, gate: Math.min(0.95, ctx.emo.gate * lv.gateK) };
-    if (KV2.sing && !window.__noNotes) return renderNoteLine(it, ctx, lv, emo);
+    if ((KV2.sing || (DSX.ok && !rap && !window.__noDS)) && !window.__noNotes) return renderNoteLine(it, ctx, lv, emo);
     let { units, sy } = flowUnits(it.tx); if (!sy.length) return null;
     const B = await lineAudio(it.tx, ctx.plan); if (!B || !B.pcms.length) return null;
     /* одна строка — один вызов нейросети (раньше по слову + повтор: в 6–10 раз дольше) */
@@ -6729,7 +6820,8 @@ self.onmessage = async (e) => { const m = e.data; try {
   async function renderNeural(raw, speech) {
     const sr = raw.sampleRate, N = raw.length, items = lyricPlan(), prompt = $q('#prompt') ? $q('#prompt').value : '';
     const plan = synthPlan($q('#lyrics').value, prompt, speech ? 'rap' : 'sing'), D = plan.D, LK = lookOf(D, speech), V = VOICES.kru; globalThis.VOXDNA = D;
-    if (!window.__mockTTS && items.some((it) => lineEng(it.tx) !== 'none')) { await ensureVoice((g, t) => dlUI(g, t)); dlUI(1, 1, true); }
+    dsState(); const dsOn = DSX.ok && !speech && !window.__noDS;   /* пение певческой моделью — Kokoro (163 МБ) не грузим вовсе */
+    if (!window.__mockTTS && !dsOn && items.some((it) => lineEng(it.tx) !== 'none')) { await ensureVoice((g, t) => dlUI(g, t)); dlUI(1, 1, true); }
     S.voxLangs = [...new Set(items.map((it) => lineLang(it.tx)))];
     const ctxBase = {
       mode: speech ? 'rap' : 'sing', spec: S.spec, track: S.track, look: LK, shiftSt: LK.shift, reg: 67,
