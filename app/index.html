@@ -3965,7 +3965,7 @@ async function init() {
     const kv = globalThis.__kv2 || {}, fit = S.voxFitL ? Array.from(S.voxFitL.values()) : [];
     const info = { app: 'track-studio', at: new Date().toISOString(), ua: navigator.userAgent, prompt: $('#prompt').value, lyrics: $('#lyrics').value, mode: $('#voiceMode').value,
       spec: S.spec ? { style: S.spec.style, bpm: S.spec.bpm, key: S.spec.key, scale: S.spec.scale, seed: S.spec.seed, look: S.spec.look } : null, duration: S.buffer.duration,
-      voice: { info: S.voxInfo, fail: S.voxFail, engine: kv.mode, sing: kv.sing, model: kv.info, from: kv.from, wiped: !!kv.wiped }, studio: S.studio || null, mixStats: S.mixStats || null, voxQA: S.voxQA || null, lineDiag: S.lineDiag || null, fit,
+      voice: { info: S.voxInfo, fail: S.voxFail, ds: globalThis.DSX ? { used: DSX.used || 0, fail: DSX.fail || null } : null, engine: kv.mode, sing: kv.sing, model: kv.info, from: kv.from, wiped: !!kv.wiped }, studio: S.studio || null, mixStats: S.mixStats || null, voxQA: S.voxQA || null, lineDiag: S.lineDiag || null, fit,
       flow: (S.flowLines || []).map((l) => ({ t0: l.t0, bars: l.bars, end: l.end })), lines: typeof lyricPlan === 'function' ? lyricPlan().map((i) => [i.t0, i.t1, i.tx]) : [],
       track: S.track ? { barDur: S.track.barDur, stepDur: S.track.stepDur, rootOff: S.track.rootOffBars || [], semis: (SCALES[S.spec.scale] || SCALES.minor).semis, sections: (S.track.sections || []).map((x) => [x.role, x.t0, x.t1]) } : null,
       fx: S.fx, vfx: S.vfx, tuner: globalThis.TUNER ? TUNER.load() : null, teacher: globalThis.TEACH ? { skills: TEACH.skillsText(), refs: TEACH.load().tracks.map((t) => t.name) } : null, store: globalThis.STORE_MSG || '', log: globalThis.__logTail || [] };
@@ -6559,7 +6559,7 @@ self.onmessage = async (e) => { const m = e.data; try {
   }
   async function dsSing(tok, dur, f0h, spk, opt) {
     const P = dsPhones(tok, dur), f0 = dsF0(f0h, P.T), A = window.TSAndroid;
-    const id = A.dsSubmit(JSON.stringify({ ph: P.ph, dur: P.fr, f0, spk, steps: (opt && opt.steps) || 8, depth: 0.6, gender: (opt && opt.gender) || 0 }));
+    const id = A.dsSubmit(JSON.stringify({ ph: P.ph, dur: P.fr, f0, spk, steps: (opt && opt.steps) || 10, depth: 0.3, gender: (opt && opt.gender) || 0 }));
     const r = await fetch('https://appassets.androidplatform.net/ds/out/' + id);
     if (!r.ok) throw new Error('певческая модель: ' + (await r.text()).slice(0, 200));
     return new Float32Array(await r.arrayBuffer());
