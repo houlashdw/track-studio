@@ -2,7 +2,9 @@
 // Ищем строки, на которых модель отдаёт NaN, сравниваем варианты (fp16/fp32, тембры, правки графа).
 // node lab/run.mjs <out.json>   (модели в lab/models/, варианты — lab/variants.json)
 import fs from 'node:fs';
-import * as ort from 'onnxruntime-web';
+const ortMod = process.env.LAB_ORT ? await import('onnxruntime-web/dist/' + process.env.LAB_ORT) : await import('onnxruntime-web');
+const ort = ortMod.InferenceSession ? ortMod : ortMod.default;
+if (process.env.LAB_ORT) ort.env.wasm.wasmPaths = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.22.0/dist/';
 
 const html = fs.readFileSync('app/index.html', 'utf8');
 const grab = (start, endMark) => { const a = html.indexOf(start); if (a < 0) throw new Error('нет ' + start); const b = html.indexOf(endMark, a); return html.slice(a, b + endMark.length); };

@@ -34,7 +34,10 @@ jobs:
       - name: Прогон
         run: |
           mkdir -p lab-out
-          LAB_CASES=${LAB_CASES:-lab/cases_emu.json} node lab/run.mjs lab-out/results.json 2>&1 | tail -80
+          ls node_modules/onnxruntime-web/dist/ | tee lab-out/dist.txt
+          LAB_CASES=lab/cases_emu.json node lab/run.mjs lab-out/results_node.json 2>&1 | tail -20
+          LAB_CASES=lab/cases_emu.json LAB_ORT=ort.min.mjs node lab/run.mjs lab-out/results_ortmin.json 2>&1 | tail -20 || true
+          LAB_CASES=lab/cases_emu.json LAB_ORT=ort.wasm.min.mjs node lab/run.mjs lab-out/results_ortwasm.json 2>&1 | tail -20 || true
       - name: Ветка lab-out
         if: always()
         run: |
