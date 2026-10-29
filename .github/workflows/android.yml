@@ -3,6 +3,7 @@ name: android
 on:
   push:
     branches: [main]
+    paths-ignore: ['lab/**', '.github/workflows/lab.yml']
   workflow_dispatch:
     inputs:
       voice:

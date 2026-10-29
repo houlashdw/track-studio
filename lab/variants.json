@@ -1,0 +1,5 @@
+[
+ {"name": "fp16_new", "model": "model_fp16.onnx", "tim": [["jf_tebukuro", 0.35], ["af_jessica", 0.35], ["af_heart", 0.3]], "pro": [["af_jessica", 0.5], ["af_sarah", 0.3], ["af_heart", 0.2]], "wav": true},
+ {"name": "fp16_old", "model": "model_fp16.onnx", "tim": [["af_heart", 0.6], ["af_sky", 0.25], ["af_bella", 0.15]], "pro": [["af_jessica", 0.5], ["af_sarah", 0.3], ["af_heart", 0.2]]},
+ {"name": "fp32_new", "model": "model.onnx", "tim": [["jf_tebukuro", 0.35], ["af_jessica", 0.35], ["af_heart", 0.3]], "pro": [["af_jessica", 0.5], ["af_sarah", 0.3], ["af_heart", 0.2]], "wav": true}
+]

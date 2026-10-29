@@ -1,0 +1,48 @@
+name: voice-lab
+
+on:
+  push:
+    branches: [main]
+    paths: ['lab/**']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: voice-lab
+  cancel-in-progress: true
+
+jobs:
+  lab:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: onnxruntime-web 1.22.0 (как в приложении)
+        run: npm init -y >/dev/null && npm i onnxruntime-web@1.22.0 --no-audit --no-fund
+      - name: Модели Kokoro (HF)
+        run: |
+          mkdir -p lab/models
+          B=https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX-timestamped/resolve/main/onnx
+          curl -sSL -o lab/models/model_fp16.onnx $B/model_fp16.onnx
+          curl -sSL -o lab/models/model.onnx $B/model.onnx
+          ls -la lab/models
+      - name: Прогон
+        run: |
+          mkdir -p lab-out
+          node lab/run.mjs lab-out/results.json 2>&1 | tail -80
+      - name: Ветка lab-out
+        if: always()
+        run: |
+          cd lab-out
+          echo "run ${{ github.run_number }} · ${{ github.sha }}" > STATUS.txt
+          git init -q -b lab-out
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          git add -A
+          git commit -q -m "lab ${{ github.run_number }}"
+          git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" lab-out
