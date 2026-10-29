@@ -52,11 +52,16 @@ def call(method, params=None):
             return m
         if m.get('method') in ('Runtime.exceptionThrown', 'Runtime.consoleAPICalled', 'Log.entryAdded'):
             p = m.get('params', {})
-            if m['method'] == 'Runtime.consoleAPICalled' and p.get('type') not in ('error', 'warning'):
-                continue
-            txt = json.dumps(p, ensure_ascii=False)[:500]
-            EVENTS.append(txt)
-            R['console'] = EVENTS[-60:]
+            if m['method'] == 'Runtime.consoleAPICalled':
+                txt = p.get('type', '') + ': ' + ' '.join(str(x.get('value', x.get('description', ''))) for x in p.get('args', []))[:400]
+            elif m['method'] == 'Log.entryAdded':
+                e = p.get('entry', {})
+                txt = 'log ' + e.get('level', '') + ': ' + (e.get('text') or '')[:300] + ' ' + (e.get('url') or '')[:120]
+            else:
+                d = p.get('exceptionDetails', {})
+                txt = 'EXCEPTION: ' + (d.get('text') or '') + ' ' + str((d.get('exception') or {}).get('description'))[:400]
+            EVENTS.append('%.0f %s' % (time.time() - T0, txt))
+            R['console'] = EVENTS[-200:]
 
 
 def ev(expr):
@@ -66,6 +71,29 @@ def ev(expr):
         d = r['exceptionDetails']
         return {'__err': (d.get('text') or '') + ' ' + str((d.get('exception') or {}).get('description'))[:400]}
     return (r.get('result') or {}).get('value')
+
+
+STATUS = "(document.querySelector('#statusText').title || document.querySelector('#statusText').textContent)"
+
+
+def start_build(setup_js):
+    """Настроить поля, дождаться свободной кнопки «Создать» и нажать её; вернуть True, если сборка пошла."""
+    ev(setup_js)
+    for attempt in range(6):
+        wait("!S.busy && !document.querySelector('#make').disabled", 600, 2)
+        time.sleep(3)   # смена режима может запустить пересборку — даём ей начаться
+        if ev("!S.busy && !document.querySelector('#make').disabled") is not True:
+            continue
+        ev("(()=>{ document.querySelector('#player').dataset.ready=''; document.querySelector('#make').click(); return 1; })()")
+        if wait("S.busy === true || document.querySelector('#player').dataset.ready === '1'", 20, 1) is not None:
+            return attempt + 1
+    return 0
+
+
+def snap():
+    return ev("""({status: %s, busy: !!S.busy, ready: document.querySelector('#player').dataset.ready, line: (document.querySelector('#voiceLine')||{}).textContent,
+      kv2: (()=>{ const k=globalThis.__kv2||{}; return {mode:k.mode, sing:k.sing, busy:!!k.busy, q:(k.q||[]).length, genN:k.genN, genMs:k.genMs|0}; })(),
+      mem: performance.memory ? Math.round(performance.memory.usedJSHeapSize/1048576) : null})""" % STATUS)
 
 
 def wait(expr, limit, every=5):
@@ -90,8 +118,9 @@ time.sleep(1)
 step('understood', ev("document.querySelector('#understood').textContent"))
 
 # 1. бит без голоса
-ev("""(()=>{ document.querySelector('#player').dataset.ready=''; document.querySelector('#modeSeg button[data-v="off"]').click();
-  const p=document.querySelector('#prompt'); p.value='jumpstyle 145 bpm, энергично'; p.dispatchEvent(new Event('input')); document.querySelector('#make').click(); return 1; })()""")
+started = start_build("""(()=>{ document.querySelector('#modeSeg button[data-v="off"]').click();
+  const p=document.querySelector('#prompt'); p.value='jumpstyle 145 bpm, энергично'; p.dispatchEvent(new Event('input')); return 1; })()""")
+step('beat_started', started)
 took = wait("document.querySelector('#player').dataset.ready==='1' && !S.busy", 900)
 step('beat', {'seconds': took, 'status': ev("document.querySelector('#statusText').title || document.querySelector('#statusText').textContent"),
               'dur': ev("S.buffer ? +S.buffer.duration.toFixed(1) : null")})
@@ -107,19 +136,23 @@ if os.environ.get('VOICE', 'true') == 'true':
     LY = ("[Verse]\\nCity lights are calling out my name tonight\\nHold me close and never let me go\\n"
           "We don't stop, we just turn it up louder\\nEvery heartbeat matching with the drum\\n"
           "[Chorus]\\nStars are falling, I will sing tonight\\nThis is our song, so sing it loud")
-    ev("""(()=>{ document.querySelector('#player').dataset.ready=''; document.querySelector('#modeSeg button[data-v="rap"]').click();
-      const l=document.querySelector('#lyrics'); l.value="%s"; l.dispatchEvent(new Event('input'));
-      const p=document.querySelector('#prompt'); p.value='хардстайл 150 bpm'; p.dispatchEvent(new Event('input')); document.querySelector('#make').click(); return 1; })()""" % LY)
-    took = None
     t0 = time.time()
-    while time.time() - t0 < 3300:
+    started = start_build("""(()=>{ document.querySelector('#modeSeg button[data-v="rap"]').click();
+      const l=document.querySelector('#lyrics'); l.value="%s"; l.dispatchEvent(new Event('input'));
+      const p=document.querySelector('#prompt'); p.value='хардстайл 150 bpm'; p.dispatchEvent(new Event('input')); return 1; })()""" % LY)
+    step('voice_started', {'attempt': started, 'after_s': round(time.time() - t0, 1), 'snap': snap()})
+    took = None
+    R['voice_snaps'] = []
+    last = 0
+    while time.time() - t0 < 3000:
         if ev("document.querySelector('#player').dataset.ready==='1' && !S.busy") is True:
             took = round(time.time() - t0, 1)
             break
-        if int(time.time() - t0) % 120 < 10:
-            R['voice_progress'] = ev("document.querySelector('#statusText').title || document.querySelector('#statusText').textContent")
+        if time.time() - last > 60:
+            last = time.time()
+            R['voice_snaps'].append([round(time.time() - t0), snap()])
             save()
-        time.sleep(10)
+        time.sleep(5)
     step('voice', {'seconds': took, 'status': ev("document.querySelector('#statusText').title || document.querySelector('#statusText').textContent"),
                    'voxInfo': ev("S.voxInfo || null"), 'voxFail': ev("S.voxFail || null"), 'kv2': ev("JSON.stringify(globalThis.__kv2 || {}).slice(0,600)"),
                    'dur': ev("S.buffer ? +S.buffer.duration.toFixed(1) : null")})
