@@ -5719,22 +5719,31 @@ self.onmessage = async (e) => { const m = e.data; try {
 } catch (err) { self.postMessage({ t: 'err', id: m.id, msg: String((err && err.message) || err) }); } };`;
   }
   /* очередь: один запуск модели за раз; сборка трека впереди фоновой озвучки; на видеочипе между фоновыми — пауза для экрана */
+  /* очередь: ровно ОДИН запуск модели за раз. Раньше таймер шёл с постановки в очередь: на медленном телефоне длинная очередь «просрочивалась»,
+     очередь считала модель свободной и отправляла следующую строку, пока прошлая ещё считалась, — два запуска разом портили память
+     (на эмуляторе: строки из NaN/тишина). Теперь таймер — с момента запуска, а занятую модель не перебиваем никогда */
   function kv2Pump() {
-    if (KV2.busy || !KV2.w || !KV2.q.length) return;
+    if (KV2.busy || !KV2.w) return;
+    while (KV2.q.length && !KV2.pend.has(KV2.q[0].id)) KV2.q.shift();   /* отменённые/просроченные — выбрасываем, не запуская */
+    if (!KV2.q.length) return;
     const j = KV2.q.shift(); KV2.busy = j; j.tp = performance.now(); KV2.w.postMessage(j.msg, j.tr || []);
+    j.to = setTimeout(() => { if (!KV2.pend.has(j.id)) return; KV2.pend.delete(j.id); j.rej(new Error('модель молчит'));
+      /* модель всё ещё считает: ждём её ответа (он сам освободит очередь); если не ответит ещё столько же — перезапуск потока */
+      j.wd = setTimeout(() => { if (KV2.busy === j) { console.warn('модель зависла — перезапуск'); kv2Kill(); KV2.initP = null; } }, j.tms); }, j.tms);
   }
   function kv2Call(msg, opts) {
     opts = opts || {};
-    return new Promise((res, rej) => { const id = ++KV2.nid; msg.id = id; const j = { id, msg, gen: opts.gen || 0, res, rej, onP: opts.onP, to: setTimeout(() => { if (KV2.pend.has(id)) { KV2.pend.delete(id); rej(new Error('модель молчит')); if (KV2.busy && KV2.busy.id === id) { KV2.busy = false; kv2Pump(); } } }, opts.timeout || 180000) };
+    if (!KV2.w) return Promise.reject(new Error('модель не запущена'));
+    return new Promise((res, rej) => { const id = ++KV2.nid; msg.id = id; const j = { id, msg, gen: opts.gen || 0, res, rej, onP: opts.onP, to: 0, wd: 0, tms: window.__kvT || opts.timeout || 180000 };
       KV2.pend.set(id, j); if (!j.gen) { const k = KV2.q.findIndex((x) => x.gen); if (k >= 0) KV2.q.splice(k, 0, j); else KV2.q.push(j); } else KV2.q.push(j); kv2Pump(); });
   }
   function kv2DropStale(g) { KV2.q = KV2.q.filter((j) => { if (j.gen && j.gen < g) { KV2.pend.delete(j.id); clearTimeout(j.to); j.rej(new Error('stale')); return false; } return true; }); }
-  function kv2Kill() { if (KV2.w) try { KV2.w.terminate(); } catch (e) { } KV2.w = null; KV2.busy = false; for (const j of KV2.pend.values()) { clearTimeout(j.to); j.rej(new Error('модель перезапущена')); } KV2.pend.clear(); KV2.q.length = 0; KV2.on = KV2.sing = false; }
+  function kv2Kill() { if (KV2.w) try { KV2.w.terminate(); } catch (e) { } KV2.w = null; if (KV2.busy) { clearTimeout(KV2.busy.to); clearTimeout(KV2.busy.wd); } KV2.busy = false; for (const j of KV2.pend.values()) { clearTimeout(j.to); clearTimeout(j.wd); j.rej(new Error('модель перезапущена')); } KV2.pend.clear(); KV2.q.length = 0; KV2.on = KV2.sing = false; }
   function kv2Spawn() {
     KV2.w = new Worker(URL.createObjectURL(new Blob([kv2Src()], { type: 'text/javascript' })));
     KV2.w.onmessage = (e) => { const m = e.data; const j = KV2.pend.get(m.id) || (KV2.busy && KV2.busy.id === m.id ? KV2.busy : null);
       if (m.t === 'prog') { const b = KV2.busy; if (b && b.onP) b.onP(m.loaded, m.total); return; }
-      if (!j) return; KV2.pend.delete(m.id); clearTimeout(j.to); const bg = j.gen; KV2.busy = false;
+      if (!j) return; KV2.pend.delete(m.id); clearTimeout(j.to); clearTimeout(j.wd); const bg = j.gen; KV2.busy = false;
       if (m.t === 'done' && j.msg && j.msg.t === 'gen') { KV2.genN = (KV2.genN || 0) + 1; KV2.genMs = (KV2.genMs || 0) + performance.now() - (j.tp || performance.now()); }
       if (m.t === 'done') j.res(m); else j.rej(new Error(m.msg));
       if (bg && KV2.mode === 'gpu') setTimeout(kv2Pump, 180); else kv2Pump(); };
