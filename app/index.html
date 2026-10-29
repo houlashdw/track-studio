@@ -1005,7 +1005,7 @@ const STYLE_WORDS = {
   lofi: [/лоу.?фай|лофай|лофи|lo.?fi|lofi|чилл|chill|учеб|study|винил|vinyl|кофе|coffee|дожд|rain|уютн|cozy|бум.?б[эе]п|boom.?bap|олд.?скул|old.?school/, 3],
   synthwave: [/синт.?вейв|synth.?wave|retrowave|ретровейв|ретро|retro|неон|neon|закат|sunset|шоссе|highway|80-?е|80s|outrun|vaporwave|вейпорвейв|kawaii|кава[йи]|future.?bass|фьюче.?бас|j-?pop|джей.?поп|идол|idol|вокалоид|vocaloid/, 2],
   industrial: [/индастриал|industrial|завод|factory|станок|machine|механизм|конвейер|ржав|rust|\bebm\b/, 2],
-  glitch: [/глитч|glitch|\bidm\b|авангард|экспериментальн|experimental|сломанн|broken beat|микро.?звук|clicks.?and.?cuts/, 3],
+  glitch: [/глитч|glitch|\bidm\b|авангард|экспериментальн|experimental|сломанн|broken beat|микро.?звук|clicks.?and.?cuts|брейк.?кор|break.?core/, 3],
   cinematic: [/кинематограф|cinematic|баллад|ballad|пианино|piano|саундтрек|soundtrack|трейлер|trailer|фильм|кино|эпичн|epic|score|оркестр|напряжен|tension|битв|battle|погон|chase/, 2],
   trance: [/(?<![а-я])транс(?![а-я])|trance|uplifting|эйфори|euphori|psy|псай/, 3],
   hardtekk: [/хард.?тек|hard.?tekk|(?<![a-z])tekk(?![a-z])|трайб|(?<![a-z])tribe(?![a-z])|tribecore|френч.?кор|frenchcore/, 5],
@@ -1036,7 +1036,7 @@ const MOOD_RULES = [
   [/свинг|swing|грув|groove|джаз|jazz|шаффл|shuffle|качающ|funky/, { swing: .3 }, 'свинг'],
   [/минимал|minimal|пуст|sparse|редк|разрежен|скуп/, { density: -.3 }, 'разреженно'],
   [/плотн|dense|насыщен|густ|массивн|layers|слоист|многослойн/, { density: .3, chaos: .1 }, 'плотнее'],
-  [/тепл|warm|винтаж|vintage|плен|tape|аналог|analog|старый|old|пыльн/, { warp: .3, grit: .1, space: .1 }, 'плёнка, тепло'],
+  [/тепл|warm|винтаж|vintage|плен|tape|аналог|analog|старый|old|пыльн|\bvhs\b|вхс|кассет|cassette/, { warp: .3, grit: .1, space: .1 }, 'плёнка, тепло'],
   [/мечт|dream|сказоч|fairy|волшеб|magic|облак|cloud|воздушн|airy|светляч/, { space: .25, dark: -.1, warp: .15 }, 'мечтательно'],
   [/холодн|cold|лед|\bice\b|кристалл|crystal|зим|winter|стерильн|стекл/, { space: .2, dark: .05, grit: -.1 }, 'холодно'],
   [/странн|weird|безум|crazy|абстракт|abstract|чужой|alien|необычн|непредсказуем|хаос|chaos|сюрреал|surreal|эксперимент|experiment/, { chaos: .4, glitch: .15 }, 'странность'],
@@ -5626,12 +5626,20 @@ return async function genp(tts, m) {
   /* переписываем узел: выход X → X__pred */
   const reNode = (n, from, to) => { const parts = []; each(n.s, n.e, (f2, wt2, s2, e2, v2, k2) => { if (f2 === 2 && wt2 === 2 && str(s2, e2) === from) parts.push(sf(2, to)); else parts.push(u8.subarray(k2, e2)); }); return ld(1, cat(parts)); };
   const dP = dX + '__pred', fP = fX + '__pred';
+  /* фаза гармоник в генераторе: atan(im/re) через Div — при re = im = 0 выходит 0/0 = NaN, и вся строка превращается в NaN-тишину
+     (в fp16 нули чаще; найдено в лаборатории: /decoder/decoder/generator/Div). Подменяем NaN на 0 — как atan2(0, 0) = 0 */
+  const nanFix = []; { const prod = new Map(); for (const n of nodes) for (const o of n.outs) prod.set(o, n);
+    for (const n of nodes) if (n.op === 'Atan' && n.ins[0]) { const src = prod.get(n.ins[0]); if (src && src.op === 'Div' && !nanFix.some((q) => q.n === src)) nanFix.push({ n: src, x: n.ins[0] }); } }
   const node = (op, ins, outs, name, attr) => ld(1, cat([...ins.map((x) => sf(1, x)), ...outs.map((x) => sf(2, x)), sf(3, name), sf(4, op), ...(attr ? [attr] : [])]));
   const dim = (d) => ld(1, typeof d === 'number' ? vint(1, d) : sf(2, d));
   const vinfo = (name, elem, dims) => cat([sf(1, name), ld(2, ld(1, cat([vint(1, elem), ld(2, cat(dims.map(dim)))])))]);
   const zeroT = cat([vint(1, 1), vint(2, 7), vint(7, 0)]);                      /* TensorProto int64 [1] = 0 */
   const zeroA = ld(5, cat([sf(1, 'value'), ld(5, zeroT), vint(20, 4)]));
+  const zeroF32 = ld(5, cat([sf(1, 'value'), ld(5, cat([vint(2, 1), key(4, 5), new Uint8Array(4)])), vint(20, 4)]));
   const extra = cat([
+    ...(nanFix.length ? [node('Constant', [], ['sing__z32'], 'sing/z32', zeroF32)] : []),
+    ...nanFix.flatMap((q, k) => [node('IsNaN', [q.x + '__raw'], ['sing__isn' + k], 'sing/isnan' + k), node('CastLike', ['sing__z32', q.x + '__raw'], ['sing__zl' + k], 'sing/zl' + k),
+      node('Where', ['sing__isn' + k, 'sing__zl' + k, q.x + '__raw'], [q.x], 'sing/nan0_' + k)]),
     node('Constant', [], ['sing__zero'], 'sing/zero', zeroA),
     node('Greater', ['dur_mix', 'sing__zero'], ['sing__dc'], 'sing/dur_cond'),
     node('Where', ['sing__dc', 'dur_in', dP], [dX], 'sing/dur_where'),
@@ -5640,11 +5648,11 @@ return async function genp(tts, m) {
     ld(12, vinfo(dP, 7, [1, 'To'])), ld(12, vinfo(fP, f0Elem, [1, 1, 'Fo'])),
   ]);
   /* граф: исходные байты кусками, два узла заменены, новое — в конце */
-  const repl = [[dN, reNode(dN, dX, dP)], [fN, reNode(fN, fX, fP)]].sort((a, b) => a[0].k0 - b[0].k0);
+  const repl = [[dN, reNode(dN, dX, dP)], [fN, reNode(fN, fX, fP)], ...nanFix.map((q) => [q.n, reNode(q.n, q.x, q.x + '__raw')])].sort((a, b) => a[0].k0 - b[0].k0);
   const gParts = []; let p = G.s; for (const [n, nb] of repl) { gParts.push(u8.subarray(p, n.k0)); gParts.push(nb); p = n.e; } gParts.push(u8.subarray(p, G.e)); gParts.push(extra);
   const gLen = gParts.reduce((s, a) => s + a.length, 0);
   const parts = [u8.subarray(0, G.k0), key(7, 2), new Uint8Array(ev(gLen)), ...gParts, u8.subarray(G.e)];
-  return { parts, f0Elem, durOut: dP, f0Out: fP, info: dX + ' / ' + fX };
+  return { parts, f0Elem, durOut: dP, f0Out: fP, info: dX + ' / ' + fX + (nanFix.length ? ' · nan0×' + nanFix.length : '') };
 }
 
   /* 1.22 — та же ветка, что у kokoro-js на телефоне (в 1.20.1 на видеочипе ломался блок F0, а на новом Chrome — тензоры float16) */
@@ -7149,6 +7157,8 @@ self.onmessage = async (e) => { const m = e.data; try {
     const p = { sat: .03, tel: 0, wide: .35, throw: 1, div: .75, ...(VFXP[spec && spec.style] || {}) }, t = ((document.querySelector('#prompt') || {}).value || '').toLowerCase().replace(/(?:без|no|without)\s+\S+/g, ' ');
     const f = (spec && spec.feat) || {}; if (f.dist) p.sat = Math.max(p.sat, f.dist >= 0.8 ? 0.85 : 0.6); if (/рок|rock|метал|metal|панк|punk|скрим|scream/.test(t)) p.sat = Math.max(p.sat, 0.45);
     if (/телефон|phone|рация|radio|радио|мегафон|megaphone/.test(t)) p.tel = 0.75; if (/эхо|echo|дилей|delay/.test(t)) p.throw = 2; if (/сух|\bdry\b|чисто|clean/.test(t)) { p.throw = 0; p.sat = Math.min(p.sat, 0.1); p.tel = 0; }
+    /* «дешёвый микрофон / гарнитура / биткраш / клиппинг» — грязный лоу-фай голос (рецепт digital hardcore): полоса гарнитуры, жёсткий клип, биткраш */
+    p.mic = 0; if (/дешев\S* микро|дешёв\S* микро|гарнитур|headset|cheap mic|bit.?crush|бит.?краш|клиппинг|clipping|убит\S* микро|рублев\S* (микро|гарнитур)/.test(t)) p.mic = /сильн|жестк|жёстк|heavy|убит|макс/.test(t) ? 0.85 : 0.6;
     if (/шёпот|шепот|whisper/.test(t)) p.sat = 0; return p;
   };
   /* по секциям: «телефон» в куплетах, ширина в припевах (копии только в боковом канале — в моно не «плывёт») */
@@ -7451,6 +7461,7 @@ self.onmessage = async (e) => { const m = e.data; try {
     /* эффекты под жанр: плейт + дилей в темп, откалиброваны и приглушены под голосом */
     try {
       const l = out.getChannelData(0), r = out.getChannelData(1); S.voxSec = ''; try { if (globalThis.sectionVoxFx) S.voxSec = sectionVoxFx(l, r, sr, vfxProfile(sp)); } catch (e) { console.warn('секции голоса', e); }
+      try { const pm = vfxProfile(sp); if (pm.mic > 0) { cheapMic(l, r, sr, pm.mic); S.voxSec = (S.voxSec ? S.voxSec + ', ' : '') + 'дешёвый микрофон'; } } catch (e) { console.warn('микрофон', e); }
       const fx = await vocalFx(l, r, sr, sp, bpm(), vf);
       for (let i = 0; i < out.length; i++) { l[i] += fx.L[i]; r[i] += fx.R[i]; }
       S.voxFx = fx.preset;
@@ -7459,6 +7470,21 @@ self.onmessage = async (e) => { const m = e.data; try {
   }
 
 
+  /* «дешёвая гарнитура»: полоса 350 Гц–3.8 кГц с призвуком, перегруз с жёстким клипом, биткраш (≈11 кГц, 9–10 бит); amt 0..1 — доля обработки */
+  function cheapMic(l, r, sr, amt) {
+    const hold = Math.max(1, Math.round(sr / 11025)), bits = amt > 0.9 ? 8 : 10, q = 2 ** (bits - 1), drv = 2.5 + amt * 4, thr = 0.55;
+    let pk = 0; for (let i = 0; i < l.length; i += 3) pk = Math.max(pk, Math.abs(l[i]), Math.abs(r[i])); if (!pk) return; const g0 = 0.8 / pk;
+    for (const x of [l, r]) {
+      const k0 = SR / sr, h1 = new BQ().hp(350 * k0, 0.8), h2 = new BQ().hp(350 * k0, 0.8), l1 = new BQ().lp(3800 * k0, 0.9), l2 = new BQ().lp(3800 * k0, 0.9), pkf = new BQ().bp(1800 * k0, 1.4); let held = 0;
+      for (let i = 0; i < x.length; i++) {
+        const d = x[i]; let y = l2.p(l1.p(h2.p(h1.p(d * g0)))); y += pkf.p(y) * 0.8;
+        y = Math.max(-thr, Math.min(thr, Math.tanh(y * drv) * 0.9));                 /* перегруз + жёсткий клип */
+        if (i % hold === 0) held = Math.round(y * q) / q; y = held;                  /* биткраш */
+        x[i] = d * (1 - amt) + y * amt * pk * 1.25;
+      }
+    }
+  }
+  globalThis.cheapMic = cheapMic;
   globalThis.__voxBus = (v, L, music) => voxBus(v, S.vfx, L, music);
   function padTo(buf, L) {
     if (buf.length === L) return buf;
