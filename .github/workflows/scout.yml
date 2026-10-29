@@ -1,0 +1,20 @@
+name: ds-scout
+on:
+  push:
+    branches: [main]
+    paths: ['lab/scout.sh']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  scout:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - run: bash lab/scout.sh
+      - name: publish
+        if: always()
+        run: |
+          cd scout-out && git init -q -b scout-out && git config user.name gha && git config user.email gha@users.noreply.github.com
+          git add -A && git commit -q -m scout && git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" scout-out
