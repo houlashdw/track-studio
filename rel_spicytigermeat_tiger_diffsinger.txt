@@ -1,0 +1,6 @@
+v106 TIGER for DiffSinger v106
+    529 MB https://github.com/spicytigermeat/tiger_diffsinger/releases/download/v106/TIGER_DS_v106_PACK.zip
+v103 TIGER for DiffSinger v103
+    529 MB https://github.com/spicytigermeat/tiger_diffsinger/releases/download/v103/TIGER_DS_v103_PACK.zip
+v102 TIGER for DiffSinger v102
+    539 MB https://github.com/spicytigermeat/tiger_diffsinger/releases/download/v102/TIGER_DS_v102_PACK.zip

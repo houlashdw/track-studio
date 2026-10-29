@@ -1,0 +1,2886 @@
+=== canary/inner/dspitch/files/dictionary.txt
+aa	aa
+ae	ae
+ah	ah
+ao	ao
+aw	aw
+ax	ax
+ay	ay
+b	b
+ch	ch
+d	d
+dh	dh
+dx	dx
+eh	eh
+er	er
+ey	ey
+f	f
+g	g
+hh	hh
+ih	ih
+iy	iy
+jh	jh
+k	k
+l	l
+m	m
+n	n
+ng	ng
+ow	ow
+oy	oy
+p	p
+q	q
+r	r
+s	s
+sh	sh
+t	t
+th	th
+uh	uh
+uw	uw
+v	v
+vf	vf
+w	w
+y	y
+z	z
+zh	zh
+vtrash	vtrash
+cl	cl
+ee	ee
+oo	oo
+uu	uu
+ux	ux
+ctrash	ctrash
+tx	tx
+rr	rr
+rx	rx
+hx	hx
+nn	nn
+tr	tr
+dr	dr
+dz	dz
+ez	ez
+jy	jy
+qy	qy
+rz	rz
+ts	ts
+xn	xn
+xy	xy
+a	a
+ahn	ahn
+au	au
+bk	bk
+bv	bv
+ehn	ehn
+en	en
+ex	ex
+fp	fp
+gl	gl
+gv	gv
+ia	ia
+ie	ie
+ir	ir
+kx	kx
+lg	lg
+ly	ly
+ny	ny
+oh	oh
+ohn	ohn
+px	px	
+ua	ua
+ue	ue
+uex	uex
+uo	uo
+ye	ye
+yu	yu
+aan	aan
+in	in
+kq	kq
+oe	oe
+on	on
+rh	rh
+uy	uy
+yn	yn
+rj	rj
+pq	pq
+tq	tq
+c	c
+cc	cc
+eo	eo
+rl	rl
+lx	lx
+shx	shx
+sx	sx
+=== canary/inner/dspitch/files/phonemes.txt
+<PAD>
+AP
+SP
+a
+aa
+aan
+ae
+ah
+ahn
+ao
+au
+aw
+ax
+ay
+b
+bk
+bv
+c
+cc
+ch
+cl
+ctrash
+d
+dh
+dr
+dx
+dz
+ee
+eh
+ehn
+en
+eo
+er
+ex
+ey
+ez
+f
+fp
+g
+gl
+gv
+hh
+hx
+ia
+ie
+ih
+in
+ir
+iy
+jh
+jy
+k
+kq
+kx
+l
+lg
+lx
+ly
+m
+n
+ng
+nn
+ny
+oe
+oh
+ohn
+on
+oo
+ow
+oy
+p
+pq
+px
+q
+qy
+r
+rh
+rj
+rl
+rr
+rx
+rz
+s
+sh
+shx
+sx
+t
+th
+tq
+tr
+ts
+tx
+ua
+ue
+uex
+uh
+uo
+uu
+uw
+ux
+uy
+v
+vf
+vtrash
+w
+xn
+xy
+y
+ye
+yn
+yu
+z
+zh
+
+=== canary/inner/dspitch/dsdict-fr.yaml
+symbols:
+- {symbol: AP, type: vowel}
+- {symbol: SP, type: vowel}
+- {symbol: aa, type: vowel}
+- {symbol: ae, type: vowel}
+- {symbol: ah, type: vowel}
+- {symbol: ao, type: vowel}
+- {symbol: aw, type: vowel}
+- {symbol: ax, type: vowel}
+- {symbol: ay, type: vowel}
+- {symbol: b, type: stop}
+- {symbol: ch, type: affricate}
+- {symbol: d, type: stop}
+- {symbol: dh, type: fricative}
+- {symbol: dx, type: stop}
+- {symbol: eh, type: vowel}
+- {symbol: er, type: vowel}
+- {symbol: ey, type: vowel}
+- {symbol: f, type: fricative}
+- {symbol: g, type: stop}
+- {symbol: hh, type: fricative}
+- {symbol: ih, type: vowel}
+- {symbol: iy, type: vowel}
+- {symbol: jh, type: affricate}
+- {symbol: k, type: stop}
+- {symbol: l, type: liquid}
+- {symbol: m, type: nasal}
+- {symbol: n, type: nasal}
+- {symbol: ng, type: nasal}
+- {symbol: ow, type: vowel}
+- {symbol: oy, type: vowel}
+- {symbol: p, type: stop}
+- {symbol: q, type: stop}
+- {symbol: r, type: liquid}
+- {symbol: s, type: fricative}
+- {symbol: sh, type: fricative}
+- {symbol: t, type: stop}
+- {symbol: th, type: fricative}
+- {symbol: uh, type: vowel}
+- {symbol: uw, type: vowel}
+- {symbol: v, type: fricative}
+- {symbol: vf, type: stop}
+- {symbol: w, type: semivowel}
+- {symbol: y, type: semivowel}
+- {symbol: z, type: fricative}
+- {symbol: zh, type: fricative}
+- {symbol: tx, type: stop}
+- {symbol: rx, type: fricative}
+- {symbol: hx, type: fricative}
+- {symbol: rr, type: stop}
+- {symbol: ee, type: vowel}
+- {symbol: oo, type: vowel}
+- {symbol: uu, type: vowel}
+- {symbol: ux, type: vowel}
+- {symbol: tr, type: affricate}
+- {symbol: dr, type: affricate}
+- {symbol: nn, type: vowel}
+- {symbol: cl, type: stop}
+- {symbol: ez, type: vowel}
+- {symbol: ir, type: vowel}
+- {symbol: yu, type: vowel}
+- {symbol: iz, type: vowel}
+- {symbol: ye, type: vowel}
+- {symbol: xn, type: nasal}
+- {symbol: qz, type: fricative}
+- {symbol: jz, type: fricative}
+- {symbol: xz, type: fricative}
+- {symbol: ts, type: affricate}
+- {symbol: dz, type: affricate}
+- {symbol: rz, type: fricative}
+- {symbol: a, type: vowel}
+- {symbol: ahn, type: vowel}
+- {symbol: au, type: vowel}
+- {symbol: bk, type: stop}
+- {symbol: bv, type: fricative}
+- {symbol: ehn, type: vowel}
+- {symbol: en, type: vowel}
+- {symbol: ex, type: vowel}
+- {symbol: fp, type: fricative}
+- {symbol: gl, type: liquid}
+- {symbol: gv, type: fricative}
+- {symbol: ia, type: vowel}
+- {symbol: ie, type: vowel}
+- {symbol: kx, type: stop}
+- {symbol: lg, type: liquid}
+- {symbol: ly, type: liquid}
+- {symbol: ny, type: nasal}
+- {symbol: oh, type: vowel}
+- {symbol: ohn, type: vowel}
+- {symbol: px, type: stop}
+- {symbol: ua, type: vowel}
+- {symbol: ue, type: vowel}
+- {symbol: uex, type: vowel}
+- {symbol: uo, type: vowel}
+- {symbol: aan, type: vowel}
+- {symbol: in, type: vowel}
+- {symbol: kq, type: stop}
+- {symbol: oe, type: vowel}
+- {symbol: on, type: vowel}
+- {symbol: rh, type: fricative}
+- {symbol: uy, type: semivowel}
+- {symbol: yn, type: vowel}
+replacements:
+- {from: ah, to: a}
+- {from: eh, to: ee}
+- {from: ae, to: eh}
+=== canary/inner/dspitch/dsdict-es.yaml
+symbols:
+- {symbol: AP, type: vowel}
+- {symbol: SP, type: vowel}
+- {symbol: aa, type: vowel}
+- {symbol: ae, type: vowel}
+- {symbol: ah, type: vowel}
+- {symbol: ao, type: vowel}
+- {symbol: aw, type: vowel}
+- {symbol: ax, type: vowel}
+- {symbol: ay, type: vowel}
+- {symbol: b, type: stop}
+- {symbol: ch, type: affricate}
+- {symbol: d, type: stop}
+- {symbol: dh, type: fricative}
+- {symbol: dx, type: stop}
+- {symbol: eh, type: vowel}
+- {symbol: er, type: vowel}
+- {symbol: ey, type: vowel}
+- {symbol: f, type: fricative}
+- {symbol: g, type: stop}
+- {symbol: hh, type: fricative}
+- {symbol: ih, type: vowel}
+- {symbol: iy, type: vowel}
+- {symbol: jh, type: affricate}
+- {symbol: k, type: stop}
+- {symbol: l, type: liquid}
+- {symbol: m, type: nasal}
+- {symbol: n, type: nasal}
+- {symbol: ng, type: nasal}
+- {symbol: ow, type: vowel}
+- {symbol: oy, type: vowel}
+- {symbol: p, type: stop}
+- {symbol: q, type: stop}
+- {symbol: r, type: liquid}
+- {symbol: s, type: fricative}
+- {symbol: sh, type: fricative}
+- {symbol: t, type: stop}
+- {symbol: th, type: fricative}
+- {symbol: uh, type: vowel}
+- {symbol: uw, type: vowel}
+- {symbol: v, type: fricative}
+- {symbol: vf, type: stop}
+- {symbol: w, type: semivowel}
+- {symbol: y, type: semivowel}
+- {symbol: z, type: fricative}
+- {symbol: zh, type: fricative}
+- {symbol: tx, type: stop}
+- {symbol: rx, type: fricative}
+- {symbol: hx, type: fricative}
+- {symbol: rr, type: stop}
+- {symbol: ee, type: vowel}
+- {symbol: oo, type: vowel}
+- {symbol: uu, type: vowel}
+- {symbol: ux, type: vowel}
+- {symbol: tr, type: affricate}
+- {symbol: dr, type: affricate}
+- {symbol: nn, type: vowel}
+- {symbol: cl, type: stop}
+- {symbol: ez, type: vowel}
+- {symbol: ir, type: vowel}
+- {symbol: yu, type: vowel}
+- {symbol: iz, type: vowel}
+- {symbol: ye, type: vowel}
+- {symbol: xn, type: nasal}
+- {symbol: qz, type: fricative}
+- {symbol: jz, type: fricative}
+- {symbol: xz, type: fricative}
+- {symbol: ts, type: affricate}
+- {symbol: dz, type: affricate}
+- {symbol: rz, type: fricative}
+- {symbol: a, type: vowel}
+- {symbol: ahn, type: vowel}
+- {symbol: au, type: vowel}
+- {symbol: bk, type: stop}
+- {symbol: bv, type: fricative}
+- {symbol: ehn, type: vowel}
+- {symbol: en, type: vowel}
+- {symbol: ex, type: vowel}
+- {symbol: fp, type: fricative}
+- {symbol: gl, type: liquid}
+- {symbol: gv, type: fricative}
+- {symbol: ia, type: vowel}
+- {symbol: ie, type: vowel}
+- {symbol: kx, type: stop}
+- {symbol: lg, type: liquid}
+- {symbol: ly, type: liquid}
+- {symbol: ny, type: nasal}
+- {symbol: oh, type: vowel}
+- {symbol: ohn, type: vowel}
+- {symbol: px, type: stop}
+- {symbol: ua, type: vowel}
+- {symbol: ue, type: vowel}
+- {symbol: uex, type: vowel}
+- {symbol: uo, type: vowel}
+- {symbol: aan, type: vowel}
+- {symbol: in, type: vowel}
+- {symbol: kq, type: stop}
+- {symbol: oe, type: vowel}
+- {symbol: on, type: vowel}
+- {symbol: rh, type: fricative}
+- {symbol: uy, type: semivowel}
+- 
+=== canary/inner/dspitch/dsdict-pt.yaml
+symbols:
+- {symbol: AP, type: vowel}
+- {symbol: SP, type: vowel}
+- {symbol: aa, type: vowel}
+- {symbol: ae, type: vowel}
+- {symbol: ah, type: vowel}
+- {symbol: ao, type: vowel}
+- {symbol: aw, type: vowel}
+- {symbol: ax, type: vowel}
+- {symbol: ay, type: vowel}
+- {symbol: b, type: stop}
+- {symbol: ch, type: affricate}
+- {symbol: d, type: stop}
+- {symbol: dh, type: fricative}
+- {symbol: dx, type: stop}
+- {symbol: eh, type: vowel}
+- {symbol: er, type: vowel}
+- {symbol: ey, type: vowel}
+- {symbol: f, type: fricative}
+- {symbol: g, type: stop}
+- {symbol: hh, type: fricative}
+- {symbol: ih, type: vowel}
+- {symbol: iy, type: vowel}
+- {symbol: jh, type: affricate}
+- {symbol: k, type: stop}
+- {symbol: l, type: liquid}
+- {symbol: m, type: nasal}
+- {symbol: n, type: nasal}
+- {symbol: ng, type: nasal}
+- {symbol: ow, type: vowel}
+- {symbol: oy, type: vowel}
+- {symbol: p, type: stop}
+- {symbol: q, type: stop}
+- {symbol: r, type: liquid}
+- {symbol: s, type: fricative}
+- {symbol: sh, type: fricative}
+- {symbol: t, type: stop}
+- {symbol: th, type: fricative}
+- {symbol: uh, type: vowel}
+- {symbol: uw, type: vowel}
+- {symbol: v, type: fricative}
+- {symbol: vf, type: stop}
+- {symbol: w, type: semivowel}
+- {symbol: y, type: semivowel}
+- {symbol: z, type: fricative}
+- {symbol: zh, type: fricative}
+- {symbol: tx, type: stop}
+- {symbol: rx, type: fricative}
+- {symbol: hx, type: fricative}
+- {symbol: rr, type: stop}
+- {symbol: ee, type: vowel}
+- {symbol: oo, type: vowel}
+- {symbol: uu, type: vowel}
+- {symbol: ux, type: vowel}
+- {symbol: tr, type: affricate}
+- {symbol: dr, type: affricate}
+- {symbol: nn, type: vowel}
+- {symbol: cl, type: stop}
+- {symbol: ez, type: vowel}
+- {symbol: ir, type: vowel}
+- {symbol: yu, type: vowel}
+- {symbol: iz, type: vowel}
+- {symbol: ye, type: vowel}
+- {symbol: xn, type: nasal}
+- {symbol: qz, type: fricative}
+- {symbol: jz, type: fricative}
+- {symbol: xz, type: fricative}
+- {symbol: ts, type: affricate}
+- {symbol: dz, type: affricate}
+- {symbol: rz, type: fricative}
+- {symbol: a, type: vowel}
+- {symbol: ahn, type: vowel}
+- {symbol: au, type: vowel}
+- {symbol: bk, type: stop}
+- {symbol: bv, type: fricative}
+- {symbol: ehn, type: vowel}
+- {symbol: en, type: vowel}
+- {symbol: ex, type: vowel}
+- {symbol: fp, type: fricative}
+- {symbol: gl, type: liquid}
+- {symbol: gv, type: fricative}
+- {symbol: ia, type: vowel}
+- {symbol: ie, type: vowel}
+- {symbol: kx, type: stop}
+- {symbol: lg, type: liquid}
+- {symbol: ly, type: liquid}
+- {symbol: ny, type: nasal}
+- {symbol: oh, type: vowel}
+- {symbol: ohn, type: vowel}
+- {symbol: px, type: stop}
+- {symbol: ua, type: vowel}
+- {symbol: ue, type: vowel}
+- {symbol: uex, type: vowel}
+- {symbol: uo, type: vowel}
+- {symbol: aan, type: vowel}
+- {symbol: in, type: vowel}
+- {symbol: kq, type: stop}
+- {symbol: oe, type: vowel}
+- {symbol: on, type: vowel}
+- {symbol: rh, type: fricative}
+- {symbol: uy, type: semivowel}
+- 
+=== canary/inner/dspitch/dsdict.yaml
+symbols:
+- {symbol: AP, type: vowel}
+- {symbol: SP, type: vowel}
+- {symbol: aa, type: vowel}
+- {symbol: ae, type: vowel}
+- {symbol: ah, type: vowel}
+- {symbol: ao, type: vowel}
+- {symbol: aw, type: vowel}
+- {symbol: ax, type: vowel}
+- {symbol: ay, type: vowel}
+- {symbol: b, type: stop}
+- {symbol: ch, type: affricate}
+- {symbol: d, type: stop}
+- {symbol: dh, type: fricative}
+- {symbol: dx, type: stop}
+- {symbol: eh, type: vowel}
+- {symbol: er, type: vowel}
+- {symbol: ey, type: vowel}
+- {symbol: f, type: fricative}
+- {symbol: g, type: stop}
+- {symbol: hh, type: fricative}
+- {symbol: ih, type: vowel}
+- {symbol: iy, type: vowel}
+- {symbol: jh, type: affricate}
+- {symbol: k, type: stop}
+- {symbol: l, type: liquid}
+- {symbol: m, type: nasal}
+- {symbol: n, type: nasal}
+- {symbol: ng, type: nasal}
+- {symbol: ow, type: vowel}
+- {symbol: oy, type: vowel}
+- {symbol: p, type: stop}
+- {symbol: q, type: stop}
+- {symbol: r, type: liquid}
+- {symbol: s, type: fricative}
+- {symbol: sh, type: fricative}
+- {symbol: t, type: stop}
+- {symbol: th, type: fricative}
+- {symbol: uh, type: vowel}
+- {symbol: uw, type: vowel}
+- {symbol: v, type: fricative}
+- {symbol: vf, type: stop}
+- {symbol: w, type: semivowel}
+- {symbol: y, type: semivowel}
+- {symbol: z, type: fricative}
+- {symbol: zh, type: fricative}
+- {symbol: tx, type: stop}
+- {symbol: rx, type: fricative}
+- {symbol: hx, type: fricative}
+- {symbol: rr, type: stop}
+- {symbol: ee, type: vowel}
+- {symbol: oo, type: vowel}
+- {symbol: uu, type: vowel}
+- {symbol: ux, type: vowel}
+- {symbol: tr, type: affricate}
+- {symbol: dr, type: affricate}
+- {symbol: nn, type: vowel}
+- {symbol: cl, type: stop}
+- {symbol: ez, type: vowel}
+- {symbol: ir, type: vowel}
+- {symbol: yu, type: vowel}
+- {symbol: iz, type: vowel}
+- {symbol: ye, type: vowel}
+- {symbol: xn, type: nasal}
+- {symbol: qy, type: fricative}
+- {symbol: jy, type: fricative}
+- {symbol: xy, type: fricative}
+- {symbol: ts, type: affricate}
+- {symbol: dz, type: affricate}
+- {symbol: rz, type: fricative}
+- {symbol: a, type: vowel}
+- {symbol: ahn, type: vowel}
+- {symbol: au, type: vowel}
+- {symbol: bk, type: stop}
+- {symbol: bv, type: fricative}
+- {symbol: ehn, type: vowel}
+- {symbol: en, type: vowel}
+- {symbol: ex, type: vowel}
+- {symbol: fp, type: fricative}
+- {symbol: gl, type: liquid}
+- {symbol: gv, type: fricative}
+- {symbol: ia, type: vowel}
+- {symbol: ie, type: vowel}
+- {symbol: kx, type: stop}
+- {symbol: lg, type: liquid}
+- {symbol: ly, type: liquid}
+- {symbol: ny, type: nasal}
+- {symbol: oh, type: vowel}
+- {symbol: ohn, type: vowel}
+- {symbol: px, type: stop}
+- {symbol: ua, type: vowel}
+- {symbol: ue, type: vowel}
+- {symbol: uex, type: vowel}
+- {symbol: uo, type: vowel}
+- {symbol: aan, type: vowel}
+- {symbol: in, type: vowel}
+- {symbol: kq, type: stop}
+- {symbol: oe, type: vowel}
+- {symbol: on, type: vowel}
+- {symbol: rh, type: fricative}
+- {symbol: uy, type: semivowel}
+- {symbol: yn, type: vowel}
+- {symbol: rs, type: stop}
+- {symbol: rj, type: stop}
+- {symbol: eo, type: 
+=== canary/inner/dspitch/dsdict-zh.yaml
+symbols:
+- {symbol: AP, type: vowel}
+- {symbol: SP, type: vowel}
+- {symbol: aa, type: vowel}
+- {symbol: ae, type: vowel}
+- {symbol: ah, type: vowel}
+- {symbol: ao, type: vowel}
+- {symbol: aw, type: vowel}
+- {symbol: ax, type: vowel}
+- {symbol: ay, type: vowel}
+- {symbol: b, type: stop}
+- {symbol: ch, type: affricate}
+- {symbol: d, type: stop}
+- {symbol: dh, type: fricative}
+- {symbol: dx, type: stop}
+- {symbol: eh, type: vowel}
+- {symbol: er, type: vowel}
+- {symbol: ey, type: vowel}
+- {symbol: f, type: fricative}
+- {symbol: g, type: stop}
+- {symbol: hh, type: fricative}
+- {symbol: ih, type: vowel}
+- {symbol: iy, type: vowel}
+- {symbol: jh, type: affricate}
+- {symbol: k, type: stop}
+- {symbol: l, type: liquid}
+- {symbol: m, type: nasal}
+- {symbol: n, type: nasal}
+- {symbol: ng, type: nasal}
+- {symbol: ow, type: vowel}
+- {symbol: oy, type: vowel}
+- {symbol: p, type: stop}
+- {symbol: q, type: stop}
+- {symbol: r, type: liquid}
+- {symbol: s, type: fricative}
+- {symbol: sh, type: fricative}
+- {symbol: t, type: stop}
+- {symbol: th, type: fricative}
+- {symbol: uh, type: vowel}
+- {symbol: uw, type: vowel}
+- {symbol: v, type: fricative}
+- {symbol: vf, type: stop}
+- {symbol: w, type: semivowel}
+- {symbol: y, type: semivowel}
+- {symbol: z, type: fricative}
+- {symbol: zh, type: fricative}
+- {symbol: tx, type: stop}
+- {symbol: rx, type: fricative}
+- {symbol: hx, type: fricative}
+- {symbol: rr, type: stop}
+- {symbol: ee, type: vowel}
+- {symbol: oo, type: vowel}
+- {symbol: uu, type: vowel}
+- {symbol: ux, type: vowel}
+- {symbol: tr, type: affricate}
+- {symbol: dr, type: affricate}
+- {symbol: nn, type: vowel}
+- {symbol: cl, type: stop}
+- {symbol: ez, type: vowel}
+- {symbol: ir, type: vowel}
+- {symbol: yu, type: vowel}
+- {symbol: iz, type: vowel}
+- {symbol: ye, type: vowel}
+- {symbol: xn, type: nasal}
+- {symbol: qy, type: fricative}
+- {symbol: jy, type: fricative}
+- {symbol: xy, type: fricative}
+- {symbol: ts, type: affricate}
+- {symbol: dz, type: affricate}
+- {symbol: rz, type: fricative}
+- {symbol: a, type: vowel}
+- {symbol: ahn, type: vowel}
+- {symbol: au, type: vowel}
+- {symbol: bk, type: stop}
+- {symbol: bv, type: fricative}
+- {symbol: ehn, type: vowel}
+- {symbol: en, type: vowel}
+- {symbol: ex, type: vowel}
+- {symbol: fp, type: fricative}
+- {symbol: gl, type: liquid}
+- {symbol: gv, type: fricative}
+- {symbol: ia, type: vowel}
+- {symbol: ie, type: vowel}
+- {symbol: kx, type: stop}
+- {symbol: lg, type: liquid}
+- {symbol: ly, type: liquid}
+- {symbol: ny, type: nasal}
+- {symbol: oh, type: vowel}
+- {symbol: ohn, type: vowel}
+- {symbol: px, type: stop}
+- {symbol: ua, type: vowel}
+- {symbol: ue, type: vowel}
+- {symbol: uex, type: vowel}
+- {symbol: uo, type: vowel}
+- {symbol: aan, type: vowel}
+- {symbol: in, type: vowel}
+- {symbol: kq, type: stop}
+- {symbol: oe, type: vowel}
+- {symbol: on, type: vowel}
+- {symbol: rh, type: fricative}
+- {symbol: uy, type: semivowel}
+- 
+=== canary/inner/dspitch/dsdict-it.yaml
+symbols:
+- {symbol: AP, type: vowel}
+- {symbol: SP, type: vowel}
+- {symbol: aa, type: vowel}
+- {symbol: ae, type: vowel}
+- {symbol: ah, type: vowel}
+- {symbol: ao, type: vowel}
+- {symbol: aw, type: vowel}
+- {symbol: ax, type: vowel}
+- {symbol: ay, type: vowel}
+- {symbol: b, type: stop}
+- {symbol: ch, type: affricate}
+- {symbol: d, type: stop}
+- {symbol: dh, type: fricative}
+- {symbol: dx, type: stop}
+- {symbol: eh, type: vowel}
+- {symbol: er, type: vowel}
+- {symbol: ey, type: vowel}
+- {symbol: f, type: fricative}
+- {symbol: g, type: stop}
+- {symbol: hh, type: fricative}
+- {symbol: ih, type: vowel}
+- {symbol: iy, type: vowel}
+- {symbol: jh, type: affricate}
+- {symbol: k, type: stop}
+- {symbol: l, type: liquid}
+- {symbol: m, type: nasal}
+- {symbol: n, type: nasal}
+- {symbol: ng, type: nasal}
+- {symbol: ow, type: vowel}
+- {symbol: oy, type: vowel}
+- {symbol: p, type: stop}
+- {symbol: q, type: stop}
+- {symbol: r, type: liquid}
+- {symbol: s, type: fricative}
+- {symbol: sh, type: fricative}
+- {symbol: t, type: stop}
+- {symbol: th, type: fricative}
+- {symbol: uh, type: vowel}
+- {symbol: uw, type: vowel}
+- {symbol: v, type: fricative}
+- {symbol: vf, type: stop}
+- {symbol: w, type: semivowel}
+- {symbol: y, type: semivowel}
+- {symbol: z, type: fricative}
+- {symbol: zh, type: fricative}
+- {symbol: tx, type: stop}
+- {symbol: rx, type: fricative}
+- {symbol: hx, type: fricative}
+- {symbol: rr, type: stop}
+- {symbol: ee, type: vowel}
+- {symbol: oo, type: vowel}
+- {symbol: uu, type: vowel}
+- {symbol: ux, type: vowel}
+- {symbol: tr, type: affricate}
+- {symbol: dr, type: affricate}
+- {symbol: nn, type: vowel}
+- {symbol: cl, type: stop}
+- {symbol: ez, type: vowel}
+- {symbol: ir, type: vowel}
+- {symbol: yu, type: vowel}
+- {symbol: iz, type: vowel}
+- {symbol: ye, type: vowel}
+- {symbol: xn, type: nasal}
+- {symbol: qz, type: fricative}
+- {symbol: jz, type: fricative}
+- {symbol: xz, type: fricative}
+- {symbol: ts, type: affricate}
+- {symbol: dz, type: affricate}
+- {symbol: rz, type: fricative}
+- {symbol: a, type: vowel}
+- {symbol: ahn, type: vowel}
+- {symbol: au, type: vowel}
+- {symbol: bk, type: stop}
+- {symbol: bv, type: fricative}
+- {symbol: ehn, type: vowel}
+- {symbol: en, type: vowel}
+- {symbol: ex, type: vowel}
+- {symbol: fp, type: fricative}
+- {symbol: gl, type: liquid}
+- {symbol: gv, type: fricative}
+- {symbol: ia, type: vowel}
+- {symbol: ie, type: vowel}
+- {symbol: kx, type: stop}
+- {symbol: lg, type: liquid}
+- {symbol: ly, type: liquid}
+- {symbol: ny, type: nasal}
+- {symbol: oh, type: vowel}
+- {symbol: ohn, type: vowel}
+- {symbol: px, type: stop}
+- {symbol: ua, type: vowel}
+- {symbol: ue, type: vowel}
+- {symbol: uex, type: vowel}
+- {symbol: uo, type: vowel}
+- {symbol: aan, type: vowel}
+- {symbol: in, type: vowel}
+- {symbol: kq, type: stop}
+- {symbol: oe, type: vowel}
+- {symbol: on, type: vowel}
+- {symbol: rh, type: fricative}
+- {symbol: uy, type: semivowel}
+- 
+=== canary/inner/dspitch/dsdict-ja.yaml
+symbols:
+- {symbol: AP, type: vowel}
+- {symbol: SP, type: vowel}
+- {symbol: aa, type: vowel}
+- {symbol: ae, type: vowel}
+- {symbol: ah, type: vowel}
+- {symbol: ao, type: vowel}
+- {symbol: aw, type: vowel}
+- {symbol: ax, type: vowel}
+- {symbol: ay, type: vowel}
+- {symbol: b, type: stop}
+- {symbol: ch, type: affricate}
+- {symbol: d, type: stop}
+- {symbol: dh, type: fricative}
+- {symbol: dx, type: stop}
+- {symbol: eh, type: vowel}
+- {symbol: er, type: vowel}
+- {symbol: ey, type: vowel}
+- {symbol: f, type: fricative}
+- {symbol: g, type: stop}
+- {symbol: hh, type: fricative}
+- {symbol: ih, type: vowel}
+- {symbol: iy, type: vowel}
+- {symbol: jh, type: affricate}
+- {symbol: k, type: stop}
+- {symbol: l, type: liquid}
+- {symbol: m, type: nasal}
+- {symbol: n, type: nasal}
+- {symbol: ng, type: nasal}
+- {symbol: ow, type: vowel}
+- {symbol: oy, type: vowel}
+- {symbol: p, type: stop}
+- {symbol: q, type: stop}
+- {symbol: r, type: liquid}
+- {symbol: s, type: fricative}
+- {symbol: sh, type: fricative}
+- {symbol: t, type: stop}
+- {symbol: th, type: fricative}
+- {symbol: uh, type: vowel}
+- {symbol: uw, type: vowel}
+- {symbol: v, type: fricative}
+- {symbol: vf, type: stop}
+- {symbol: w, type: semivowel}
+- {symbol: y, type: semivowel}
+- {symbol: z, type: fricative}
+- {symbol: zh, type: fricative}
+- {symbol: tx, type: stop}
+- {symbol: rx, type: fricative}
+- {symbol: hx, type: fricative}
+- {symbol: rr, type: stop}
+- {symbol: ee, type: vowel}
+- {symbol: oo, type: vowel}
+- {symbol: uu, type: vowel}
+- {symbol: ux, type: vowel}
+- {symbol: tr, type: affricate}
+- {symbol: dr, type: affricate}
+- {symbol: nn, type: vowel}
+- {symbol: cl, type: stop}
+- {symbol: ez, type: vowel}
+- {symbol: ir, type: vowel}
+- {symbol: yu, type: vowel}
+- {symbol: iz, type: vowel}
+- {symbol: ye, type: vowel}
+- {symbol: xn, type: nasal}
+- {symbol: qz, type: fricative}
+- {symbol: jz, type: fricative}
+- {symbol: xz, type: fricative}
+- {symbol: ts, type: affricate}
+- {symbol: dz, type: affricate}
+- {symbol: rz, type: fricative}
+- {symbol: a, type: vowel}
+- {symbol: ahn, type: vowel}
+- {symbol: au, type: vowel}
+- {symbol: bk, type: stop}
+- {symbol: bv, type: fricative}
+- {symbol: ehn, type: vowel}
+- {symbol: en, type: vowel}
+- {symbol: ex, type: vowel}
+- {symbol: fp, type: fricative}
+- {symbol: gl, type: liquid}
+- {symbol: gv, type: fricative}
+- {symbol: ia, type: vowel}
+- {symbol: ie, type: vowel}
+- {symbol: kx, type: stop}
+- {symbol: lg, type: liquid}
+- {symbol: ly, type: liquid}
+- {symbol: ny, type: nasal}
+- {symbol: oh, type: vowel}
+- {symbol: ohn, type: vowel}
+- {symbol: px, type: stop}
+- {symbol: ua, type: vowel}
+- {symbol: ue, type: vowel}
+- {symbol: uex, type: vowel}
+- {symbol: uo, type: vowel}
+- {symbol: aan, type: vowel}
+- {symbol: in, type: vowel}
+- {symbol: kq, type: stop}
+- {symbol: oe, type: vowel}
+- {symbol: on, type: vowel}
+- {symbol: rh, type: fricative}
+- {symbol: uy, type: semivowel}
+- 
+=== canary/inner/dspitch/dsconfig.yaml
+# ver b08
+phonemes: files/phonemes.txt
+linguistic: files/linguistic.onnx
+pitch: files/pitch.onnx
+
+hop_size: 512
+sample_rate: 44100
+
+# for melody encoder
+predict_dur: false
+use_note_rest: true
+use_expr: true
+use_continuous_acceleration: true
+
+speakers:
+  - files/canary
+=== canary/inner/dspitch/dsdict-en-tgm.yaml
+symbols:
+- {symbol: AP, type: vowel}
+- {symbol: SP, type: vowel}
+- {symbol: aa, type: vowel}
+- {symbol: ae, type: vowel}
+- {symbol: ah, type: vowel}
+- {symbol: ao, type: vowel}
+- {symbol: aw, type: vowel}
+- {symbol: ax, type: vowel}
+- {symbol: ay, type: vowel}
+- {symbol: b, type: stop}
+- {symbol: ch, type: affricate}
+- {symbol: d, type: stop}
+- {symbol: dh, type: fricative}
+- {symbol: dx, type: stop}
+- {symbol: eh, type: vowel}
+- {symbol: er, type: vowel}
+- {symbol: ey, type: vowel}
+- {symbol: f, type: fricative}
+- {symbol: g, type: stop}
+- {symbol: hh, type: fricative}
+- {symbol: ih, type: vowel}
+- {symbol: iy, type: vowel}
+- {symbol: jh, type: affricate}
+- {symbol: k, type: stop}
+- {symbol: l, type: liquid}
+- {symbol: m, type: nasal}
+- {symbol: n, type: nasal}
+- {symbol: ng, type: nasal}
+- {symbol: ow, type: vowel}
+- {symbol: oy, type: vowel}
+- {symbol: p, type: stop}
+- {symbol: q, type: stop}
+- {symbol: r, type: liquid}
+- {symbol: s, type: fricative}
+- {symbol: sh, type: fricative}
+- {symbol: t, type: stop}
+- {symbol: th, type: fricative}
+- {symbol: uh, type: vowel}
+- {symbol: uw, type: vowel}
+- {symbol: v, type: fricative}
+- {symbol: vf, type: stop}
+- {symbol: w, type: semivowel}
+- {symbol: y, type: semivowel}
+- {symbol: z, type: fricative}
+- {symbol: zh, type: fricative}
+- {symbol: tx, type: stop}
+- {symbol: rx, type: fricative}
+- {symbol: hx, type: fricative}
+- {symbol: rr, type: stop}
+- {symbol: ee, type: vowel}
+- {symbol: oo, type: vowel}
+- {symbol: uu, type: vowel}
+- {symbol: ux, type: vowel}
+- {symbol: nn, type: vowel}
+- {symbol: tr, type: affricate}
+- {symbol: dr, type: affricate}
+- {symbol: cl, type: stop}
+entries:
+- {grapheme: "br", phonemes: [AP]}
+- {grapheme: "-", phonemes: [SP]}
+- {grapheme: "vf", phonemes: [vf]}
+- {grapheme: "cl", phonemes: [q]}
+- {grapheme: "'", phonemes: [q]}
+- {grapheme: "openutau", phonemes: [ow, p, ih, n, uw, t, aa, uw]}
+- {grapheme: "diffsinger", phonemes: [d, ih, f, s, ih, ng, er]}
+- {grapheme: "tiger", phonemes: [t, ay, g, er]}
+- {grapheme: "triton", phonemes: [tr, ay, q, ih, n]}
+- {grapheme: "canary", phonemes: [k, ax, n, eh, r, iy]}
+- {grapheme: "miyo", phonemes: [m, iy, y, ow]}
+- {grapheme: "luther", phonemes: [l, uw, th, er]}
+- {grapheme: "meaw", phonemes: [m, ey, uw]}
+- {grapheme: "rikki", phonemes: [r, iy, k, iy]}
+- {grapheme: "you", phonemes: [y, uw]}
+- {grapheme: "i'm", phonemes: [ay, m]}
+- {grapheme: "don't", phonemes: [d, ow, n, q]}
+- {grapheme: "won't", phonemes: [w, ow, n, q]}
+- {grapheme: "can't", phonemes: [k, ae, n, q]}
+- {grapheme: "isn't", phonemes: [ih, z, ax, n, q]}
+- {grapheme: "hasn't", phonemes: [hh, ae, z, ih, n, q]}
+- {grapheme: "advert", phonemes: [ae, d, v, er, t, cl]}
+- {grapheme: "addy", phonemes: [ae, dx, iy]}
+- {grapheme: "admin", phonemes: [ae, d, m, ih, n]}
+- {grapheme: "aggro", phonemes: [ae, g, r, ow]}
+- {grapheme: "alky", phonemes: [ae, l, k, iy]}
+- {grapheme: "amp", phonemes: [ae, m, p]
+=== canary/inner/dspitch/dsdict_bup.yaml
+symbols:
+- {symbol: AP, type: vowel}
+- {symbol: SP, type: vowel}
+- {symbol: aa, type: vowel}
+- {symbol: ae, type: vowel}
+- {symbol: ah, type: vowel}
+- {symbol: ao, type: vowel}
+- {symbol: aw, type: vowel}
+- {symbol: ax, type: vowel}
+- {symbol: ay, type: vowel}
+- {symbol: b, type: stop}
+- {symbol: ch, type: affricate}
+- {symbol: d, type: stop}
+- {symbol: dh, type: fricative}
+- {symbol: dx, type: stop}
+- {symbol: eh, type: vowel}
+- {symbol: er, type: vowel}
+- {symbol: ey, type: vowel}
+- {symbol: f, type: fricative}
+- {symbol: g, type: stop}
+- {symbol: hh, type: fricative}
+- {symbol: ih, type: vowel}
+- {symbol: iy, type: vowel}
+- {symbol: jh, type: affricate}
+- {symbol: k, type: stop}
+- {symbol: l, type: liquid}
+- {symbol: m, type: nasal}
+- {symbol: n, type: nasal}
+- {symbol: ng, type: nasal}
+- {symbol: ow, type: vowel}
+- {symbol: oy, type: vowel}
+- {symbol: p, type: stop}
+- {symbol: q, type: stop}
+- {symbol: r, type: liquid}
+- {symbol: s, type: fricative}
+- {symbol: sh, type: fricative}
+- {symbol: t, type: stop}
+- {symbol: th, type: fricative}
+- {symbol: uh, type: vowel}
+- {symbol: uw, type: vowel}
+- {symbol: v, type: fricative}
+- {symbol: vf, type: stop}
+- {symbol: w, type: semivowel}
+- {symbol: y, type: semivowel}
+- {symbol: z, type: fricative}
+- {symbol: zh, type: fricative}
+- {symbol: tx, type: stop}
+- {symbol: rx, type: fricative}
+- {symbol: hx, type: fricative}
+- {symbol: rr, type: stop}
+- {symbol: ee, type: vowel}
+- {symbol: oo, type: vowel}
+- {symbol: uu, type: vowel}
+- {symbol: ux, type: vowel}
+- {symbol: tr, type: affricate}
+- {symbol: dr, type: affricate}
+- {symbol: nn, type: vowel}
+- {symbol: cl, type: stop}
+- {symbol: ez, type: vowel}
+- {symbol: ir, type: vowel}
+- {symbol: yu, type: vowel}
+- {symbol: iz, type: vowel}
+- {symbol: ye, type: vowel}
+- {symbol: xn, type: nasal}
+- {symbol: qy, type: fricative}
+- {symbol: jy, type: fricative}
+- {symbol: xy, type: fricative}
+- {symbol: ts, type: affricate}
+- {symbol: dz, type: affricate}
+- {symbol: rz, type: fricative}
+- {symbol: a, type: vowel}
+- {symbol: ahn, type: vowel}
+- {symbol: au, type: vowel}
+- {symbol: bk, type: stop}
+- {symbol: bv, type: fricative}
+- {symbol: ehn, type: vowel}
+- {symbol: en, type: vowel}
+- {symbol: ex, type: vowel}
+- {symbol: fp, type: fricative}
+- {symbol: gl, type: liquid}
+- {symbol: gv, type: fricative}
+- {symbol: ia, type: vowel}
+- {symbol: ie, type: vowel}
+- {symbol: kx, type: stop}
+- {symbol: lg, type: liquid}
+- {symbol: ly, type: liquid}
+- {symbol: ny, type: nasal}
+- {symbol: oh, type: vowel}
+- {symbol: ohn, type: vowel}
+- {symbol: px, type: stop}
+- {symbol: ua, type: vowel}
+- {symbol: ue, type: vowel}
+- {symbol: uex, type: vowel}
+- {symbol: uo, type: vowel}
+- {symbol: aan, type: vowel}
+- {symbol: in, type: vowel}
+- {symbol: kq, type: stop}
+- {symbol: oe, type: vowel}
+- {symbol: on, type: vowel}
+- {symbol: rh, type: fricative}
+- {symbol: uy, type: semivowel}
+- 
+=== canary/inner/dspitch/dsdict-en.yaml
+symbols:
+- {symbol: AP, type: vowel}
+- {symbol: SP, type: vowel}
+- {symbol: aa, type: vowel}
+- {symbol: ae, type: vowel}
+- {symbol: ah, type: vowel}
+- {symbol: ao, type: vowel}
+- {symbol: aw, type: vowel}
+- {symbol: ax, type: vowel}
+- {symbol: ay, type: vowel}
+- {symbol: b, type: stop}
+- {symbol: ch, type: affricate}
+- {symbol: d, type: stop}
+- {symbol: dh, type: fricative}
+- {symbol: dx, type: stop}
+- {symbol: eh, type: vowel}
+- {symbol: er, type: vowel}
+- {symbol: ey, type: vowel}
+- {symbol: f, type: fricative}
+- {symbol: g, type: stop}
+- {symbol: hh, type: fricative}
+- {symbol: ih, type: vowel}
+- {symbol: iy, type: vowel}
+- {symbol: jh, type: affricate}
+- {symbol: k, type: stop}
+- {symbol: l, type: liquid}
+- {symbol: m, type: nasal}
+- {symbol: n, type: nasal}
+- {symbol: ng, type: nasal}
+- {symbol: ow, type: vowel}
+- {symbol: oy, type: vowel}
+- {symbol: p, type: stop}
+- {symbol: q, type: stop}
+- {symbol: r, type: liquid}
+- {symbol: s, type: fricative}
+- {symbol: sh, type: fricative}
+- {symbol: t, type: stop}
+- {symbol: th, type: fricative}
+- {symbol: uh, type: vowel}
+- {symbol: uw, type: vowel}
+- {symbol: v, type: fricative}
+- {symbol: vf, type: stop}
+- {symbol: w, type: semivowel}
+- {symbol: y, type: semivowel}
+- {symbol: z, type: fricative}
+- {symbol: zh, type: fricative}
+- {symbol: tx, type: stop}
+- {symbol: rx, type: fricative}
+- {symbol: hx, type: fricative}
+- {symbol: rr, type: stop}
+- {symbol: ee, type: vowel}
+- {symbol: oo, type: vowel}
+- {symbol: uu, type: vowel}
+- {symbol: ux, type: vowel}
+- {symbol: tr, type: affricate}
+- {symbol: dr, type: affricate}
+- {symbol: nn, type: vowel}
+- {symbol: cl, type: stop}
+- {symbol: ez, type: vowel}
+- {symbol: ir, type: vowel}
+- {symbol: yu, type: vowel}
+- {symbol: iz, type: vowel}
+- {symbol: ye, type: vowel}
+- {symbol: xn, type: nasal}
+- {symbol: qy, type: fricative}
+- {symbol: jy, type: fricative}
+- {symbol: xy, type: fricative}
+- {symbol: ts, type: affricate}
+- {symbol: dz, type: affricate}
+- {symbol: rz, type: fricative}
+- {symbol: a, type: vowel}
+- {symbol: ahn, type: vowel}
+- {symbol: au, type: vowel}
+- {symbol: bk, type: stop}
+- {symbol: bv, type: fricative}
+- {symbol: ehn, type: vowel}
+- {symbol: en, type: vowel}
+- {symbol: ex, type: vowel}
+- {symbol: fp, type: fricative}
+- {symbol: gl, type: liquid}
+- {symbol: gv, type: fricative}
+- {symbol: ia, type: vowel}
+- {symbol: ie, type: vowel}
+- {symbol: kx, type: stop}
+- {symbol: lg, type: liquid}
+- {symbol: ly, type: liquid}
+- {symbol: ny, type: nasal}
+- {symbol: oh, type: vowel}
+- {symbol: ohn, type: vowel}
+- {symbol: px, type: stop}
+- {symbol: ua, type: vowel}
+- {symbol: ue, type: vowel}
+- {symbol: uex, type: vowel}
+- {symbol: uo, type: vowel}
+- {symbol: aan, type: vowel}
+- {symbol: in, type: vowel}
+- {symbol: kq, type: stop}
+- {symbol: oe, type: vowel}
+- {symbol: on, type: vowel}
+- {symbol: rh, type: fricative}
+- {symbol: uy, type: semivowel}
+- 
+=== canary/inner/dsacoustic/dictionary.txt
+aa	aa
+ae	ae
+ah	ah
+ao	ao
+aw	aw
+ax	ax
+ay	ay
+b	b
+ch	ch
+d	d
+dh	dh
+dx	dx
+eh	eh
+er	er
+ey	ey
+f	f
+g	g
+hh	hh
+ih	ih
+iy	iy
+jh	jh
+k	k
+l	l
+m	m
+n	n
+ng	ng
+ow	ow
+oy	oy
+p	p
+q	q
+r	r
+s	s
+sh	sh
+t	t
+th	th
+uh	uh
+uw	uw
+v	v
+vf	vf
+w	w
+y	y
+z	z
+zh	zh
+vtrash	vtrash
+cl	cl
+ee	ee
+oo	oo
+uu	uu
+ux	ux
+ctrash	ctrash
+tx	tx
+rr	rr
+rx	rx
+hx	hx
+nn	nn
+tr	tr
+dr	dr
+dz	dz
+ez	ez
+jy	jy
+qy	qy
+rz	rz
+ts	ts
+xn	xn
+xy	xy
+a	a
+ahn	ahn
+au	au
+bk	bk
+bv	bv
+ehn	ehn
+en	en
+ex	ex
+fp	fp
+gl	gl
+gv	gv
+ia	ia
+ie	ie
+ir	ir
+kx	kx
+lg	lg
+ly	ly
+ny	ny
+oh	oh
+ohn	ohn
+px	px	
+ua	ua
+ue	ue
+uex	uex
+uo	uo
+ye	ye
+yu	yu
+aan	aan
+in	in
+kq	kq
+oe	oe
+on	on
+rh	rh
+uy	uy
+yn	yn
+iz	iz
+rj	rj
+rs	rs
+pq	pq
+tq	tq
+io	io
+c	c
+cc	cc
+eo	eo
+rl	rl
+lx	lx
+shx	shx
+sx	sx
+=== canary/inner/dsacoustic/phonemes.txt
+<PAD>
+AP
+SP
+a
+aa
+aan
+ae
+ah
+ahn
+ao
+au
+aw
+ax
+ay
+b
+bk
+bv
+c
+cc
+ch
+cl
+ctrash
+d
+dh
+dr
+dx
+dz
+ee
+eh
+ehn
+en
+eo
+er
+ex
+ey
+ez
+f
+fp
+g
+gl
+gv
+hh
+hx
+ia
+ie
+ih
+in
+io
+ir
+iy
+iz
+jh
+jy
+k
+kq
+kx
+l
+lg
+lx
+ly
+m
+n
+ng
+nn
+ny
+oe
+oh
+ohn
+on
+oo
+ow
+oy
+p
+pq
+px
+q
+qy
+r
+rh
+rj
+rl
+rr
+rs
+rx
+rz
+s
+sh
+shx
+sx
+t
+th
+tq
+tr
+ts
+tx
+ua
+ue
+uex
+uh
+uo
+uu
+uw
+ux
+uy
+v
+vf
+vtrash
+w
+xn
+xy
+y
+ye
+yn
+yu
+z
+zh
+
+=== canary/inner/dsdur/files/dictionary.txt
+aa	aa
+ae	ae
+ah	ah
+ao	ao
+aw	aw
+ax	ax
+ay	ay
+b	b
+ch	ch
+d	d
+dh	dh
+dx	dx
+eh	eh
+er	er
+ey	ey
+f	f
+g	g
+hh	hh
+ih	ih
+iy	iy
+jh	jh
+k	k
+l	l
+m	m
+n	n
+ng	ng
+ow	ow
+oy	oy
+p	p
+q	q
+r	r
+s	s
+sh	sh
+t	t
+th	th
+uh	uh
+uw	uw
+v	v
+vf	vf
+w	w
+y	y
+z	z
+zh	zh
+vtrash	vtrash
+cl	cl
+ee	ee
+oo	oo
+uu	uu
+ux	ux
+ctrash	ctrash
+tx	tx
+rr	rr
+rx	rx
+hx	hx
+nn	nn
+tr	tr
+dr	dr
+dz	dz
+ez	ez
+jy	jy
+qy	qy
+rz	rz
+ts	ts
+xn	xn
+xy	xy
+a	a
+ahn	ahn
+au	au
+bk	bk
+bv	bv
+ehn	ehn
+en	en
+ex	ex
+fp	fp
+gl	gl
+gv	gv
+ia	ia
+ie	ie
+ir	ir
+kx	kx
+lg	lg
+ly	ly
+ny	ny
+oh	oh
+ohn	ohn
+px	px	
+ua	ua
+ue	ue
+uex	uex
+uo	uo
+ye	ye
+yu	yu
+aan	aan
+in	in
+kq	kq
+oe	oe
+on	on
+rh	rh
+uy	uy
+yn	yn
+iz	iz
+rj	rj
+rs	rs
+pq	pq
+tq	tq
+io	io
+c	c
+cc	cc
+eo	eo
+rl	rl
+lx	lx
+shx	shx
+sx	sx
+=== canary/inner/dsdur/files/phonemes.txt
+<PAD>
+AP
+SP
+a
+aa
+aan
+ae
+ah
+ahn
+ao
+au
+aw
+ax
+ay
+b
+bk
+bv
+c
+cc
+ch
+cl
+ctrash
+d
+dh
+dr
+dx
+dz
+ee
+eh
+ehn
+en
+eo
+er
+ex
+ey
+ez
+f
+fp
+g
+gl
+gv
+hh
+hx
+ia
+ie
+ih
+in
+io
+ir
+iy
+iz
+jh
+jy
+k
+kq
+kx
+l
+lg
+lx
+ly
+m
+n
+ng
+nn
+ny
+oe
+oh
+ohn
+on
+oo
+ow
+oy
+p
+pq
+px
+q
+qy
+r
+rh
+rj
+rl
+rr
+rs
+rx
+rz
+s
+sh
+shx
+sx
+t
+th
+tq
+tr
+ts
+tx
+ua
+ue
+uex
+uh
+uo
+uu
+uw
+ux
+uy
+v
+vf
+vtrash
+w
+xn
+xy
+y
+ye
+yn
+yu
+z
+zh
+
+=== canary/inner/dsdur/dsdict-fr.yaml
+symbols:
+- {symbol: AP, type: vowel}
+- {symbol: SP, type: vowel}
+- {symbol: aa, type: vowel}
+- {symbol: ae, type: vowel}
+- {symbol: ah, type: vowel}
+- {symbol: ao, type: vowel}
+- {symbol: aw, type: vowel}
+- {symbol: ax, type: vowel}
+- {symbol: ay, type: vowel}
+- {symbol: b, type: stop}
+- {symbol: ch, type: affricate}
+- {symbol: d, type: stop}
+- {symbol: dh, type: fricative}
+- {symbol: dx, type: stop}
+- {symbol: eh, type: vowel}
+- {symbol: er, type: vowel}
+- {symbol: ey, type: vowel}
+- {symbol: f, type: fricative}
+- {symbol: g, type: stop}
+- {symbol: hh, type: fricative}
+- {symbol: ih, type: vowel}
+- {symbol: iy, type: vowel}
+- {symbol: jh, type: affricate}
+- {symbol: k, type: stop}
+- {symbol: l, type: liquid}
+- {symbol: m, type: nasal}
+- {symbol: n, type: nasal}
+- {symbol: ng, type: nasal}
+- {symbol: ow, type: vowel}
+- {symbol: oy, type: vowel}
+- {symbol: p, type: stop}
+- {symbol: q, type: stop}
+- {symbol: r, type: liquid}
+- {symbol: s, type: fricative}
+- {symbol: sh, type: fricative}
+- {symbol: t, type: stop}
+- {symbol: th, type: fricative}
+- {symbol: uh, type: vowel}
+- {symbol: uw, type: vowel}
+- {symbol: v, type: fricative}
+- {symbol: vf, type: stop}
+- {symbol: w, type: semivowel}
+- {symbol: y, type: semivowel}
+- {symbol: z, type: fricative}
+- {symbol: zh, type: fricative}
+- {symbol: tx, type: stop}
+- {symbol: rx, type: fricative}
+- {symbol: hx, type: fricative}
+- {symbol: rr, type: stop}
+- {symbol: ee, type: vowel}
+- {symbol: oo, type: vowel}
+- {symbol: uu, type: vowel}
+- {symbol: ux, type: vowel}
+- {symbol: tr, type: affricate}
+- {symbol: dr, type: affricate}
+- {symbol: nn, type: vowel}
+- {symbol: cl, type: stop}
+- {symbol: ez, type: vowel}
+- {symbol: ir, type: vowel}
+- {symbol: yu, type: vowel}
+- {symbol: iz, type: vowel}
+- {symbol: ye, type: vowel}
+- {symbol: xn, type: nasal}
+- {symbol: qz, type: fricative}
+- {symbol: jz, type: fricative}
+- {symbol: xz, type: fricative}
+- {symbol: ts, type: affricate}
+- {symbol: dz, type: affricate}
+- {symbol: rz, type: fricative}
+- {symbol: a, type: vowel}
+- {symbol: ahn, type: vowel}
+- {symbol: au, type: vowel}
+- {symbol: bk, type: stop}
+- {symbol: bv, type: fricative}
+- {symbol: ehn, type: vowel}
+- {symbol: en, type: vowel}
+- {symbol: ex, type: vowel}
+- {symbol: fp, type: fricative}
+- {symbol: gl, type: liquid}
+- {symbol: gv, type: fricative}
+- {symbol: ia, type: vowel}
+- {symbol: ie, type: vowel}
+- {symbol: kx, type: stop}
+- {symbol: lg, type: liquid}
+- {symbol: ly, type: liquid}
+- {symbol: ny, type: nasal}
+- {symbol: oh, type: vowel}
+- {symbol: ohn, type: vowel}
+- {symbol: px, type: stop}
+- {symbol: ua, type: vowel}
+- {symbol: ue, type: vowel}
+- {symbol: uex, type: vowel}
+- {symbol: uo, type: vowel}
+- {symbol: aan, type: vowel}
+- {symbol: in, type: vowel}
+- {symbol: kq, type: stop}
+- {symbol: oe, type: vowel}
+- {symbol: on, type: vowel}
+- {symbol: rh, type: fricative}
+- {symbol: uy, type: semivowel}
+- {symbol: yn, type: vowel}
+replacements:
+- {from: ah, to: a}
+- {from: eh, to: ee}
+- {from: ae, to: eh}
+=== canary/inner/dsdur/dsdict-es.yaml
+symbols:
+- {symbol: AP, type: vowel}
+- {symbol: SP, type: vowel}
+- {symbol: aa, type: vowel}
+- {symbol: ae, type: vowel}
+- {symbol: ah, type: vowel}
+- {symbol: ao, type: vowel}
+- {symbol: aw, type: vowel}
+- {symbol: ax, type: vowel}
+- {symbol: ay, type: vowel}
+- {symbol: b, type: stop}
+- {symbol: ch, type: affricate}
+- {symbol: d, type: stop}
+- {symbol: dh, type: fricative}
+- {symbol: dx, type: stop}
+- {symbol: eh, type: vowel}
+- {symbol: er, type: vowel}
+- {symbol: ey, type: vowel}
+- {symbol: f, type: fricative}
+- {symbol: g, type: stop}
+- {symbol: hh, type: fricative}
+- {symbol: ih, type: vowel}
+- {symbol: iy, type: vowel}
+- {symbol: jh, type: affricate}
+- {symbol: k, type: stop}
+- {symbol: l, type: liquid}
+- {symbol: m, type: nasal}
+- {symbol: n, type: nasal}
+- {symbol: ng, type: nasal}
+- {symbol: ow, type: vowel}
+- {symbol: oy, type: vowel}
+- {symbol: p, type: stop}
+- {symbol: q, type: stop}
+- {symbol: r, type: liquid}
+- {symbol: s, type: fricative}
+- {symbol: sh, type: fricative}
+- {symbol: t, type: stop}
+- {symbol: th, type: fricative}
+- {symbol: uh, type: vowel}
+- {symbol: uw, type: vowel}
+- {symbol: v, type: fricative}
+- {symbol: vf, type: stop}
+- {symbol: w, type: semivowel}
+- {symbol: y, type: semivowel}
+- {symbol: z, type: fricative}
+- {symbol: zh, type: fricative}
+- {symbol: tx, type: stop}
+- {symbol: rx, type: fricative}
+- {symbol: hx, type: fricative}
+- {symbol: rr, type: stop}
+- {symbol: ee, type: vowel}
+- {symbol: oo, type: vowel}
+- {symbol: uu, type: vowel}
+- {symbol: ux, type: vowel}
+- {symbol: tr, type: affricate}
+- {symbol: dr, type: affricate}
+- {symbol: nn, type: vowel}
+- {symbol: cl, type: stop}
+- {symbol: ez, type: vowel}
+- {symbol: ir, type: vowel}
+- {symbol: yu, type: vowel}
+- {symbol: iz, type: vowel}
+- {symbol: ye, type: vowel}
+- {symbol: xn, type: nasal}
+- {symbol: qz, type: fricative}
+- {symbol: jz, type: fricative}
+- {symbol: xz, type: fricative}
+- {symbol: ts, type: affricate}
+- {symbol: dz, type: affricate}
+- {symbol: rz, type: fricative}
+- {symbol: a, type: vowel}
+- {symbol: ahn, type: vowel}
+- {symbol: au, type: vowel}
+- {symbol: bk, type: stop}
+- {symbol: bv, type: fricative}
+- {symbol: ehn, type: vowel}
+- {symbol: en, type: vowel}
+- {symbol: ex, type: vowel}
+- {symbol: fp, type: fricative}
+- {symbol: gl, type: liquid}
+- {symbol: gv, type: fricative}
+- {symbol: ia, type: vowel}
+- {symbol: ie, type: vowel}
+- {symbol: kx, type: stop}
+- {symbol: lg, type: liquid}
+- {symbol: ly, type: liquid}
+- {symbol: ny, type: nasal}
+- {symbol: oh, type: vowel}
+- {symbol: ohn, type: vowel}
+- {symbol: px, type: stop}
+- {symbol: ua, type: vowel}
+- {symbol: ue, type: vowel}
+- {symbol: uex, type: vowel}
+- {symbol: uo, type: vowel}
+- {symbol: aan, type: vowel}
+- {symbol: in, type: vowel}
+- {symbol: kq, type: stop}
+- {symbol: oe, type: vowel}
+- {symbol: on, type: vowel}
+- {symbol: rh, type: fricative}
+- {symbol: uy, type: semivowel}
+- 
+=== canary/inner/dsdur/dsdict-pt.yaml
+symbols:
+- {symbol: AP, type: vowel}
+- {symbol: SP, type: vowel}
+- {symbol: aa, type: vowel}
+- {symbol: ae, type: vowel}
+- {symbol: ah, type: vowel}
+- {symbol: ao, type: vowel}
+- {symbol: aw, type: vowel}
+- {symbol: ax, type: vowel}
+- {symbol: ay, type: vowel}
+- {symbol: b, type: stop}
+- {symbol: ch, type: affricate}
+- {symbol: d, type: stop}
+- {symbol: dh, type: fricative}
+- {symbol: dx, type: stop}
+- {symbol: eh, type: vowel}
+- {symbol: er, type: vowel}
+- {symbol: ey, type: vowel}
+- {symbol: f, type: fricative}
+- {symbol: g, type: stop}
+- {symbol: hh, type: fricative}
+- {symbol: ih, type: vowel}
+- {symbol: iy, type: vowel}
+- {symbol: jh, type: affricate}
+- {symbol: k, type: stop}
+- {symbol: l, type: liquid}
+- {symbol: m, type: nasal}
+- {symbol: n, type: nasal}
+- {symbol: ng, type: nasal}
+- {symbol: ow, type: vowel}
+- {symbol: oy, type: vowel}
+- {symbol: p, type: stop}
+- {symbol: q, type: stop}
+- {symbol: r, type: liquid}
+- {symbol: s, type: fricative}
+- {symbol: sh, type: fricative}
+- {symbol: t, type: stop}
+- {symbol: th, type: fricative}
+- {symbol: uh, type: vowel}
+- {symbol: uw, type: vowel}
+- {symbol: v, type: fricative}
+- {symbol: vf, type: stop}
+- {symbol: w, type: semivowel}
+- {symbol: y, type: semivowel}
+- {symbol: z, type: fricative}
+- {symbol: zh, type: fricative}
+- {symbol: tx, type: stop}
+- {symbol: rx, type: fricative}
+- {symbol: hx, type: fricative}
+- {symbol: rr, type: stop}
+- {symbol: ee, type: vowel}
+- {symbol: oo, type: vowel}
+- {symbol: uu, type: vowel}
+- {symbol: ux, type: vowel}
+- {symbol: tr, type: affricate}
+- {symbol: dr, type: affricate}
+- {symbol: nn, type: vowel}
+- {symbol: cl, type: stop}
+- {symbol: ez, type: vowel}
+- {symbol: ir, type: vowel}
+- {symbol: yu, type: vowel}
+- {symbol: iz, type: vowel}
+- {symbol: ye, type: vowel}
+- {symbol: xn, type: nasal}
+- {symbol: qz, type: fricative}
+- {symbol: jz, type: fricative}
+- {symbol: xz, type: fricative}
+- {symbol: ts, type: affricate}
+- {symbol: dz, type: affricate}
+- {symbol: rz, type: fricative}
+- {symbol: a, type: vowel}
+- {symbol: ahn, type: vowel}
+- {symbol: au, type: vowel}
+- {symbol: bk, type: stop}
+- {symbol: bv, type: fricative}
+- {symbol: ehn, type: vowel}
+- {symbol: en, type: vowel}
+- {symbol: ex, type: vowel}
+- {symbol: fp, type: fricative}
+- {symbol: gl, type: liquid}
+- {symbol: gv, type: fricative}
+- {symbol: ia, type: vowel}
+- {symbol: ie, type: vowel}
+- {symbol: kx, type: stop}
+- {symbol: lg, type: liquid}
+- {symbol: ly, type: liquid}
+- {symbol: ny, type: nasal}
+- {symbol: oh, type: vowel}
+- {symbol: ohn, type: vowel}
+- {symbol: px, type: stop}
+- {symbol: ua, type: vowel}
+- {symbol: ue, type: vowel}
+- {symbol: uex, type: vowel}
+- {symbol: uo, type: vowel}
+- {symbol: aan, type: vowel}
+- {symbol: in, type: vowel}
+- {symbol: kq, type: stop}
+- {symbol: oe, type: vowel}
+- {symbol: on, type: vowel}
+- {symbol: rh, type: fricative}
+- {symbol: uy, type: semivowel}
+- 
+=== canary/inner/dsdur/dsdict.yaml
+symbols:
+- {symbol: AP, type: vowel}
+- {symbol: SP, type: vowel}
+- {symbol: aa, type: vowel}
+- {symbol: ae, type: vowel}
+- {symbol: ah, type: vowel}
+- {symbol: ao, type: vowel}
+- {symbol: aw, type: vowel}
+- {symbol: ax, type: vowel}
+- {symbol: ay, type: vowel}
+- {symbol: b, type: stop}
+- {symbol: ch, type: affricate}
+- {symbol: d, type: stop}
+- {symbol: dh, type: fricative}
+- {symbol: dx, type: stop}
+- {symbol: eh, type: vowel}
+- {symbol: er, type: vowel}
+- {symbol: ey, type: vowel}
+- {symbol: f, type: fricative}
+- {symbol: g, type: stop}
+- {symbol: hh, type: fricative}
+- {symbol: ih, type: vowel}
+- {symbol: iy, type: vowel}
+- {symbol: jh, type: affricate}
+- {symbol: k, type: stop}
+- {symbol: l, type: liquid}
+- {symbol: m, type: nasal}
+- {symbol: n, type: nasal}
+- {symbol: ng, type: nasal}
+- {symbol: ow, type: vowel}
+- {symbol: oy, type: vowel}
+- {symbol: p, type: stop}
+- {symbol: q, type: stop}
+- {symbol: r, type: liquid}
+- {symbol: s, type: fricative}
+- {symbol: sh, type: fricative}
+- {symbol: t, type: stop}
+- {symbol: th, type: fricative}
+- {symbol: uh, type: vowel}
+- {symbol: uw, type: vowel}
+- {symbol: v, type: fricative}
+- {symbol: vf, type: stop}
+- {symbol: w, type: semivowel}
+- {symbol: y, type: semivowel}
+- {symbol: z, type: fricative}
+- {symbol: zh, type: fricative}
+- {symbol: tx, type: stop}
+- {symbol: rx, type: fricative}
+- {symbol: hx, type: fricative}
+- {symbol: rr, type: stop}
+- {symbol: ee, type: vowel}
+- {symbol: oo, type: vowel}
+- {symbol: uu, type: vowel}
+- {symbol: ux, type: vowel}
+- {symbol: tr, type: affricate}
+- {symbol: dr, type: affricate}
+- {symbol: nn, type: vowel}
+- {symbol: cl, type: stop}
+- {symbol: ez, type: vowel}
+- {symbol: ir, type: vowel}
+- {symbol: yu, type: vowel}
+- {symbol: iz, type: vowel}
+- {symbol: ye, type: vowel}
+- {symbol: xn, type: nasal}
+- {symbol: qy, type: fricative}
+- {symbol: jy, type: fricative}
+- {symbol: xy, type: fricative}
+- {symbol: ts, type: affricate}
+- {symbol: dz, type: affricate}
+- {symbol: rz, type: fricative}
+- {symbol: a, type: vowel}
+- {symbol: ahn, type: vowel}
+- {symbol: au, type: vowel}
+- {symbol: bk, type: stop}
+- {symbol: bv, type: fricative}
+- {symbol: ehn, type: vowel}
+- {symbol: en, type: vowel}
+- {symbol: ex, type: vowel}
+- {symbol: fp, type: fricative}
+- {symbol: gl, type: liquid}
+- {symbol: gv, type: fricative}
+- {symbol: ia, type: vowel}
+- {symbol: ie, type: vowel}
+- {symbol: kx, type: stop}
+- {symbol: lg, type: liquid}
+- {symbol: ly, type: liquid}
+- {symbol: ny, type: nasal}
+- {symbol: oh, type: vowel}
+- {symbol: ohn, type: vowel}
+- {symbol: px, type: stop}
+- {symbol: ua, type: vowel}
+- {symbol: ue, type: vowel}
+- {symbol: uex, type: vowel}
+- {symbol: uo, type: vowel}
+- {symbol: aan, type: vowel}
+- {symbol: in, type: vowel}
+- {symbol: kq, type: stop}
+- {symbol: oe, type: vowel}
+- {symbol: on, type: vowel}
+- {symbol: rh, type: fricative}
+- {symbol: uy, type: semivowel}
+- {symbol: yn, type: vowel}
+- {symbol: rs, type: stop}
+- {symbol: rj, type: stop}
+- {symbol: eo, type: 
+=== canary/inner/dsdur/dsdict-zh.yaml
+symbols:
+- {symbol: AP, type: vowel}
+- {symbol: SP, type: vowel}
+- {symbol: aa, type: vowel}
+- {symbol: ae, type: vowel}
+- {symbol: ah, type: vowel}
+- {symbol: ao, type: vowel}
+- {symbol: aw, type: vowel}
+- {symbol: ax, type: vowel}
+- {symbol: ay, type: vowel}
+- {symbol: b, type: stop}
+- {symbol: ch, type: affricate}
+- {symbol: d, type: stop}
+- {symbol: dh, type: fricative}
+- {symbol: dx, type: stop}
+- {symbol: eh, type: vowel}
+- {symbol: er, type: vowel}
+- {symbol: ey, type: vowel}
+- {symbol: f, type: fricative}
+- {symbol: g, type: stop}
+- {symbol: hh, type: fricative}
+- {symbol: ih, type: vowel}
+- {symbol: iy, type: vowel}
+- {symbol: jh, type: affricate}
+- {symbol: k, type: stop}
+- {symbol: l, type: liquid}
+- {symbol: m, type: nasal}
+- {symbol: n, type: nasal}
+- {symbol: ng, type: nasal}
+- {symbol: ow, type: vowel}
+- {symbol: oy, type: vowel}
+- {symbol: p, type: stop}
+- {symbol: q, type: stop}
+- {symbol: r, type: liquid}
+- {symbol: s, type: fricative}
+- {symbol: sh, type: fricative}
+- {symbol: t, type: stop}
+- {symbol: th, type: fricative}
+- {symbol: uh, type: vowel}
+- {symbol: uw, type: vowel}
+- {symbol: v, type: fricative}
+- {symbol: vf, type: stop}
+- {symbol: w, type: semivowel}
+- {symbol: y, type: semivowel}
+- {symbol: z, type: fricative}
+- {symbol: zh, type: fricative}
+- {symbol: tx, type: stop}
+- {symbol: rx, type: fricative}
+- {symbol: hx, type: fricative}
+- {symbol: rr, type: stop}
+- {symbol: ee, type: vowel}
+- {symbol: oo, type: vowel}
+- {symbol: uu, type: vowel}
+- {symbol: ux, type: vowel}
+- {symbol: tr, type: affricate}
+- {symbol: dr, type: affricate}
+- {symbol: nn, type: vowel}
+- {symbol: cl, type: stop}
+- {symbol: ez, type: vowel}
+- {symbol: ir, type: vowel}
+- {symbol: yu, type: vowel}
+- {symbol: iz, type: vowel}
+- {symbol: ye, type: vowel}
+- {symbol: xn, type: nasal}
+- {symbol: qy, type: fricative}
+- {symbol: jy, type: fricative}
+- {symbol: xy, type: fricative}
+- {symbol: ts, type: affricate}
+- {symbol: dz, type: affricate}
+- {symbol: rz, type: fricative}
+- {symbol: a, type: vowel}
+- {symbol: ahn, type: vowel}
+- {symbol: au, type: vowel}
+- {symbol: bk, type: stop}
+- {symbol: bv, type: fricative}
+- {symbol: ehn, type: vowel}
+- {symbol: en, type: vowel}
+- {symbol: ex, type: vowel}
+- {symbol: fp, type: fricative}
+- {symbol: gl, type: liquid}
+- {symbol: gv, type: fricative}
+- {symbol: ia, type: vowel}
+- {symbol: ie, type: vowel}
+- {symbol: kx, type: stop}
+- {symbol: lg, type: liquid}
+- {symbol: ly, type: liquid}
+- {symbol: ny, type: nasal}
+- {symbol: oh, type: vowel}
+- {symbol: ohn, type: vowel}
+- {symbol: px, type: stop}
+- {symbol: ua, type: vowel}
+- {symbol: ue, type: vowel}
+- {symbol: uex, type: vowel}
+- {symbol: uo, type: vowel}
+- {symbol: aan, type: vowel}
+- {symbol: in, type: vowel}
+- {symbol: kq, type: stop}
+- {symbol: oe, type: vowel}
+- {symbol: on, type: vowel}
+- {symbol: rh, type: fricative}
+- {symbol: uy, type: semivowel}
+- 
+=== canary/inner/dsdur/dsdict-it.yaml
+symbols:
+- {symbol: AP, type: vowel}
+- {symbol: SP, type: vowel}
+- {symbol: aa, type: vowel}
+- {symbol: ae, type: vowel}
+- {symbol: ah, type: vowel}
+- {symbol: ao, type: vowel}
+- {symbol: aw, type: vowel}
+- {symbol: ax, type: vowel}
+- {symbol: ay, type: vowel}
+- {symbol: b, type: stop}
+- {symbol: ch, type: affricate}
+- {symbol: d, type: stop}
+- {symbol: dh, type: fricative}
+- {symbol: dx, type: stop}
+- {symbol: eh, type: vowel}
+- {symbol: er, type: vowel}
+- {symbol: ey, type: vowel}
+- {symbol: f, type: fricative}
+- {symbol: g, type: stop}
+- {symbol: hh, type: fricative}
+- {symbol: ih, type: vowel}
+- {symbol: iy, type: vowel}
+- {symbol: jh, type: affricate}
+- {symbol: k, type: stop}
+- {symbol: l, type: liquid}
+- {symbol: m, type: nasal}
+- {symbol: n, type: nasal}
+- {symbol: ng, type: nasal}
+- {symbol: ow, type: vowel}
+- {symbol: oy, type: vowel}
+- {symbol: p, type: stop}
+- {symbol: q, type: stop}
+- {symbol: r, type: liquid}
+- {symbol: s, type: fricative}
+- {symbol: sh, type: fricative}
+- {symbol: t, type: stop}
+- {symbol: th, type: fricative}
+- {symbol: uh, type: vowel}
+- {symbol: uw, type: vowel}
+- {symbol: v, type: fricative}
+- {symbol: vf, type: stop}
+- {symbol: w, type: semivowel}
+- {symbol: y, type: semivowel}
+- {symbol: z, type: fricative}
+- {symbol: zh, type: fricative}
+- {symbol: tx, type: stop}
+- {symbol: rx, type: fricative}
+- {symbol: hx, type: fricative}
+- {symbol: rr, type: stop}
+- {symbol: ee, type: vowel}
+- {symbol: oo, type: vowel}
+- {symbol: uu, type: vowel}
+- {symbol: ux, type: vowel}
+- {symbol: tr, type: affricate}
+- {symbol: dr, type: affricate}
+- {symbol: nn, type: vowel}
+- {symbol: cl, type: stop}
+- {symbol: ez, type: vowel}
+- {symbol: ir, type: vowel}
+- {symbol: yu, type: vowel}
+- {symbol: iz, type: vowel}
+- {symbol: ye, type: vowel}
+- {symbol: xn, type: nasal}
+- {symbol: qz, type: fricative}
+- {symbol: jz, type: fricative}
+- {symbol: xz, type: fricative}
+- {symbol: ts, type: affricate}
+- {symbol: dz, type: affricate}
+- {symbol: rz, type: fricative}
+- {symbol: a, type: vowel}
+- {symbol: ahn, type: vowel}
+- {symbol: au, type: vowel}
+- {symbol: bk, type: stop}
+- {symbol: bv, type: fricative}
+- {symbol: ehn, type: vowel}
+- {symbol: en, type: vowel}
+- {symbol: ex, type: vowel}
+- {symbol: fp, type: fricative}
+- {symbol: gl, type: liquid}
+- {symbol: gv, type: fricative}
+- {symbol: ia, type: vowel}
+- {symbol: ie, type: vowel}
+- {symbol: kx, type: stop}
+- {symbol: lg, type: liquid}
+- {symbol: ly, type: liquid}
+- {symbol: ny, type: nasal}
+- {symbol: oh, type: vowel}
+- {symbol: ohn, type: vowel}
+- {symbol: px, type: stop}
+- {symbol: ua, type: vowel}
+- {symbol: ue, type: vowel}
+- {symbol: uex, type: vowel}
+- {symbol: uo, type: vowel}
+- {symbol: aan, type: vowel}
+- {symbol: in, type: vowel}
+- {symbol: kq, type: stop}
+- {symbol: oe, type: vowel}
+- {symbol: on, type: vowel}
+- {symbol: rh, type: fricative}
+- {symbol: uy, type: semivowel}
+- 
+=== canary/inner/dsdur/dsdict-ja.yaml
+symbols:
+- {symbol: AP, type: vowel}
+- {symbol: SP, type: vowel}
+- {symbol: aa, type: vowel}
+- {symbol: ae, type: vowel}
+- {symbol: ah, type: vowel}
+- {symbol: ao, type: vowel}
+- {symbol: aw, type: vowel}
+- {symbol: ax, type: vowel}
+- {symbol: ay, type: vowel}
+- {symbol: b, type: stop}
+- {symbol: ch, type: affricate}
+- {symbol: d, type: stop}
+- {symbol: dh, type: fricative}
+- {symbol: dx, type: stop}
+- {symbol: eh, type: vowel}
+- {symbol: er, type: vowel}
+- {symbol: ey, type: vowel}
+- {symbol: f, type: fricative}
+- {symbol: g, type: stop}
+- {symbol: hh, type: fricative}
+- {symbol: ih, type: vowel}
+- {symbol: iy, type: vowel}
+- {symbol: jh, type: affricate}
+- {symbol: k, type: stop}
+- {symbol: l, type: liquid}
+- {symbol: m, type: nasal}
+- {symbol: n, type: nasal}
+- {symbol: ng, type: nasal}
+- {symbol: ow, type: vowel}
+- {symbol: oy, type: vowel}
+- {symbol: p, type: stop}
+- {symbol: q, type: stop}
+- {symbol: r, type: liquid}
+- {symbol: s, type: fricative}
+- {symbol: sh, type: fricative}
+- {symbol: t, type: stop}
+- {symbol: th, type: fricative}
+- {symbol: uh, type: vowel}
+- {symbol: uw, type: vowel}
+- {symbol: v, type: fricative}
+- {symbol: vf, type: stop}
+- {symbol: w, type: semivowel}
+- {symbol: y, type: semivowel}
+- {symbol: z, type: fricative}
+- {symbol: zh, type: fricative}
+- {symbol: tx, type: stop}
+- {symbol: rx, type: fricative}
+- {symbol: hx, type: fricative}
+- {symbol: rr, type: stop}
+- {symbol: ee, type: vowel}
+- {symbol: oo, type: vowel}
+- {symbol: uu, type: vowel}
+- {symbol: ux, type: vowel}
+- {symbol: tr, type: affricate}
+- {symbol: dr, type: affricate}
+- {symbol: nn, type: vowel}
+- {symbol: cl, type: stop}
+- {symbol: ez, type: vowel}
+- {symbol: ir, type: vowel}
+- {symbol: yu, type: vowel}
+- {symbol: iz, type: vowel}
+- {symbol: ye, type: vowel}
+- {symbol: xn, type: nasal}
+- {symbol: qz, type: fricative}
+- {symbol: jz, type: fricative}
+- {symbol: xz, type: fricative}
+- {symbol: ts, type: affricate}
+- {symbol: dz, type: affricate}
+- {symbol: rz, type: fricative}
+- {symbol: a, type: vowel}
+- {symbol: ahn, type: vowel}
+- {symbol: au, type: vowel}
+- {symbol: bk, type: stop}
+- {symbol: bv, type: fricative}
+- {symbol: ehn, type: vowel}
+- {symbol: en, type: vowel}
+- {symbol: ex, type: vowel}
+- {symbol: fp, type: fricative}
+- {symbol: gl, type: liquid}
+- {symbol: gv, type: fricative}
+- {symbol: ia, type: vowel}
+- {symbol: ie, type: vowel}
+- {symbol: kx, type: stop}
+- {symbol: lg, type: liquid}
+- {symbol: ly, type: liquid}
+- {symbol: ny, type: nasal}
+- {symbol: oh, type: vowel}
+- {symbol: ohn, type: vowel}
+- {symbol: px, type: stop}
+- {symbol: ua, type: vowel}
+- {symbol: ue, type: vowel}
+- {symbol: uex, type: vowel}
+- {symbol: uo, type: vowel}
+- {symbol: aan, type: vowel}
+- {symbol: in, type: vowel}
+- {symbol: kq, type: stop}
+- {symbol: oe, type: vowel}
+- {symbol: on, type: vowel}
+- {symbol: rh, type: fricative}
+- {symbol: uy, type: semivowel}
+- 
+=== canary/inner/dsdur/dsconfig.yaml
+# ver b08
+phonemes: files/phonemes.txt
+linguistic: files/linguistic.onnx
+dur: files/dur.onnx
+
+hop_size: 512
+sample_rate: 44100
+
+predict_dur: true
+predict_pitch: false
+use_expr: true
+use_note_rest: true
+use_continuous_acceleration: true
+
+speakers:
+  - files/canary_arc
+  - files/canary_spark
+  - files/canary_voltage
+=== canary/inner/dsdur/dsdict-en-tgm.yaml
+symbols:
+- {symbol: AP, type: vowel}
+- {symbol: SP, type: vowel}
+- {symbol: aa, type: vowel}
+- {symbol: ae, type: vowel}
+- {symbol: ah, type: vowel}
+- {symbol: ao, type: vowel}
+- {symbol: aw, type: vowel}
+- {symbol: ax, type: vowel}
+- {symbol: ay, type: vowel}
+- {symbol: b, type: stop}
+- {symbol: ch, type: affricate}
+- {symbol: d, type: stop}
+- {symbol: dh, type: fricative}
+- {symbol: dx, type: stop}
+- {symbol: eh, type: vowel}
+- {symbol: er, type: vowel}
+- {symbol: ey, type: vowel}
+- {symbol: f, type: fricative}
+- {symbol: g, type: stop}
+- {symbol: hh, type: fricative}
+- {symbol: ih, type: vowel}
+- {symbol: iy, type: vowel}
+- {symbol: jh, type: affricate}
+- {symbol: k, type: stop}
+- {symbol: l, type: liquid}
+- {symbol: m, type: nasal}
+- {symbol: n, type: nasal}
+- {symbol: ng, type: nasal}
+- {symbol: ow, type: vowel}
+- {symbol: oy, type: vowel}
+- {symbol: p, type: stop}
+- {symbol: q, type: stop}
+- {symbol: r, type: liquid}
+- {symbol: s, type: fricative}
+- {symbol: sh, type: fricative}
+- {symbol: t, type: stop}
+- {symbol: th, type: fricative}
+- {symbol: uh, type: vowel}
+- {symbol: uw, type: vowel}
+- {symbol: v, type: fricative}
+- {symbol: vf, type: stop}
+- {symbol: w, type: semivowel}
+- {symbol: y, type: semivowel}
+- {symbol: z, type: fricative}
+- {symbol: zh, type: fricative}
+- {symbol: tx, type: stop}
+- {symbol: rx, type: fricative}
+- {symbol: hx, type: fricative}
+- {symbol: rr, type: stop}
+- {symbol: ee, type: vowel}
+- {symbol: oo, type: vowel}
+- {symbol: uu, type: vowel}
+- {symbol: ux, type: vowel}
+- {symbol: nn, type: vowel}
+- {symbol: tr, type: affricate}
+- {symbol: dr, type: affricate}
+- {symbol: cl, type: stop}
+entries:
+- {grapheme: "br", phonemes: [AP]}
+- {grapheme: "-", phonemes: [SP]}
+- {grapheme: "vf", phonemes: [vf]}
+- {grapheme: "cl", phonemes: [q]}
+- {grapheme: "'", phonemes: [q]}
+- {grapheme: "openutau", phonemes: [ow, p, ih, n, uw, t, aa, uw]}
+- {grapheme: "diffsinger", phonemes: [d, ih, f, s, ih, ng, er]}
+- {grapheme: "tiger", phonemes: [t, ay, g, er]}
+- {grapheme: "triton", phonemes: [tr, ay, q, ih, n]}
+- {grapheme: "canary", phonemes: [k, ax, n, eh, r, iy]}
+- {grapheme: "miyo", phonemes: [m, iy, y, ow]}
+- {grapheme: "luther", phonemes: [l, uw, th, er]}
+- {grapheme: "meaw", phonemes: [m, ey, uw]}
+- {grapheme: "rikki", phonemes: [r, iy, k, iy]}
+- {grapheme: "you", phonemes: [y, uw]}
+- {grapheme: "i'm", phonemes: [ay, m]}
+- {grapheme: "don't", phonemes: [d, ow, n, q]}
+- {grapheme: "won't", phonemes: [w, ow, n, q]}
+- {grapheme: "can't", phonemes: [k, ae, n, q]}
+- {grapheme: "isn't", phonemes: [ih, z, ax, n, q]}
+- {grapheme: "hasn't", phonemes: [hh, ae, z, ih, n, q]}
+- {grapheme: "advert", phonemes: [ae, d, v, er, t, cl]}
+- {grapheme: "addy", phonemes: [ae, dx, iy]}
+- {grapheme: "admin", phonemes: [ae, d, m, ih, n]}
+- {grapheme: "aggro", phonemes: [ae, g, r, ow]}
+- {grapheme: "alky", phonemes: [ae, l, k, iy]}
+- {grapheme: "amp", phonemes: [ae, m, p]
+=== canary/inner/dsdur/dsdict_bup.yaml
+symbols:
+- {symbol: AP, type: vowel}
+- {symbol: SP, type: vowel}
+- {symbol: aa, type: vowel}
+- {symbol: ae, type: vowel}
+- {symbol: ah, type: vowel}
+- {symbol: ao, type: vowel}
+- {symbol: aw, type: vowel}
+- {symbol: ax, type: vowel}
+- {symbol: ay, type: vowel}
+- {symbol: b, type: stop}
+- {symbol: ch, type: affricate}
+- {symbol: d, type: stop}
+- {symbol: dh, type: fricative}
+- {symbol: dx, type: stop}
+- {symbol: eh, type: vowel}
+- {symbol: er, type: vowel}
+- {symbol: ey, type: vowel}
+- {symbol: f, type: fricative}
+- {symbol: g, type: stop}
+- {symbol: hh, type: fricative}
+- {symbol: ih, type: vowel}
+- {symbol: iy, type: vowel}
+- {symbol: jh, type: affricate}
+- {symbol: k, type: stop}
+- {symbol: l, type: liquid}
+- {symbol: m, type: nasal}
+- {symbol: n, type: nasal}
+- {symbol: ng, type: nasal}
+- {symbol: ow, type: vowel}
+- {symbol: oy, type: vowel}
+- {symbol: p, type: stop}
+- {symbol: q, type: stop}
+- {symbol: r, type: liquid}
+- {symbol: s, type: fricative}
+- {symbol: sh, type: fricative}
+- {symbol: t, type: stop}
+- {symbol: th, type: fricative}
+- {symbol: uh, type: vowel}
+- {symbol: uw, type: vowel}
+- {symbol: v, type: fricative}
+- {symbol: vf, type: stop}
+- {symbol: w, type: semivowel}
+- {symbol: y, type: semivowel}
+- {symbol: z, type: fricative}
+- {symbol: zh, type: fricative}
+- {symbol: tx, type: stop}
+- {symbol: rx, type: fricative}
+- {symbol: hx, type: fricative}
+- {symbol: rr, type: stop}
+- {symbol: ee, type: vowel}
+- {symbol: oo, type: vowel}
+- {symbol: uu, type: vowel}
+- {symbol: ux, type: vowel}
+- {symbol: tr, type: affricate}
+- {symbol: dr, type: affricate}
+- {symbol: nn, type: vowel}
+- {symbol: cl, type: stop}
+- {symbol: ez, type: vowel}
+- {symbol: ir, type: vowel}
+- {symbol: yu, type: vowel}
+- {symbol: iz, type: vowel}
+- {symbol: ye, type: vowel}
+- {symbol: xn, type: nasal}
+- {symbol: qy, type: fricative}
+- {symbol: jy, type: fricative}
+- {symbol: xy, type: fricative}
+- {symbol: ts, type: affricate}
+- {symbol: dz, type: affricate}
+- {symbol: rz, type: fricative}
+- {symbol: a, type: vowel}
+- {symbol: ahn, type: vowel}
+- {symbol: au, type: vowel}
+- {symbol: bk, type: stop}
+- {symbol: bv, type: fricative}
+- {symbol: ehn, type: vowel}
+- {symbol: en, type: vowel}
+- {symbol: ex, type: vowel}
+- {symbol: fp, type: fricative}
+- {symbol: gl, type: liquid}
+- {symbol: gv, type: fricative}
+- {symbol: ia, type: vowel}
+- {symbol: ie, type: vowel}
+- {symbol: kx, type: stop}
+- {symbol: lg, type: liquid}
+- {symbol: ly, type: liquid}
+- {symbol: ny, type: nasal}
+- {symbol: oh, type: vowel}
+- {symbol: ohn, type: vowel}
+- {symbol: px, type: stop}
+- {symbol: ua, type: vowel}
+- {symbol: ue, type: vowel}
+- {symbol: uex, type: vowel}
+- {symbol: uo, type: vowel}
+- {symbol: aan, type: vowel}
+- {symbol: in, type: vowel}
+- {symbol: kq, type: stop}
+- {symbol: oe, type: vowel}
+- {symbol: on, type: vowel}
+- {symbol: rh, type: fricative}
+- {symbol: uy, type: semivowel}
+- 
+=== canary/inner/dsdur/dsdict-en.yaml
+symbols:
+- {symbol: AP, type: vowel}
+- {symbol: SP, type: vowel}
+- {symbol: aa, type: vowel}
+- {symbol: ae, type: vowel}
+- {symbol: ah, type: vowel}
+- {symbol: ao, type: vowel}
+- {symbol: aw, type: vowel}
+- {symbol: ax, type: vowel}
+- {symbol: ay, type: vowel}
+- {symbol: b, type: stop}
+- {symbol: ch, type: affricate}
+- {symbol: d, type: stop}
+- {symbol: dh, type: fricative}
+- {symbol: dx, type: stop}
+- {symbol: eh, type: vowel}
+- {symbol: er, type: vowel}
+- {symbol: ey, type: vowel}
+- {symbol: f, type: fricative}
+- {symbol: g, type: stop}
+- {symbol: hh, type: fricative}
+- {symbol: ih, type: vowel}
+- {symbol: iy, type: vowel}
+- {symbol: jh, type: affricate}
+- {symbol: k, type: stop}
+- {symbol: l, type: liquid}
+- {symbol: m, type: nasal}
+- {symbol: n, type: nasal}
+- {symbol: ng, type: nasal}
+- {symbol: ow, type: vowel}
+- {symbol: oy, type: vowel}
+- {symbol: p, type: stop}
+- {symbol: q, type: stop}
+- {symbol: r, type: liquid}
+- {symbol: s, type: fricative}
+- {symbol: sh, type: fricative}
+- {symbol: t, type: stop}
+- {symbol: th, type: fricative}
+- {symbol: uh, type: vowel}
+- {symbol: uw, type: vowel}
+- {symbol: v, type: fricative}
+- {symbol: vf, type: stop}
+- {symbol: w, type: semivowel}
+- {symbol: y, type: semivowel}
+- {symbol: z, type: fricative}
+- {symbol: zh, type: fricative}
+- {symbol: tx, type: stop}
+- {symbol: rx, type: fricative}
+- {symbol: hx, type: fricative}
+- {symbol: rr, type: stop}
+- {symbol: ee, type: vowel}
+- {symbol: oo, type: vowel}
+- {symbol: uu, type: vowel}
+- {symbol: ux, type: vowel}
+- {symbol: tr, type: affricate}
+- {symbol: dr, type: affricate}
+- {symbol: nn, type: vowel}
+- {symbol: cl, type: stop}
+- {symbol: ez, type: vowel}
+- {symbol: ir, type: vowel}
+- {symbol: yu, type: vowel}
+- {symbol: iz, type: vowel}
+- {symbol: ye, type: vowel}
+- {symbol: xn, type: nasal}
+- {symbol: qy, type: fricative}
+- {symbol: jy, type: fricative}
+- {symbol: xy, type: fricative}
+- {symbol: ts, type: affricate}
+- {symbol: dz, type: affricate}
+- {symbol: rz, type: fricative}
+- {symbol: a, type: vowel}
+- {symbol: ahn, type: vowel}
+- {symbol: au, type: vowel}
+- {symbol: bk, type: stop}
+- {symbol: bv, type: fricative}
+- {symbol: ehn, type: vowel}
+- {symbol: en, type: vowel}
+- {symbol: ex, type: vowel}
+- {symbol: fp, type: fricative}
+- {symbol: gl, type: liquid}
+- {symbol: gv, type: fricative}
+- {symbol: ia, type: vowel}
+- {symbol: ie, type: vowel}
+- {symbol: kx, type: stop}
+- {symbol: lg, type: liquid}
+- {symbol: ly, type: liquid}
+- {symbol: ny, type: nasal}
+- {symbol: oh, type: vowel}
+- {symbol: ohn, type: vowel}
+- {symbol: px, type: stop}
+- {symbol: ua, type: vowel}
+- {symbol: ue, type: vowel}
+- {symbol: uex, type: vowel}
+- {symbol: uo, type: vowel}
+- {symbol: aan, type: vowel}
+- {symbol: in, type: vowel}
+- {symbol: kq, type: stop}
+- {symbol: oe, type: vowel}
+- {symbol: on, type: vowel}
+- {symbol: rh, type: fricative}
+- {symbol: uy, type: semivowel}
+- 
+=== canary/inner/character.txt
+name=
+=== canary/inner/character.yaml
+name: "Canary DS v106"
+localized_names:
+  en-US: "Canary DS v106"
+  jp-JP: "Canary(カナリー) DS v106"
+  ko-KO: "카네리 DS v106"
+
+author: "tigermeat"
+voice: "MinaMoonrise"
+version: "v106"
+
+# DETAILED CREDITS
+#
+# Voice Provider, Manager: MinaMoonrise
+# DiffSinger Development: tigermeat
+# Character Design Assistance: Crusher
+# Character Illustration: Angela M Chong
+
+web: "http://jaevocalproject.weebly.com/canary.html"
+
+singer_type: diffsinger
+text_file_encoding: utf-8
+
+image: "extra/icon.png"
+portrait: "extra/canary.png"
+portrait_opacity: 0.4
+
+default_phonemizer: OpenUtau.Plugin.Builtin.DiffSingerPhonemizer
+
+subbanks:
+- {color: "01 Arc", suffix: dsacoustic/canary_arc}
+- {color: "02 Spark", suffix: dsacoustic/canary_spark}
+- {color: "03 Voltage", suffix: dsacoustic/canary_voltage}
+
+# CHANGELOG
+
+# v102 - Initial Release (2/2/24)
+
+# v103 - 2/10/24
+# Changes:
+# Support for French
+# More DS Dict Support!
+# Retrained Pitch Model
+# Better Fine-Tuned Vocoder
+
+# v106
+# Changes:
+# Retrained with new "Reflow" backend for DiffSinger.
+# Added Korean XLS Support.
+=== canary/inner/extra/other/reference.txt
+Artwork: Mina Moonrise
+Frilly Sketch: Crusher
+=== canary/inner/dsvocoder/vocoder.yaml
+name: "tgm_hifigan"
+model: "tgm_hifigan_v105.onnx"
+num_mel_bins: 128
+hop_size: 512
+sample_rate: 44100
+=== canary/inner/dsconfig.yaml
+# Canary DS
+# v102
+
+phonemes: dsacoustic/phonemes.txt
+acoustic: dsacoustic/acoustic.onnx
+dictionary: dsacoustic/dictionary.txt
+vocoder: refinegan
+
+hidden_size: 256
+
+use_key_shift_embed: true
+use_speed_embed: true
+use_energy_embed: false
+use_breathiness_embed: false
+use_voicing_embed: false
+use_tension_embed: false
+use_continuous_acceleration: true
+use_variable_depth: true
+
+max_depth: 0.6
+num_mel_bins: 128
+mel_fmin: 40
+mel_fmax: 16000
+mel_base: '10'
+mel_scale: slaney
+
+speakers:
+  - dsacoustic/canary_arc
+  - dsacoustic/canary_spark
+  - dsacoustic/canary_voltage
+
+augmentation_args:
+  random_pitch_shifting:
+    enabled: true
+    range: [-5., 5.]
+    scale: 1.0
+  fixed_pitch_shifting:
+    enabled: true
+    targets: [-5., 5.]
+    scale: 0.75
+  random_time_stretching:
+    enabled: true
+    range: [0.5, 2.]
+    domain: log  # or linear
+    scale: 1.0
+=== canary/Canary_DS_v106_PACK/OpenUTAU Plugins/credit_Millefeuille.txt
+Millefeuille Phonemizer by Imsupposedto (https://github.com/imsupposedto/Millefeuille-DiffSinger-French)
+=== canary/Canary_DS_v106_PACK/readme.txt
+To install:
+
+Voice Library:
+- Drag the ".zip" file in the "Voice Library" Folder into an OpenUTAU window. You will be prompted to ensure all information is clear and does not include jumbled characters.
+- After that, you will be able to use the DS Library.
+
+OpenUTAU Plugins:
+- Drag each '.dll' file into OpenUTAU seperately, accepting the prompt each time.
+- Before being able to use plugin phonemizers, you'll need to restart OpenUTAU.

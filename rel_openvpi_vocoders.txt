@@ -1,0 +1,11 @@
+pc-nsf-hifigan-44.1k-hop512-128bin-2025.02 PC-NSF-HiFiGAN with ability of pitch shifting and extremely wide pitch range
+    50 MB https://github.com/openvpi/vocoders/releases/download/pc-nsf-hifigan-44.1k-hop512-128bin-2025.02/pc_nsf_hifigan_44.1k_hop512_128bin_2025.02.oudep
+    50 MB https://github.com/openvpi/vocoders/releases/download/pc-nsf-hifigan-44.1k-hop512-128bin-2025.02/pc_nsf_hifigan_44.1k_hop512_128bin_2025.02.zip
+nsf-hifigan-44.1k-hop512-128bin-2024.02 Finetuned NSF-HiFiGAN with expanded pitch range and improved audio quality
+    50 MB https://github.com/openvpi/vocoders/releases/download/nsf-hifigan-44.1k-hop512-128bin-2024.02/nsf_hifigan_44.1k_hop512_128bin_2024.02.oudep
+    50 MB https://github.com/openvpi/vocoders/releases/download/nsf-hifigan-44.1k-hop512-128bin-2024.02/nsf_hifigan_44.1k_hop512_128bin_2024.02.zip
+    50 MB https://github.com/openvpi/vocoders/releases/download/nsf-hifigan-44.1k-hop512-128bin-2024.02/nsf_hifigan_44.1k_hop512_128bin_2024.02_logE.oudep
+nsf-hifigan-v1 NSF-HiFiGAN with 44.1 kHz sampling rate
+    50 MB https://github.com/openvpi/vocoders/releases/download/nsf-hifigan-v1/nsf_hifigan_20221211.zip
+    1074 MB https://github.com/openvpi/vocoders/releases/download/nsf-hifigan-v1/nsf_hifigan_finetune_20221211.zip
+    50 MB https://github.com/openvpi/vocoders/releases/download/nsf-hifigan-v1/nsf_hifigan_onnx_20221211.zip

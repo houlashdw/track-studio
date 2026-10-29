@@ -1,0 +1,6 @@
+v106 Canary for DiffSinger v106
+    519 MB https://github.com/spicytigermeat/canary_diffsinger/releases/download/v106/Canary_DS_v106_PACK.zip
+v103 Canary for DiffSinger v103
+    520 MB https://github.com/spicytigermeat/canary_diffsinger/releases/download/v103/Canary_DS_v103_PACK.zip
+v102 INITIAL RELEASE
+    517 MB https://github.com/spicytigermeat/canary_diffsinger/releases/download/v102/Canary_DS_v102_PACK.zip
