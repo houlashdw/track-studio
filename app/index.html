@@ -1267,11 +1267,31 @@ function makeTitle(prompt, styleId, seed) {
 }
 
 /* ============ КОМПОЗИТОР: spec → события ============ */
+/* структура из пометок в тексте ([Intro] [Verse] [Pre-Chorus] [Chorus] [Bridge] [Drop] [Outro]) — как в ACE-Step / YuE:
+   части бита строятся под блоки текста, припев всегда ложится на самую мощную часть */
+const LYR_TAGS = [[/^(intro|интро|вступление)/, 'intro', 'Интро', 1, .35], [/^(pre-?chorus|предприпев|пре-?хук|pre-?hook|build|нарастание)/, 'build', 'Предприпев', 1, .72],
+  [/^(chorus|hook|refrain|припев|хук|рефрен)/, 'peak', 'Припев', 2, .95], [/^(drop|дроп)/, 'drop', 'Дроп', 2.4, 1], [/^(bridge|бридж|мост)/, 'lift', 'Бридж', 1.4, .7],
+  [/^(break|брейк|instrumental|инструментал|проигрыш|interlude)/, 'break', 'Брейк', 1.2, .4], [/^(outro|аутро|концовка|конец)/, 'outro', 'Аутро', 1, .3],
+  [/^(verse|куплет|rap|рэп|part|часть)/, 'verse', 'Куплет', 3, .68]];
+function lyrBlocks(txt) {
+  return (txt || '').trim().split(/\n\s*\n/).map((b) => { const ls = b.split('\n').map((x) => x.trim()).filter(Boolean), tl = ls.find((x) => /^\[.*\]$/.test(x)), tag = tl ? tl.slice(1, -1).trim().toLowerCase() : '';
+    const T = tag ? LYR_TAGS.find((q) => q[0].test(tag)) : null; return { tag, T, lines: ls.filter((x) => !/^\[.*\]$/.test(x)) }; });
+}
+function lyrForm(txt) {
+  const B = lyrBlocks(txt); if (B.filter((b) => b.T).length < 2) return null;   /* меньше двух пометок — структуру выбирает промпт, как раньше */
+  const out = []; B.forEach((b, i) => { if (!b.T && !b.lines.length) return; const T = b.T || LYR_TAGS[LYR_TAGS.length - 1], n = b.lines.length;
+    out.push([T[1], T[2], n ? n * 2 + 1 : T[3] * 3, T[4], i]); });   /* вес — сколько тактов просят строки (≈2 на строку + вдох) */
+  if (out[0] && out[0][0] !== 'intro') out.unshift(['intro', 'Интро', 3, .35, -1]);
+  if (out[out.length - 1][0] !== 'outro') out.push(['outro', 'Аутро', 3, .3, -1]);
+  return out;
+}
 function planForm(spec, totalBars) {
   const Rj = mulberry32((spec.seed ^ 0x77aa) >>> 0), P = (a) => a[Math.floor(Rj() * a.length)], U = (a, b) => a + (b - a) * Rj();
   const form = spec.form, S = [], add = (role, name, w, e, opt) => S.push([role, name, w, e, !!opt]);
   const units = Math.floor(totalBars / 2);
-  if (form === 'drift') {
+  if (spec.lyrForm && spec.lyrForm.length >= 2) {
+    for (const q of spec.lyrForm) { add(q[0], q[1], q[2], q[3]); S[S.length - 1][5] = q[4]; }
+  } else if (form === 'drift') {
     add('flow', 'Вход', U(1.5, 2.5), .28); const n = P([3, 4, 5]); let e = .42;
     for (let i = 0; i < n; i++) { e = clamp(e + U(-.12, .22), .35, .88); add('flow', P(['Рост', 'Волна', 'Глубина', 'Течение', 'Свет', 'Тень']), U(2, 3.5), e, i > 1); }
     add('outro', 'Растворение', U(1.2, 2), .22);
@@ -1314,7 +1334,8 @@ function planForm(spec, totalBars) {
   let bar = 0; const seen = {}, nm = {};
   return S.map((s, i) => {
     const bars = alloc[i] * 2; seen[s[0]] = (seen[s[0]] || 0) + 1; nm[s[1]] = (nm[s[1]] || 0) + 1;
-    const sec = { idx: i, role: s[0], name: s[1] + (nm[s[1]] > 1 ? ' ' + ['', 'II', 'III', 'IV'][nm[s[1]] - 1] : ''), start: bar, bars, variant: seen[s[0]] - 1, energy: clamp(s[3] * (.55 + .7 * spec.energy), .12, 1) };
+    const sec = { idx: i, role: s[0], name: s[1] + (nm[s[1]] > 1 ? ' ' + ['', 'II', 'III', 'IV', 'V', 'VI'][nm[s[1]] - 1] : ''), start: bar, bars, variant: seen[s[0]] - 1, energy: clamp(s[3] * (.55 + .7 * spec.energy), .12, 1) };
+    if (s[5] != null) sec.blk = s[5];
     bar += bars; return sec;
   });
 }
@@ -3279,6 +3300,7 @@ async function buildTrack(label) {
     SMP.active = !!SMP.themed || !!($('#net') && $('#net').checked); if (typeof applyThemeMood === 'function') applyThemeMood(spec); netCreditsUI();
     spec.rap = false;
     if ($('#voiceMode').value === 'rap' && $('#rapSetup') && $('#rapSetup').checked) { rapifySpec(spec); syncControls(); }
+    spec.lyrForm = $('#voiceMode').value !== 'off' && !S.instrOnly ? lyrForm($('#lyrics').value) : null;
     const track = compose(spec);
     setStatus('Рендерю звук: ' + track.events.length + ' нот и ударов…', .05, true);
     await new Promise((r) => setTimeout(r, 30));
@@ -3787,10 +3809,12 @@ function layoutLyrics(track, txt, mode) {
   /* блоки текста; [Chorus]/[Hook]/[Припев] помечают строки припева — в них дубли и гармонии в любом жанре */
   const CHO = /^\[\s*(chorus|hook|refrain|pre-?chorus|припев|хук|рефрен)/i, choSet = new Set();
   const blocks = txt.split(/\n\s*\n/).map((b) => { const ls = b.split('\n').map((x) => x.trim()); const cho = ls.some((x) => CHO.test(x)); const out = ls.filter((x) => x && !/^\[.*\]$/.test(x)); if (cho) out.forEach((x) => choSet.add(x)); return out; }).filter((b) => b.length);
-  const secs = track.sections.filter((s) => !['intro', 'outro', 'break'].includes(s.role));
+  const byTag = track.sections.some((s) => s.blk != null), RB = byTag ? lyrBlocks(txt) : null;
+  if (byTag) RB.forEach((b) => { if (b.T && b.T[1] === 'peak') b.lines.forEach((x) => choSet.add(x)); });
+  const secs = byTag ? track.sections.filter((s) => s.blk >= 0 && RB[s.blk] && RB[s.blk].lines.length) : track.sections.filter((s) => !['intro', 'outro', 'break'].includes(s.role));
   if (!blocks.length || !secs.length) return items;
   secs.forEach((s, i) => {
-    const lines = blocks.length >= secs.length ? blocks.filter((_, j) => Math.min(j, secs.length - 1) === i).flat() : blocks[i % blocks.length];
+    const lines = byTag ? RB[s.blk].lines : blocks.length >= secs.length ? blocks.filter((_, j) => Math.min(j, secs.length - 1) === i).flat() : blocks[i % blocks.length];
     if (!lines.length) return;
     const avail = s.bars - (s.bars >= 8 ? 1 : 0); let bar = 0, li = 0;
     while (bar < avail && li < 64) {
@@ -4746,7 +4770,7 @@ document.addEventListener('DOMContentLoaded', init);
 (function () {
   const $q = (s) => document.querySelector(s);
   const RATE = { rap: 3.5, sing: 2.5 };   /* слогов в секунду: при 4.8 голос тараторил */
-  const isHook = (h) => /припев|chorus|hook|хук|refrain/i.test(h || '');
+  const isHook = (h) => !/pre-?chorus|pre-?hook|пред|пре-/i.test(h || '') && /припев|chorus|hook|хук|refrain/i.test(h || '');
   function parseBlocks(txt) {
     return txt.split(/\n\s*\n/).map((b) => {
       const ls = b.split('\n').map((x) => x.trim()).filter(Boolean), head = ls.find((x) => /^\[.*\]$/.test(x)) || '';
@@ -4759,19 +4783,20 @@ document.addEventListener('DOMContentLoaded', init);
 
   globalThis.layoutLyrics = function (track, txt, mode) {
     const rap = mode === 'rap', bd = track.barDur, items = [], blocks = parseBlocks(txt);
-    const secs = track.sections.filter((s) => !['intro', 'outro', 'break'].includes(s.role));
+    const byTag = track.sections.some((s) => s.blk != null), RB = byTag ? lyrBlocks(txt) : null;   /* части бита построены по пометкам текста — блок едет ровно в свою часть */
+    const secs = byTag ? track.sections.filter((s) => s.blk >= 0 && RB[s.blk] && RB[s.blk].lines.length) : track.sections.filter((s) => !['intro', 'outro', 'break'].includes(s.role));
     if (!blocks.length || !secs.length) return items;
     const spb = sylRate(60 / (bd / 4), rap) * bd;   /* по темпу бита */
     const barsFor = (tx) => { const need = sylN(tx) / spb; let lb = need <= 1.15 ? 1 : need <= 2.6 ? 2 : need <= 3.3 ? 3 : 4; if (!rap && lb === 3) lb = 4; return lb; };
     const uniq = blocks.length >= secs.length, hookB = blocks.find((b) => b.hook), shortL = blocks.reduce((a, b) => a + b.lines.length, 0) <= 6; let carry = [];
     secs.forEach((s, i) => {
-      const own = uniq ? blocks.filter((_, j) => Math.min(j, secs.length - 1) === i) : (i < blocks.length ? [blocks[i]] : hookB ? [hookB] : shortL ? [blocks[i % blocks.length]] : []);
+      const own = byTag ? [{ hook: RB[s.blk].T && RB[s.blk].T[1] === 'peak' || isHook(RB[s.blk].tag), lines: RB[s.blk].lines }] : uniq ? blocks.filter((_, j) => Math.min(j, secs.length - 1) === i) : (i < blocks.length ? [blocks[i]] : hookB ? [hookB] : shortL ? [blocks[i % blocks.length]] : []);
       const lines = carry.concat(own.flatMap((b) => b.lines)), hook = own.some((b) => b.hook) || (!hookB && shortL); carry = [];
-      const avail = s.bars - (s.bars >= 8 ? 1 : 0); let bar = 0, li = 0, guard = 0;
+      const avail = s.bars - (s.bars >= 8 && !byTag ? 1 : 0); let bar = 0, li = 0, guard = 0;
       const place = (tx) => {
         const lb = Math.min(barsFor(tx), avail); if (bar + lb > avail) return false;
         if ((lb === 2 || lb === 4) && bar % 2 === 1 && bar + 1 + lb <= avail) bar += 1;
-        items.push({ t0: s.t0 + bar * bd, t1: s.t0 + (bar + lb) * bd, tx, bars: lb, sec: s.idx }); bar += lb; return true;
+        items.push({ t0: s.t0 + bar * bd, t1: s.t0 + (bar + lb) * bd, tx, bars: lb, sec: s.idx, cho: hook }); bar += lb; return true;
       };
       while (li < lines.length && place(lines[li])) li++;
       if (li < lines.length) { carry = lines.slice(li); return; }
@@ -6677,7 +6702,7 @@ self.onmessage = async (e) => { const m = e.data; try {
         /* аниме-регистр: мелодия выше на ~3–4 полутона (в ладу бита — каждая нота заново подгоняется к гамме) */
         const top0 = Math.max(...notes0), up = window.__dsUp != null ? window.__dsUp : clamp(77 - top0, 0, 4), nDS = up ? notes0.map((m, k) => fitMidi(m + up, ctx.track, ctx.spec, it.t0 + tV[k], sy[k].stress >= 0.6, 1.5, nl[k])) : notes0;
         const f0d = buildF0('', nDS, 0).f0, norm = (x) => { let e = 0, n = 0, pk = 0; for (let i = 0; i < x.length; i++) { const a = Math.abs(x[i]); if (a > pk) pk = a; } for (let i = 0; i < x.length; i++) if (Math.abs(x[i]) > 0.02 * pk) { e += x[i] * x[i]; n++; } const r = n ? Math.sqrt(e / n) : 0; return r > 0 ? Math.min(0.95 / pk, 0.22 / r) * 10 ** ((lv.db || 0) / 20) : 1; };
-        const VO = { voltage: 0.7, arc: 0.3 }, GD = 0.08;   /* «Voltage» — самый яркий подголос Canary (замер: центроид 910 Гц против 577), лёгкий сдвиг формант вверх */
+        const VO = window.__dsVO || { voltage: 0.7, arc: 0.3 }, GD = window.__dsGD != null ? window.__dsGD : 0.08;   /* «Voltage» — самый яркий подголос Canary (замер: центроид 910 Гц против 577), лёгкий сдвиг формант вверх */
         const yP = dsSing(tok, dur, f0d, VO, { gender: GD, lang });
         let dP = null, hP = null;
         if (hot && S.voxStack !== false && !window.__noStack) {
