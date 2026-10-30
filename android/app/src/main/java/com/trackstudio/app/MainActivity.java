@@ -59,6 +59,7 @@ public class MainActivity extends Activity {
         WebView.setWebContentsDebuggingEnabled(true);
 
         ds = new DsEngine(getFilesDir());
+        new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> ds.preload(), 4000);
         web = new WebView(this);
         web.setBackgroundColor(Color.parseColor(BG));
         WebSettings s = web.getSettings();

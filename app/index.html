@@ -3175,9 +3175,11 @@ async function aixRun() {
 /* певческая модель в приложении: строка с кнопкой «Скачать» и прогрессом */
 function dsUI() {
   const row = $('#dsRow'); if (!row || !window.TSAndroid || !window.TSAndroid.dsStatus) return;
+  try { S.hq = localStorage.getItem('ts_hq') === '1'; } catch (e) { }
   const msg = $('#dsMsg'), btn = $('#dsBtn'), bar = $('#dsBar');
   const draw = () => { let s; try { s = JSON.parse(TSAndroid.dsStatus()); } catch (e) { return; } row.hidden = false;
-    if (s.state === 'installed' || s.state === 'ready') { msg.textContent = '🎤 Пение — певческая модель Canary (DiffSinger) ✓'; btn.hidden = true; bar.hidden = true; if (globalThis.DSX) { DSX.ok = true; } return true; }
+    if (s.state === 'installed' || s.state === 'ready') { msg.innerHTML = '🎤 Пение — Canary ✓ <label class="chk sm" style="display:inline-flex;margin-left:8px"><input type="checkbox" id="dsHQ"' + (S.hq ? ' checked' : '') + '><span>макс. качество (в 2–3 раза дольше)</span></label>';
+      $('#dsHQ').onchange = (e) => { S.hq = e.target.checked; try { localStorage.setItem('ts_hq', S.hq ? '1' : ''); } catch (er) { } }; btn.hidden = true; bar.hidden = true; if (globalThis.DSX) { DSX.ok = true; } return true; }
     if (s.state === 'downloading') { msg.textContent = 'Качаю певческую модель… ' + Math.round(s.progress * 100) + '% (один раз, ~520 МБ)'; btn.hidden = true; bar.hidden = false; bar.firstElementChild.style.width = Math.round(s.progress * 100) + '%'; return false; }
     msg.textContent = (/^error/.test(s.state) ? 'Не скачалось (' + s.state.slice(7, 90) + '). ' : '') + '🎤 Настоящий певческий голос для пения (Canary, без «заиканий»): скачать один раз ~520 МБ'; btn.hidden = false; bar.hidden = true; return true; };
   btn.onclick = () => { try { TSAndroid.dsInstall(); } catch (e) { } poll(); };
@@ -6157,7 +6159,7 @@ self.onmessage = async (e) => { const m = e.data; try {
   }
   function progText(doneL, nL) {
     const el = (performance.now() - TS.t0) / 1000, eta = doneL >= 2 && doneL < nL ? Math.max(0, Math.round((el / doneL) * (nL - doneL))) : null;
-    return 'Голос ' + modeLabel() + ' · строк готово ' + doneL + ' из ' + nL + (TS.cached ? ' (заранее ' + TS.cached + ')' : '') + ' · ' + Math.round(el) + ' с' + (eta != null ? ' · осталось ~' + eta + ' с' : '');
+    return 'Голос ' + (globalThis.DSX && DSX.on ? 'Canary' : modeLabel()) + ' · строк готово ' + doneL + ' из ' + nL + (TS.cached ? ' (заранее ' + TS.cached + ')' : '') + ' · ' + Math.round(el) + ' с' + (eta != null ? ' · осталось ~' + eta + ' с' : '');
   }
   /* ================= ДВИЖОК ФЛОУ =================
      Рэпер сначала держит ритм, потом вставляет слова. Здесь так же:
@@ -6571,12 +6573,24 @@ self.onmessage = async (e) => { const m = e.data; try {
     for (let k = 0; k < T; k++) { const x = (k / DS_FPS) / 0.0125, i = Math.min(n - 1, Math.floor(x)), j = Math.min(n - 1, i + 1), w = x - i; out[k] = +(filled[i] * (1 - w) + filled[j] * w).toFixed(2); }
     return out;
   }
+  /* одинаковые строки (припев, повторы) не считаем заново: тот же запрос — тот же звук */
+  const dsCache = new Map();
   async function dsSing(tok, dur, f0h, spk, opt) {
     const P = dsPhones(tok, dur, opt && opt.lang), f0 = dsF0(f0h, P.T), A = window.TSAndroid;
-    const id = A.dsSubmit(JSON.stringify({ ph: P.ph, dur: P.fr, f0, spk, steps: (opt && opt.steps) || 10, depth: 0.3, gender: (opt && opt.gender) || 0 }));
-    const r = await fetch('https://appassets.androidplatform.net/ds/out/' + id);
-    if (!r.ok) throw new Error('певческая модель: ' + (await r.text()).slice(0, 200));
-    return new Float32Array(await r.arrayBuffer());
+    const q = JSON.stringify({ ph: P.ph, dur: P.fr, f0, spk, steps: (opt && opt.steps) || (S.hq ? 10 : 6), depth: 0.3, gender: (opt && opt.gender) || 0 });
+    let pr = dsCache.get(q);
+    if (!pr) { pr = (async () => { const id = A.dsSubmit(q), r = await fetch('https://appassets.androidplatform.net/ds/out/' + id);
+        if (!r.ok) throw new Error('певческая модель: ' + (await r.text()).slice(0, 200)); return new Float32Array(await r.arrayBuffer()); })();
+      dsCache.set(q, pr); pr.catch(() => dsCache.delete(q)); if (dsCache.size > 60) dsCache.delete(dsCache.keys().next().value); }
+    return (await pr).slice();
+  }
+  /* дабл без второго прогона модели: та же дорожка с плавающей задержкой 8–20 мс и лёгким «плаванием» высоты — как второй дубль */
+  function dsDouble(y, sr, seed) {
+    const R = mulberry32(seed >>> 0), o = new Float32Array(y.length), base = 0.012 * sr, dep = 0.004 * sr, f1 = 0.21 + R() * 0.2, f2 = 0.53 + R() * 0.3, p1 = R() * 6.28, p2 = R() * 6.28;
+    for (let i = 0; i < y.length; i++) { const d = base + dep * (0.65 * Math.sin(p1 + (6.2832 * f1 * i) / sr) + 0.35 * Math.sin(p2 + (6.2832 * f2 * i) / sr)), x = i - d, j = Math.floor(x), w = x - j;
+      o[i] = j >= 0 && j + 1 < y.length ? y[j] * (1 - w) + y[j + 1] * w : 0; }
+    let lp = 0; for (let i = 0; i < o.length; i++) { lp += 0.55 * (o[i] - lp); o[i] = lp; }   /* чуть темнее лида — не спорит с ним */
+    return o;
   }
   globalThis.dsSing = dsSing; globalThis.dsPhones = dsPhones; globalThis.dsF0 = dsF0;
   async function renderNoteLine(it, ctx, lv, emo) {
@@ -6668,14 +6682,15 @@ self.onmessage = async (e) => { const m = e.data; try {
         let dP = null, hP = null;
         if (hot && S.voxStack !== false && !window.__noStack) {
           const Rd = mulberry32((hashStr(it.tx + '|stk') ^ (ctx.spec.seed & 0xffff)) >>> 0), det = (Rd() < 0.5 ? -1 : 1) * (6 + Rd() * 6);
-          dP = dsSing(tok, dur, buildF0('d', nDS, det).f0, { arc: 0.6, voltage: 0.4 }, { gender: GD, lang });
+          dP = S.hq ? dsSing(tok, dur, buildF0('d', nDS, det).f0, { arc: 0.6, voltage: 0.4 }, { gender: GD, lang }) : null;
           const hb = nDS.map((m, k) => { const tt = it.t0 + tV[k], w = soundAt(ctx.track, ctx.spec, tt), sc = SCALES[ctx.spec.scale] || SCALES.minor, kk = (((ctx.spec.key + keyOffAt(ctx.track, tt)) % 12) + 12) % 12;
             let b2 = m - 3, bs = -1; for (const c2 of [m - 3, m - 4, m - 5]) { const pc = ((c2 % 12) + 12) % 12, v = (sc.semis.includes((pc - kk + 12) % 12) ? 1 : 0) + w[pc]; if (v > bs) { bs = v; b2 = c2; } } return b2; });
-          hP = dsSing(tok, dur, buildF0('h', hb, -4).f0, { spark: 0.5, arc: 0.5 }, { gender: GD, lang });
+          hP = dsSing(tok, dur, buildF0('h', hb, -4).f0, { spark: 0.5, arc: 0.5 }, { gender: GD, lang, steps: S.hq ? 10 : 4 });
         }
         let y = await yP; const g = norm(y); for (let i = 0; i < y.length; i++) y[i] *= g;
         const late = (x, sec) => { const n = Math.round(sec * 44100), o = new Float32Array(x.length); o.set(x.subarray(0, Math.max(0, x.length - n)), n); return o; };
         let db = null, hy = null; const Rl = mulberry32((hashStr(it.tx + '|late') ^ (ctx.spec.seed & 0xffff)) >>> 0);
+        if (!dP && hot && S.voxStack !== false && !window.__noStack) db = late(dsDouble(y, 44100, hashStr(it.tx + '|dbl') ^ ctx.spec.seed), 0.01 + Rl() * 0.012);
         if (dP) { try { db = await dP; for (let i = 0; i < db.length; i++) db[i] *= g; db = late(db, 0.012 + Rl() * 0.018); } catch (er) { console.warn('дубль', er); } }
         if (hP) { try { hy = await hP; for (let i = 0; i < hy.length; i++) hy[i] *= g; hy = late(hy, 0.006 + Rl() * 0.012); } catch (er) { console.warn('гармония', er); } }
         TS.total++; TS.done++; DSX.used = (DSX.used || 0) + 1;
@@ -6837,7 +6852,7 @@ self.onmessage = async (e) => { const m = e.data; try {
   async function renderNeural(raw, speech) {
     const sr = raw.sampleRate, N = raw.length, items = lyricPlan(), prompt = $q('#prompt') ? $q('#prompt').value : '';
     const plan = synthPlan($q('#lyrics').value, prompt, speech ? 'rap' : 'sing'), D = plan.D, LK = lookOf(D, speech), V = VOICES.kru; globalThis.VOXDNA = D;
-    dsState(); DSX.used = 0; const dsOn = DSX.ok && !speech && !window.__noDS;   /* пение певческой моделью — Kokoro (163 МБ) не грузим вовсе */
+    dsState(); DSX.used = 0; const dsOn = DSX.ok && !speech && !window.__noDS; DSX.on = dsOn;   /* пение певческой моделью — Kokoro (163 МБ) не грузим вовсе */
     if (dsOn && KV2.w && !window.__dbgNotes) { try { kv2Kill(); KV2.initP = null; } catch (e) { } }   /* память телефона — певческой модели (Kokoro понадобится снова только для рэпа) */
     if (!window.__mockTTS && !dsOn && items.some((it) => lineEng(it.tx) !== 'none')) { await ensureVoice((g, t) => dlUI(g, t)); dlUI(1, 1, true); }
     S.voxLangs = [...new Set(items.map((it) => lineLang(it.tx)))];
@@ -6870,7 +6885,7 @@ self.onmessage = async (e) => { const m = e.data; try {
       if (S.voxInhale && LK.inhale && it.t0 - prevEnd > 0.4) inhaleAt(m, sr, start + L.lead * 0.5 - 0.2, pkOf(L.y) * 0.1 * LK.inhale);
       prevEnd = it.t1;
       /* эдлибы по настроению: короткое слово в паузе после строки, тише */
-      if (S.voxAdlibs !== false && (S.voxAdlibs || D.excl) && !(globalThis.__kv2 && globalThis.__kv2.sing && !window.__noNotes) && L.flow && ctxBase.emo.adl.length && i % 2 === 1) {   /* в нотном режиме без речевых вставок: звучали чужеродно */ try { const w = ctxBase.emo.adl[(i >> 1) % ctxBase.emo.adl.length], T = await say(w + (ctxBase.emo.excl ? '!' : '.'), D, 'shout'), xa = trim(T.pcm, T.sr), te = it.t0 + (L.flow.end || L.flow.tOn[L.flow.tOn.length - 1]) + 0.12, nx = i + 1 < items.length ? items[i + 1].t0 - 0.65 : 1e9; if (te < it.t1 + 0.3 && te + xa.length / T.sr < nx) { addResampled(h1, xa, T.sr, sr, te, 0.55, 0.6); anyH = true; } } catch (e) { } }
+      if (!dsOn && S.voxAdlibs !== false && (S.voxAdlibs || D.excl) && !(globalThis.__kv2 && globalThis.__kv2.sing && !window.__noNotes) && L.flow && ctxBase.emo.adl.length && i % 2 === 1) {   /* в нотном режиме без речевых вставок: звучали чужеродно */ try { const w = ctxBase.emo.adl[(i >> 1) % ctxBase.emo.adl.length], T = await say(w + (ctxBase.emo.excl ? '!' : '.'), D, 'shout'), xa = trim(T.pcm, T.sr), te = it.t0 + (L.flow.end || L.flow.tOn[L.flow.tOn.length - 1]) + 0.12, nx = i + 1 < items.length ? items[i + 1].t0 - 0.65 : 1e9; if (te < it.t1 + 0.3 && te + xa.length / T.sr < nx) { addResampled(h1, xa, T.sr, sr, te, 0.55, 0.6); anyH = true; } } catch (e) { } }
       syl += L.syl;
       await new Promise((r) => setTimeout(r, 0));
     }

@@ -42,7 +42,7 @@ public class DsEngine {
     volatile String state = "none";
     volatile double progress = 0;
     OrtEnvironment env;
-    OrtSession ac, vc;
+    volatile OrtSession ac, vc;
     final Map<String, Integer> ph = new HashMap<>();
     final Map<String, float[]> emb = new HashMap<>();
     final ExecutorService run = Executors.newSingleThreadExecutor();
@@ -54,7 +54,7 @@ public class DsEngine {
         if (new File(dir, "ok").exists()) state = "installed";
     }
 
-    synchronized String status() {
+    String status() {   /* без блокировки: страница опрашивает статус, пока модель грузится */
         try {
             JSONObject o = new JSONObject();
             o.put("state", state);
@@ -105,6 +105,7 @@ public class DsEngine {
                 new FileOutputStream(new File(dir, "ok")).close();
                 progress = 1;
                 state = "installed";
+                preload();
             } catch (Exception ex) {
                 state = "error: " + ex.getMessage();
             }
@@ -161,6 +162,12 @@ public class DsEngine {
         }
         state = "ready";
         android.util.Log.i("TrackStudio", "ds ready");
+    }
+
+    /* загрузить модель заранее, в фоне — чтобы первая песня не ждала загрузки 400 МБ */
+    void preload() {
+        if (ac != null || !new File(dir, "ok").exists()) return;
+        run.submit(() -> { try { load(); } catch (Throwable t) { android.util.Log.w("TrackStudio", "ds preload", t); ac = null; } return null; });
     }
 
     synchronized String submit(String json) {
