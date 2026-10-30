@@ -1,0 +1,271 @@
+{
+ "steps": [
+  {
+   "name": "env",
+   "value": {
+    "href": "https://appassets.androidplatform.net/index.html",
+    "secure": true,
+    "caches": "object",
+    "idb": "object",
+    "ua": "Mozilla/5.0 (Linux; Android 15; sdk_gphone64_x86_64 Build/AE3A.240806.043; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/124.0.6367.219 Mobile Safari/537.36 TrackStudioApp/1",
+    "bridge": "object",
+    "platform": "android 35",
+    "sw": false,
+    "title": "Трек Студия",
+    "analyze": "function",
+    "installHidden": true,
+    "inApp": true,
+    "w": 320,
+    "h": 592,
+    "dpr": 1
+   },
+   "t": 0.1
+  },
+  {
+   "name": "understood",
+   "value": "Понял: Хардстайл · 150 bpm · рэп ~4,4 слога/с в такт",
+   "t": 1.1
+  },
+  {
+   "name": "beat_started",
+   "value": 1,
+   "t": 4.1
+  },
+  {
+   "name": "beat",
+   "value": {
+    "seconds": 25.0,
+    "status": "Готово: 1:29 · пак «Джампстайл · aggr», собрано за 23.4 с",
+    "dur": 92.8
+   },
+   "t": 29.2
+  },
+  {
+   "name": "save_link",
+   "value": "Сохранено: Загрузки/TrackStudio/ci-test.txt",
+   "t": 31.9
+  },
+  {
+   "name": "save_wav",
+   "value": "Сохранено: Загрузки/TrackStudio/ржавый-горизонт.wav",
+   "t": 39.9
+  },
+  {
+   "name": "downloads_after_beat",
+   "value": "total 15996\n-rwxrwx--- 1 u0_a188 media_rw       16 2026-10-30 21:35 ci-test.txt\n-rwxrwx--- 1 u0_a188 media_rw 16366316 2026-10-30 21:35 ржавый-горизонт.wav\n",
+   "t": 40.0
+  },
+  {
+   "name": "ds_install",
+   "value": {
+    "status": "{\"state\":\"ready\",\"progress\":1,\"loaded\":true,\"pitch\":\"installed\",\"pprogress\":1}",
+    "seconds": 40
+   },
+   "t": 80.0
+  },
+  {
+   "name": "voice_ds_started",
+   "value": {
+    "attempt": 1,
+    "after_s": 3.0,
+    "snap": {
+     "status": "Пишу партитуру…",
+     "busy": true,
+     "ready": "",
+     "line": "Аниме · милая · энергичная",
+     "kv2": {
+      "mode": "",
+      "sing": false,
+      "busy": false,
+      "q": 0,
+      "genMs": 0
+     },
+     "mem": 78
+    }
+   },
+   "t": 83.0
+  },
+  {
+   "name": "voice_ds",
+   "value": {
+    "seconds": 48.1,
+    "status": "Готово: 0:44 · пак «J-pop / аниме · aggr» · голос: Аниме · милая · энергичная · пение, собрано за 44.7 с",
+    "voxInfo": "Аниме · милая · энергичная · пение",
+    "voxFail": null,
+    "kv2": "{\"w\":null,\"on\":false,\"sing\":false,\"failed\":false,\"nid\":0,\"pend\":{},\"q\":[],\"busy\":false,\"mode\":\"\",\"info\":\"\",\"initP\":null,\"from\":\"\"}",
+    "dur": 49.6,
+    "lineDiag": "[]"
+   },
+   "t": 128.1
+  },
+  {
+   "name": "voice_ds_report",
+   "value": "Загрузки/TrackStudio/report-voice_ds.zip",
+   "t": 134.4
+  },
+  {
+   "name": "ds_used",
+   "value": "{\"used\":8,\"status\":\"{\\\"state\\\":\\\"ready\\\",\\\"progress\\\":1,\\\"loaded\\\":true,\\\"pitch\\\":\\\"installed\\\",\\\"pprogress\\\":1}\",\"kit\":\"\",\"bank\":75}",
+   "t": 134.4
+  },
+  {
+   "name": "voice_started",
+   "value": {
+    "attempt": 1,
+    "after_s": 55.4,
+    "snap": {
+     "status": "Пишу партитуру…",
+     "busy": true,
+     "ready": "",
+     "line": "Аниме · обычная · поёт нотами ✓",
+     "kv2": {
+      "mode": "native",
+      "sing": true,
+      "busy": false,
+      "q": 0,
+      "genMs": 0
+     },
+     "mem": 78
+    }
+   },
+   "t": 189.8
+  },
+  {
+   "name": "voice",
+   "value": {
+    "seconds": 95.8,
+    "status": "Готово: 0:44 · пак «Хардстайл · glossy» · голос: Аниме · обычная · фразами в бит, собрано за 35.8 с",
+    "voxInfo": "Аниме · обычная · фразами в бит",
+    "voxFail": null,
+    "kv2": "{\"w\":null,\"on\":true,\"sing\":true,\"failed\":false,\"nid\":1,\"pend\":{},\"q\":[],\"busy\":false,\"mode\":\"native\",\"info\":\"/encoder/Cast_output_0 / /encoder/F0_proj/Conv_output_0 · nan0×1 · нативно\",\"initP\":{},\"from\":\"файл приложения\",\"native\":true}",
+    "dur": 47.1,
+    "lineDiag": "[{\"tx\":\"City lights are calling out my name toni\",\"rms\":0.06145,\"nf\":0},{\"tx\":\"Hold me close and never let me go\",\"rms\":0.06153,\"nf\":0},{\"tx\":\"Hold me close and never let me go\",\"rms\":0.06153,\"nf\":0},{\"tx\":\"We don't stop, we just turn it up louder\",\"rms\":0.06408,\"nf\":0},{\"tx\":\"Every heartbeat matching with the drum\",\"rms\":0.05969,\"nf\":0},{\"tx\":\"Stars are falling, I will sing tonight\",\"rms\":0.06115,\"nf\":0},{\"tx\":\"This is our song, so sing it loud\",\"rms\":0.05526,\"nf\":0},{\"tx\":\"City lights are calling out my name toni\",\"rms\":0.06112,\"nf\":0},{\"tx\":\"We don't stop, we just turn it up louder\",\"rms\":0.06422,\"nf\":0}]"
+   },
+   "t": 230.2
+  },
+  {
+   "name": "voice_report",
+   "value": "Загрузки/TrackStudio/report-voice.zip",
+   "t": 235.7
+  },
+  {
+   "name": "voice_sing_started",
+   "value": {
+    "attempt": 1,
+    "after_s": 51.3,
+    "snap": {
+     "status": "Пишу партитуру…",
+     "busy": true,
+     "ready": "",
+     "line": "Аниме · милая · энергичная · поёт нотами ✓",
+     "kv2": {
+      "mode": "native",
+      "sing": true,
+      "busy": false,
+      "q": 0,
+      "genMs": 0
+     },
+     "mem": 78
+    }
+   },
+   "t": 287.1
+  },
+  {
+   "name": "voice_sing",
+   "value": {
+    "seconds": 101.3,
+    "status": "Готово: 0:44 · пак «J-pop / аниме · glossy» · голос: Аниме · милая · энергичная · пение, собрано за 45.5 с",
+    "voxInfo": "Аниме · милая · энергичная · пение",
+    "voxFail": null,
+    "kv2": "{\"w\":null,\"on\":true,\"sing\":true,\"failed\":false,\"nid\":1,\"pend\":{},\"q\":[],\"busy\":false,\"mode\":\"native\",\"info\":\"/encoder/Cast_output_0 / /encoder/F0_proj/Conv_output_0 · nan0×1 · нативно\",\"initP\":{},\"from\":\"файл приложения\",\"native\":true}",
+    "dur": 46.8,
+    "lineDiag": "[]"
+   },
+   "t": 337.1
+  },
+  {
+   "name": "voice_sing_report",
+   "value": "Загрузки/TrackStudio/report-voice_sing.zip",
+   "t": 343.0
+  },
+  {
+   "name": "downloads",
+   "value": "total 19972\n-rwxrwx--- 1 u0_a188 media_rw       16 2026-10-30 21:35 ci-test.txt\n-rwxrwx--- 1 u0_a188 media_rw  1341539 2026-10-30 21:39 report-voice.zip\n-rwxrwx--- 1 u0_a188 media_rw  1379099 2026-10-30 21:37 report-voice_ds.zip\n-rwxrwx--- 1 u0_a188 media_rw  1333976 2026-10-30 21:41 report-voice_sing.zip\n-rwxrwx--- 1 u0_a188 media_rw 16366316 2026-10-30 21:35 ржавый-горизонт.wav\n",
+   "t": 343.0
+  }
+ ],
+ "console": [
+  "0 log error: Failed to load resource: net::ERR_NAME_NOT_RESOLVED https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Onest:wght@400;500;600&family=Unbounded:wght@",
+  "0 log error: Failed to load resource: the server responded with a status of 404 (Not Found) https://appassets.androidplatform.net/favicon.ico",
+  "19 log: бит: ноты за 12.6 с (2 потока)",
+  "88 log: бит: ноты за 3.5 с (2 потока)",
+  "128 log: голос: трек озвучен за 41.4 с, режим CPU, заранее 0/8",
+  "138 log: бит: ноты за 3.5 с (2 потока)",
+  "159 log: голос Kokoro: нативно на процессоре телефона",
+  "183 log: голос: трек озвучен за 25.6 с, режим телефон · ноты, заранее 0/8",
+  "195 log: бит: ноты за 2.7 с (2 потока)",
+  "225 log: голос: трек озвучен за 32.4 с, режим телефон · ноты, заранее 0/9",
+  "240 log: бит: ноты за 3.9 с (2 потока)",
+  "280 log: голос: трек озвучен за 37.1 с, режим телефон · ноты, заранее 0/9",
+  "292 log: бит: ноты за 2.1 с (2 потока)",
+  "332 log: голос: трек озвучен за 42.1 с, режим телефон · ноты, заранее 0/8"
+ ],
+ "voice_ds_snaps": [
+  [
+   3,
+   {
+    "status": "Пишу партитуру…",
+    "busy": true,
+    "ready": "",
+    "line": "Аниме · милая · энергичная",
+    "kv2": {
+     "mode": "",
+     "sing": false,
+     "busy": false,
+     "q": 0,
+     "genMs": 0
+    },
+    "mem": 78
+   }
+  ]
+ ],
+ "voice_snaps": [
+  [
+   55,
+   {
+    "status": "Пишу партитуру…",
+    "busy": true,
+    "ready": "",
+    "line": "Аниме · обычная · поёт нотами ✓",
+    "kv2": {
+     "mode": "native",
+     "sing": true,
+     "busy": false,
+     "q": 0,
+     "genMs": 0
+    },
+    "mem": 78
+   }
+  ]
+ ],
+ "voice_sing_snaps": [
+  [
+   51,
+   {
+    "status": "Пишу партитуру…",
+    "busy": true,
+    "ready": "",
+    "line": "Аниме · милая · энергичная · поёт нотами ✓",
+    "kv2": {
+     "mode": "native",
+     "sing": true,
+     "busy": false,
+     "q": 0,
+     "genMs": 0
+    },
+    "mem": 78
+   }
+  ]
+ ],
+ "total_s": 343.0
+}

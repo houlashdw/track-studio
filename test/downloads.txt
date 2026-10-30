@@ -1,0 +1,6 @@
+total 19972
+-rwxrwx--- 1 u0_a188 media_rw       16 2026-10-30 21:35 ci-test.txt
+-rwxrwx--- 1 u0_a188 media_rw  1341539 2026-10-30 21:39 report-voice.zip
+-rwxrwx--- 1 u0_a188 media_rw  1379099 2026-10-30 21:37 report-voice_ds.zip
+-rwxrwx--- 1 u0_a188 media_rw  1333976 2026-10-30 21:41 report-voice_sing.zip
+-rwxrwx--- 1 u0_a188 media_rw 16366316 2026-10-30 21:35 ржавый-горизонт.wav
