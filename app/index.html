@@ -845,6 +845,13 @@ const STYLES = {
     d: { energy: .4, dark: .45, density: .4, space: .35, echo: .3, grit: .3, swing: .5, pump: 0, chaos: .15, glitch: .05, warp: .5 },
     layers: L('kick snare hats perc bass pad lead tex fx'),
   },
+  jpop: {
+    name: 'J-pop / аниме', bpm: [126, 176], kick: 'four', snare: 'clap', hats: 'eighth', perc: ['shaker', 'click'], bass: 'pulse8',
+    chord: 'pad', cl: 2, arp: 'up', arpRate: 1, lead: 'saw', form: 'story', scales: ['major', 'minor', 'dorian'],
+    kit: { kick: 'tight', snare: 'snare', bass: 'pulse', lead: 'saw', arp: 'pluck', pad: 'piano', tex: 'hiss' },
+    d: { energy: .8, dark: .2, density: .45, space: .45, echo: .35, grit: .06, swing: 0, pump: .15, chaos: .1, glitch: .04, warp: .08 },
+    layers: L('kick snare hats perc bass pad arp tex fx')   /* в поп-песне мелодию ведёт голос — синт-лида нет */,
+  },
   synthwave: {
     name: 'Синтвейв', bpm: [98, 116], kick: 'four', snare: 'clap', hats: 'eighth', perc: ['click', 'tom'], bass: 'pulse8',
     chord: 'pad', cl: 2, arp: 'updown', arpRate: 1, lead: 'saw', form: 'story', scales: ['minor', 'major', 'dorian'],
@@ -1000,10 +1007,11 @@ const STYLE_WORDS = {
   techno: [/техно|techno|берлин|berlin|рейв|rave|бетон|подвал/, 2],
   house: [/хаус|house|диско|disco|фанк|funk|танцпол|вечеринк|party/, 2],
   ambient: [/эмбиент|ambient|медитац|атмосфер|дрон|drone|безмятеж|(?<![а-я])покой|туман|fog|океан|ocean|парящ|floating/, 2],
-  dnb: [/драм.?н.?бейс|drum.?n.?bass|\bdnb\b|\bd&b\b|jungle|джангл|нейрофанк|neurofunk|j-?rock|джей.?рок|опенинг|opening|аниме.?рок|(?<![а-я])рок(?![а-я])|(?<![a-z])rock(?![a-z])|панк|punk/, 3],
+  dnb: [/драм.?н.?бейс|drum.?n.?bass|\bdnb\b|\bd&b\b|jungle|джангл|нейрофанк|neurofunk|(?<![а-я])рок(?![а-я])|(?<![a-z])rock(?![a-z])|панк|punk/, 3],
   dub: [/(?<![а-я])даб(?![а-я])|\bdub\b|регги|reggae|ямайк|jamaic/, 3],
   trap: [/трэп|трап|trap|хип.?хоп|hip.?hop|рэп|\brap\b|808/, 3],
   lofi: [/лоу.?фай|лофай|лофи|lo.?fi|lofi|чилл|chill|учеб|study|винил|vinyl|кофе|coffee|дожд|rain|уютн|cozy|бум.?б[эе]п|boom.?bap|олд.?скул|old.?school/, 3],
+  jpop: [/j-?pop|джей.?поп|j-?rock|джей.?рок|аниме|anime|опенинг|opening|эндинг|ending|идол|idol|вокалоид|vocaloid|kawai|кава[йи]|v-?tuber|втубер|(?<![а-яa-z])поп(?![а-я])|(?<![a-z])pop(?![a-z])|о любви|про любовь|love song/, 3],
   synthwave: [/синт.?вейв|synth.?wave|retrowave|ретровейв|ретро|retro|неон|neon|закат|sunset|шоссе|highway|80-?е|80s|outrun|vaporwave|вейпорвейв|kawaii|кава[йи]|future.?bass|фьюче.?бас|j-?pop|джей.?поп|идол|idol|вокалоид|vocaloid/, 2],
   industrial: [/индастриал|industrial|завод|factory|станок|machine|механизм|конвейер|ржав|rust|\bebm\b/, 2],
   glitch: [/глитч|glitch|\bidm\b|авангард|экспериментальн|experimental|сломанн|broken beat|микро.?звук|clicks.?and.?cuts|брейк.?кор|break.?core/, 3],
@@ -1151,7 +1159,7 @@ function analyze(prompt, salt = 0) {
     fromMood = true;
     let best = -9;
     for (const [id, st] of Object.entries(STYLES)) {
-      const sc = -Math.abs(st.d.energy - clamp(.6 + mood.energy, 0, 1)) - Math.abs(st.d.dark - clamp(.55 + mood.dark, 0, 1)) + Rh() * .55 - (mood.chaos > .2 && id !== 'glitch' ? 0 : 0) + (mood.chaos > .3 && id === 'glitch' ? .8 : 0) + (mood.space > .3 && (id === 'ambient' || id === 'cinematic') ? .5 : 0);
+      const sc = (id === 'jpop' && /песн|song|вокал|vocal|голос|voice|спой|поёт|поет|sing/.test(textN) ? .8 : 0) - Math.abs(st.d.energy - clamp(.6 + mood.energy, 0, 1)) - Math.abs(st.d.dark - clamp(.55 + mood.dark, 0, 1)) + Rh() * .55 - (mood.chaos > .2 && id !== 'glitch' ? 0 : 0) + (mood.chaos > .3 && id === 'glitch' ? .8 : 0) + (mood.space > .3 && (id === 'ambient' || id === 'cinematic') ? .5 : 0);
       if (sc > best) { best = sc; styleId = id; }
     }
   }
@@ -1509,7 +1517,7 @@ function compose(spec) {
     const secKick = spec.feat && spec.feat.dist >= 0.5 ? (Rs(), 'dist') : Rs() < .35 ? pick(Rs, ['tight', 'long', 'dist', 'hard', 'jump', 'tekk']) : null, secSnare = Rs() < .45 ? pick(Rs, ['clap', 'rim', 'snare', 'gated']) : null;
     const secBass = INSTP.bass ? INSTP.bass : !['808', '808d'].includes(st.kit.bass) && Rs() < .4 ? pick(Rs, ['sawsub', 'sub', 'reese', 'pulse', 'wobble']) : st.kit.bass;
     const padKit = padInst || (sec.idx > 0 && Rs() < .4 ? pick(Rs, ['strings', 'tri']) : st.kit.pad);
-    const secPerc = Rs() < .7 ? pickN(Rs, ['click', 'metal', 'conga', 'tom', 'blip', 'cowbell', 'shaker', 'rim'], 2 + Math.floor(Rs() * 2)) : st.perc;
+    const secPerc = Rs() < .7 ? pickN(Rs, ['click', 'metal', 'conga', 'tom', 'blip', 'shaker', 'rim'].concat((st.perc || []).includes('cowbell') ? ['cowbell'] : []), 2 + Math.floor(Rs() * 2)) : st.perc;   /* ковбелл — подпись фонка, в другие стили не подмешиваем */
     let arpIdx = 0;
     const phDr = [];
     const phD = (ph) => phDr[ph] || (phDr[ph] = (() => {
@@ -1748,6 +1756,7 @@ const GV = (c) => (c === 'x' || c === 'X' ? 1 : c === 'o' ? .6 : c === 'g' ? .28
 const gp = (s) => Array.from({ length: 16 }, (_, i) => GV((s || '')[i] || '.'));
 const G = (k, sn, hc, ho, hr) => ({ k, sn, hc: hc || '................', ho: ho || '................', hr: hr || null });
 const GROOVES = {
+  jpop: [G('x.....x.x.......', '....x.......x...', 'x.x.x.x.x.x.x.x.'), G('x.....x...x.x...', '....x.......x..g', 'x.x.x.x.x.x.x.x.', '..............o.'), G('x...x...x...x...', '....x.......x...', 'x.x.x.x.x.x.x.x.', '..o...o...o...o.'), G('x.x...x.x.....x.', '....x.......x...', 'xxxxxxxxxxxxxxxx')],
   hardstyle: [G('x...x...x...x...', '....x.......x...', '..............x.', '..o...o...o...o.'), G('x...x...x...x.x.', '....x.......x..g', '.x.x.x.x.x.x.x.x', '..o...o...o...o.'), G('x...x...x..xx...', '....x.......x...', '..x...x...x...x.', '..o...o...o...o.'), G('x...x...x...x..x', '....x...g...x...', '................', 'o.o.o.o.o.o.o.o.')],
   hardtekk: [G('x..x..x.x..x..x.', '....x.......x...', '..x...x...x...x.', 'o...o...o...o...'), G('x.x.x.x.x.x.x.x.', '....x.......x...', '.x.x.x.x.x.x.x.x', '..o...o...o...o.'), G('x..xx..xx..xx..x', '....x.......x...', '..x...x...x...x.', '..o...o...o...o.'), G('x...x..xx...x.x.', '.......x.......x', '.x.x.x.x.x.x.x.x', '..o...o...o...o.'), G('x.xxx.xxx.xxx.xx', '....x.......x...', '................', '..o...o...o...o.')],
   jumpstyle: [G('x...x...x...x...', '....x.......x...', 'x.x.x.x.x.x.x.x.', '..o...o...o...o.'), G('x..x..x.x..x..x.', '....x.......x...', '..x...x...x...x.', 'o...o...o...o...'), G('x...x...x..xx...', '....x...g...x...', 'x.x.x.x.x.x.x.x.', '..o...o...o...o.'), G('x...x..xx...x...', '....x.......x..g', '.x.x.x.x.x.x.x.x', '..o...o...o...o.')],
@@ -2974,6 +2983,7 @@ const STYLE_EXPAND = {
   dub: { inst: [], mood: ['тягуче'], fx: ['эхо'], snd: ['глубокий суб-бас'] },
   trap: { inst: ['808'], mood: ['тёмно'], fx: [], snd: ['хэты быстрые роллы'] },
   lofi: { inst: ['клавиши'], mood: ['тепло', 'спокойно'], fx: ['приглушённо'], snd: ['винил'] },
+  jpop: { inst: ['пианино', 'гитара'], mood: ['светло', 'энергично'], fx: ['реверб'], snd: ['яркие аккорды', 'пульсирующий бас'] },
   synthwave: { inst: ['суперсо'], mood: ['тепло', 'мечтательно'], fx: ['реверб'], snd: ['пульсирующий бас', 'неон'] },
   industrial: { inst: [], mood: ['жёстко', 'холодно'], fx: ['перегруз'], snd: ['металлическая перкуссия'] },
   glitch: { inst: ['колокольчики'], mood: ['странно'], fx: [], snd: ['ломаный ритм'] },
@@ -5050,10 +5060,10 @@ self.onmessage = (e) => { try { const r = analyze(e.data.L, e.data.R, e.data.sr)
   }
   /* САМ ИЩЕТ ЭТАЛОНЫ в свободной музыке с открытыми лицензиями: Openverse (Jamendo, ccMixter, Freesound), Internet Archive, Wikimedia Commons.
      Ищет по стилю текущего трека, качает до 16 МБ, слушает тем же ухом, что и твои файлы. Не больше 6 треков в день. */
-  const NET_Q = { techno: 'techno', house: 'house music', ambient: 'ambient', dnb: 'drum and bass', dub: 'dub', trap: 'trap beat', lofi: 'lofi hip hop', synthwave: 'synthwave', industrial: 'industrial', glitch: 'idm glitch',
+  const NET_Q = { techno: 'techno', house: 'house music', ambient: 'ambient', dnb: 'drum and bass', dub: 'dub', trap: 'trap beat', lofi: 'lofi hip hop', synthwave: 'synthwave', jpop: 'anime opening', industrial: 'industrial', glitch: 'idm glitch',
     cinematic: 'cinematic', trance: 'trance', hardstyle: 'hardstyle', hardtekk: 'hardtek', jumpstyle: 'jumpstyle', gabber: 'gabber', rage: 'opium rage', melancore: 'melancore', hoodtrap: 'hoodtrap', phonk: 'phonk', drill: 'drill', jersey: 'jersey club', dubstep: 'dubstep' };
   /* учится по жанровым тегам (как ищут на SoundCloud/Audius), а не по «free beat»: тег из промпта → тег стиля; в фоне обходит любимые теги по очереди */
-  const NET_TAGS = ['melancore', 'opium rage', 'hardtekk', 'jumpstyle', 'hoodtrap', 'hardstyle', 'digicore', 'breakcore', 'phonk', 'hyperpop', 'jersey club', 'drum and bass'];
+  const NET_TAGS = ['melancore', 'opium rage', 'hardtekk', 'jumpstyle', 'hoodtrap', 'hardstyle', 'digicore', 'breakcore', 'hyperpop', 'jersey club', 'drum and bass'];
   const TAG_RE = [[/меланкор|melan.?core/, 'melancore'], [/опиум|opium|рейдж|rage/, 'opium rage'], [/хард.?тек|hard.?tekk?/, 'hardtekk'], [/джамп|jump.?style/, 'jumpstyle'], [/худ.?тр[эе]п|hood.?trap/, 'hoodtrap'],
     [/хард.?стайл|hard.?style/, 'hardstyle'], [/диджи.?кор|digi.?core/, 'digicore'], [/брейк.?кор|break.?core/, 'breakcore'], [/хайпер.?поп|hyper.?pop/, 'hyperpop'], [/фонк|phonk/, 'phonk'], [/джерси|jersey/, 'jersey club']];
   const netQuery = () => { const pr = (($q('#prompt') && $q('#prompt').value) || '').toLowerCase(), sp = (typeof S !== 'undefined' && S.spec) || {};
@@ -7301,7 +7311,7 @@ self.onmessage = async (e) => { const m = e.data; try {
   /* голос по умолчанию чистый: насыщение и «телефон» лёгкие; сильно — только где это суть жанра или просили словами */
   const VFXP = { phonk: { sat: .3, tel: .3, wide: .4, throw: 2, div: .75 }, rage: { sat: .4, tel: 0, wide: .6, throw: 1, div: .5 }, trap: { sat: .08, tel: 0, wide: .35, throw: 2, div: .75 }, hoodtrap: { sat: .1, tel: 0, wide: .3, throw: 2, div: .75 },
     drill: { sat: .1, tel: 0, wide: .3, throw: 1, div: .5 }, lofi: { sat: .05, tel: 0, wide: .2, throw: 1, div: 1 }, melancore: { sat: .05, tel: 0, wide: .5, throw: 2, div: .75 }, jersey: { sat: .08, tel: 0, wide: .4, throw: 1, div: .5 },
-    dnb: { sat: .05, tel: 0, wide: .5, throw: 1, div: .5 }, synthwave: { sat: .03, tel: 0, wide: .5, throw: 1, div: .75 }, cinematic: { sat: 0, tel: 0, wide: .4, throw: 1, div: 1 }, ambient: { sat: 0, tel: 0, wide: .45, throw: 1, div: 1 },
+    dnb: { sat: .05, tel: 0, wide: .5, throw: 1, div: .5 }, synthwave: { sat: .03, tel: 0, wide: .5, throw: 1, div: .75 }, jpop: { sat: .02, tel: 0, wide: .55, throw: 1, div: .5 }, cinematic: { sat: 0, tel: 0, wide: .4, throw: 1, div: 1 }, ambient: { sat: 0, tel: 0, wide: .45, throw: 1, div: 1 },
     dubstep: { sat: .2, tel: 0, wide: .5, throw: 1, div: .5 }, hardstyle: { sat: .25, tel: 0, wide: .5, throw: 1, div: .5 }, industrial: { sat: .35, tel: .2, wide: .3, throw: 1, div: .5 }, gabber: { sat: .3, tel: 0, wide: .4, throw: 1, div: .5 } };
   globalThis.vfxProfile = function (spec) {
     const p = { sat: .03, tel: 0, wide: .35, throw: 1, div: .75, ...(VFXP[spec && spec.style] || {}) }, t = ((document.querySelector('#prompt') || {}).value || '').toLowerCase().replace(/(?:без|no|without)\s+\S+/g, ' ');
