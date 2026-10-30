@@ -178,7 +178,7 @@ if os.environ.get('VOICE', 'true') == 'true':
     step('ds_install', {'status': st, 'seconds': round(time.time() - t0)})
     if st and 'installed' in st:
         voice_track('sing', 'аниме-опенинг, энергично, милый голос, 150 bpm', 'voice_ds')
-        step('ds_used', ev("JSON.stringify({used: (globalThis.DSX||{}).used, fail: (globalThis.DSX||{}).fail})"))
+        step('ds_used', ev("JSON.stringify({used: (globalThis.DSX||{}).used, fail: (globalThis.DSX||{}).fail, status: TSAndroid.dsStatus(), kit: S.track && S.track.skName, bank: Object.keys(SKIT.st.pcm).length})"))
 if os.environ.get('VOICE', 'true') == 'true':
     for mode, prompt, name in TRACKS:
         voice_track(mode, prompt, name)

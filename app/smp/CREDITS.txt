@@ -1,0 +1,5 @@
+Банк ударных Трек Студии (smp/) — только свободные звуки:
+- TR-808 samples by Edward Loveall (github.com/tidalcycles/sounds-tr808-fischer) — CC0 1.0
+- uzu-drumkit by Switch Angel, Mot4i, Ludens (github.com/tidalcycles/uzu-drumkit) — public domain (Unlicense)
+- free-drum-samples by Boochi44 (github.com/Boochi44/free-drum-samples) — CC0 1.0
+Звуки обрезаны, нормализованы и перекодированы в OGG.

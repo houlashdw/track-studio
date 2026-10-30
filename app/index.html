@@ -2237,8 +2237,16 @@ function tuneHz(f, t, set) {
   return 440 * 2 ** ((best - 69) / 12);
 }
 /* ---- голоса: каждая пишет в T (и T2) и вызывает commit ---- */
+/* живые ударные из банка (CC0 / public domain: TR-808 Edward Loveall, uzu-drumkit, free-drum-samples) — набор выбирается на трек */
+function skHit(B, e, layer, o) {
+  const pcm = B.pcm, r = (B.r || 1) * ((o && o.r) || 1), n0 = Math.floor((pcm.length - 2) / r), n = Math.max(64, Math.min(n0, o && o.len ? Math.floor(o.len * SR) : n0)); scratch(n + 8);
+  const dr = (o && o.drive) || 0, tn = dr ? Math.tanh(dr) : 1, g = e.v * ((o && o.g) || 1) * (B.g || 1), fl = Math.max(1, Math.min(n >> 2, Math.floor(0.012 * SR)));
+  for (let k = 0; k < n; k++) { const pos = k * r, i0 = pos | 0, fr = pos - i0; let x = pcm[i0] * (1 - fr) + pcm[i0 + 1] * fr; if (dr) x = Math.tanh(x * dr) / tn; T[k] = x * g * (k > n - fl ? (n - k) / fl : 1); }
+  commit(layer, e.t, n);
+}
 const VOICE = {
   kick(e) {
+    if (CFG.sk && CFG.sk.kick && !e.syn) { const kk = e.kk || CFG.X.kickKit || CFG.kit.kick; skHit(CFG.sk.kick, e, 'kick', { drive: ({ dist: 1.8, hard: 2.5 }[kk] || 0) + (CFG.distAmt || 0) * 3, g: 1 }); return; }
     const X = CFG.X.kick, kk = e.kk || CFG.X.kickKit || CFG.kit.kick;
     const B = { tight: [160, 46, .012, .3], long: [125, 40, .025, .8], dist: [210, 50, .01, .3], hard: [420, 50, .028, .46], jump: [330, 56, .02, .28], gabber: [520, 46, .03, .6], tekk: [380, 52, .018, .32] }[kk] || [160, 46, .012, .3];
     const P = [B[0] * X.f0, clamp(B[1] * X.f1, 30, 90), B[2] * X.pd, clamp(B[3] * X.dec, .12, 1.2)]; { const f1 = clamp(tuneHz(P[1], e.t, 'root'), 30, 95); P[0] *= f1 / P[1]; P[1] = f1; }
@@ -2256,6 +2264,8 @@ const VOICE = {
     commit('kick', e.t, n);
   },
   snare(e) {
+    if (CFG.sk && !e.syn) { const k1 = e.sk ? e.k : CFG.X.snareKit && !e.roll ? CFG.X.snareKit : (e.k || 'clap'), B = k1 === 'clap' ? CFG.sk.clap || CFG.sk.snare : k1 === 'rim' || k1 === 'gated' ? null : CFG.sk.snare || CFG.sk.clap;
+      if (B) { skHit(B, e, 'snare', { len: e.roll ? 0.13 : 0.6, g: 0.85 }); return; } }
     const k0 = e.sk ? e.k : CFG.X.snareKit && !e.roll ? CFG.X.snareKit : (e.k || 'clap'), v = e.v, sh = e.roll ? .7 : 1, X = { ...CFG.X.snare, tone: Math.max(90, tuneHz(CFG.X.snare.tone + 25, e.t, 'chord') - 25) };   /* тон с подъездом +80 Гц: на ноту попадает середина удара */
     const n = Math.floor(.5 * SR); scratch(n); let ni = nStart();
     if (k0 === 'clap') {
@@ -2285,6 +2295,7 @@ const VOICE = {
     commit('snare', e.t, n);
   },
   hats(e) {
+    if (CFG.sk && !e.syn) { const B = e.o ? CFG.sk.ohat : CFG.sk.hat; if (B) { skHit(B, e, 'hats', { len: e.o ? 0.12 + 0.2 * CFG.X.hat.od : 0.09 * CFG.X.hat.tau + 0.03, g: e.o ? 0.5 : 0.55 }); return; } }
     const X = CFG.X.hat, d = (e.o ? .2 * X.od : (.035 + .02 * RND()) * X.tau), n = Math.floor((d + .06) * SR); scratch(n);
     const flt = X.bp ? new BQ().bp(X.hp * 1.2, X.q * 2) : new BQ().hp(X.hp, X.q); let ni = nStart(); const tau = d / 4.5;
     const ph = [0, 0, 0, 0, 0, 0], rt = [1, 1.4471, 1.617, 1.9265, 2.5028, 2.6637];
@@ -2699,7 +2710,7 @@ function renderSetup(track, N, salt, off, len, bufs) {
   A = bufs ? { N: L, off: 0, ...bufs } : { N: L, off: off || 0, dL: new Float32Array(L), dR: new Float32Array(L), mL: new Float32Array(L), mR: new Float32Array(L), sD: new Float32Array(L), sV: new Float32Array(L) };
   const X = soundDesign(spec.seed, spec), retro_ = X.look === 'retro', lvl = {}, sd = {}, sv = {};
   for (const l of LAYERS) { lvl[l] = LEVEL[l] * X.lv[l] * (spec.mix[l] == null ? 1 : spec.mix[l]); sd[l] = SEND[l][0] * X.sdm[l] * X.echoB * (.25 + 1.6 * spec.echo); sv[l] = SEND[l][1] * X.sv[l] * X.wetB * (.3 + 1.5 * clamp(spec.space, retro_ ? .3 : .5, retro_ ? .6 : .62)); }
-  CFG = { X, bd: null, dbg: (typeof window !== 'undefined' && window.__DBG) || {}, spec, distAmt: (spec.feat && spec.feat.dist) || 0, rootOff: track.rootOffBars || [], barDur: track.barDur, kit: track.kit, lvl, sd, sv, sections: track.sections, root: track.root };
+  CFG = { X, bd: null, dbg: (typeof window !== 'undefined' && window.__DBG) || {}, spec, distAmt: (spec.feat && spec.feat.dist) || 0, rootOff: track.rootOffBars || [], barDur: track.barDur, kit: track.kit, lvl, sd, sv, sections: track.sections, root: track.root, sk: track.sk || null };
   { const bd = new Float32Array(N).fill(1), dur = .1, dn = Math.floor(dur * SR), dp = X.bduck;
     for (const kt of track.kickTimes) { const i0 = Math.round(kt * SR); for (let j = 0; j < dn && i0 + j < N; j++) { const g = 1 - dp * (1 - j / dn) ** 1.5; if (g < bd[i0 + j]) bd[i0 + j] = g; } }
     CFG.bd = bd; }
@@ -2744,7 +2755,7 @@ async function beatPar(track, ev, N, P) {
   for (const e of work) { cur.push(e); acc += cost(e); if (parts.length < K - 1 && acc >= (tot / K) * (parts.length + 1)) { parts.push(cur); cur = []; } }
   parts.push(cur);
   while (BW.ws.length < parts.length) BW.ws.push(new Worker(URL.createObjectURL(new Blob([beatWorkerSrc()], { type: 'text/javascript' }))));
-  const lite = { spec: track.spec, duration: track.duration, kickTimes: track.kickTimes, kit: track.kit, sections: track.sections, root: track.root };
+  const lite = { spec: track.spec, duration: track.duration, kickTimes: track.kickTimes, kit: track.kit, sections: track.sections, root: track.root, sk: track.sk || null };
   let doneN = 0;
   const res = await Promise.all(parts.map((pe, k) => new Promise((ok, no) => {
     if (!pe.length) return ok(null);
@@ -2761,6 +2772,7 @@ async function beatPar(track, ev, N, P) {
 }
 async function renderTrack(track, onProgress) {
   const spec = track.spec, N = Math.ceil(SR * (track.duration + 3.4)), P = (p) => onProgress && onProgress(p);
+  if (typeof SKIT !== 'undefined') { try { await SKIT.ready(2500); track.sk = SKIT.pick(spec); track.skName = track.sk ? track.sk.name : ''; } catch (e) { track.sk = null; } }
   const X = renderSetup(track, N, 0); track.pack = X.pack;
   const ev = track.events.slice().sort((a, b) => a.t - b.t); let rest = ev; const tb = performance.now();
   try { const r = await beatPar(track, ev, N, P); if (r) rest = r; } catch (e) { console.warn('бит в потоках не вышел — считаю в основном', e); BW.off = true; for (const w of BW.ws) try { w.terminate(); } catch (e2) { } BW.ws.length = 0; renderSetup(track, N, 0); rest = ev; }
@@ -2816,6 +2828,36 @@ function zipStore(name, data) {
 }
 
 /* ============ ИНТЕРФЕЙС ============ */
+/* банк живых ударных: лежит в приложении (smp/), грузится один раз; на трек выбирается свой набор — биты звучат по-разному */
+const SKIT = (() => {
+  const st = { idx: null, pcm: {}, p: null };
+  const base = () => (location.protocol === 'file:' && window.TSAndroid ? 'https://appassets.androidplatform.net/smp/' : 'smp/');
+  function load() {
+    if (st.p) return st.p;
+    st.p = (async () => {
+      const r = await fetch(base() + 'index.json'); if (!r.ok) throw new Error('нет банка'); st.idx = await r.json();
+      const ac = new OfflineAudioContext(1, 1, SR), jobs = [];
+      for (const [c, L] of Object.entries(st.idx)) if (!c.startsWith('_')) for (const it of L) jobs.push((async () => { try { const b = await (await fetch(base() + it.f)).arrayBuffer(), a = await ac.decodeAudioData(b); st.pcm[it.f] = a.getChannelData(0).slice(); } catch (e) { } })());
+      await Promise.all(jobs); return Object.keys(st.pcm).length;
+    })().catch((e) => { st.idx = null; return 0; });
+    return st.p;
+  }
+  const ready = (ms) => Promise.race([load(), new Promise((r) => setTimeout(() => r(0), ms || 2000))]);
+  /* какой шанс у жанра на живые ударные; «жёсткие» жанры держат свою синт-бочку */
+  const P = { trap: .8, hoodtrap: .8, drill: .8, phonk: .8, rage: .75, melancore: .8, jersey: .8, lofi: .85, jpop: .65, house: .6, techno: .5, synthwave: .5, dnb: .55, glitch: .6, dub: .6, dubstep: .5, trance: .45, cinematic: .4, ambient: .35, industrial: .4, hardstyle: .5, hardtekk: .5, jumpstyle: .5, gabber: .4 };
+  const HARD = new Set(['hardstyle', 'hardtekk', 'jumpstyle', 'gabber']);
+  function pick(spec) {
+    if (!st.idx || window.__noSK || (spec.feat && spec.feat.noSK)) return null;
+    const R = mulberry32(((spec.seed || 1) ^ 0x5eed5) >>> 0); if (R() > (P[spec.style] != null ? P[spec.style] : .5)) return null;
+    const one = (c, pr) => { const L = (st.idx[c] || []).filter((it) => st.pcm[it.f]); if (!L.length || R() > pr) return null; const it = L[Math.floor(R() * L.length)]; return { pcm: st.pcm[it.f], f: it.f, r: 2 ** ((R() * 2 - 1) * 1.5 / 12) }; };
+    const sk = { kick: HARD.has(spec.style) ? null : one('kick', .85), snare: one('snare', .9), clap: one('clap', .9), hat: one('hat', .8), ohat: one('ohat', .8) };
+    if (sk.kick) sk.kick.r = 1;
+    const parts = Object.entries(sk).filter(([k, v]) => v).map(([k, v]) => k + ':' + v.f.replace(/\.ogg$/, ''));
+    if (!parts.length) return null; sk.name = parts.join(' '); return sk;
+  }
+  return { load, ready, pick, st };
+})();
+setTimeout(() => SKIT.load(), 1500);
 const $ = (s, r = document) => r.querySelector(s);
 const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
 const S = { spec: null, track: null, buffer: null, peaks: null, occ: null, versions: [], playing: false, offset: 0, t0: 0, ctx: null, src: null, analyser: null, busy: false, dirty: false, claude: undefined };
@@ -3220,9 +3262,10 @@ function dsUI() {
   try { S.hq = localStorage.getItem('ts_hq') === '1'; } catch (e) { }
   const msg = $('#dsMsg'), btn = $('#dsBtn'), bar = $('#dsBar');
   const draw = () => { let s; try { s = JSON.parse(TSAndroid.dsStatus()); } catch (e) { return; } row.hidden = false;
-    if (s.state === 'installed' || s.state === 'ready') { msg.innerHTML = '🎤 Пение — Canary ✓ <label class="chk sm" style="display:inline-flex;margin-left:8px"><input type="checkbox" id="dsHQ"' + (S.hq ? ' checked' : '') + '><span>макс. качество (в 2–3 раза дольше)</span></label>';
+    if ((s.state === 'installed' || s.state === 'ready') && s.pitch === 'downloading') { msg.textContent = '🎤 Докачиваю живую подачу голоса… ' + Math.round((s.pprogress || 0) * 100) + '% (один раз, ~125 МБ; петь уже можно)'; btn.hidden = true; bar.hidden = false; bar.firstElementChild.style.width = Math.round((s.pprogress || 0) * 100) + '%'; if (globalThis.DSX) DSX.ok = true; return false; }
+    if (s.state === 'installed' || s.state === 'ready') { msg.innerHTML = '🎤 Пение — Canary' + (s.pitch === 'installed' ? ' · живая подача' : '') + ' ✓ <label class="chk sm" style="display:inline-flex;margin-left:8px"><input type="checkbox" id="dsHQ"' + (S.hq ? ' checked' : '') + '><span>макс. качество (в 2–3 раза дольше)</span></label>';
       $('#dsHQ').onchange = (e) => { S.hq = e.target.checked; try { localStorage.setItem('ts_hq', S.hq ? '1' : ''); } catch (er) { } }; btn.hidden = true; bar.hidden = true; if (globalThis.DSX) { DSX.ok = true; } return true; }
-    if (s.state === 'downloading') { msg.textContent = 'Качаю певческую модель… ' + Math.round(s.progress * 100) + '% (один раз, ~520 МБ)'; btn.hidden = true; bar.hidden = false; bar.firstElementChild.style.width = Math.round(s.progress * 100) + '%'; return false; }
+    if (s.state === 'downloading') { msg.textContent = (s.pitch === 'downloading' ? 'Качаю живую подачу… ' + Math.round((s.pprogress || 0) * 100) : 'Качаю певческую модель… ' + Math.round(s.progress * 100)) + '% (один раз, ~650 МБ)'; btn.hidden = true; bar.hidden = false; bar.firstElementChild.style.width = Math.round(s.progress * 100) + '%'; return false; }
     msg.textContent = (/^error/.test(s.state) ? 'Не скачалось (' + s.state.slice(7, 90) + '). ' : '') + '🎤 Настоящий певческий голос для пения (Canary, без «заиканий»): скачать один раз ~520 МБ'; btn.hidden = false; bar.hidden = true; return true; };
   btn.onclick = () => { try { TSAndroid.dsInstall(); } catch (e) { } poll(); };
   const poll = () => { if (!draw()) setTimeout(poll, 1000); };
@@ -3331,7 +3374,7 @@ async function buildTrack(label) {
     /* голос озвучивается параллельно с рендером бита (нейросеть в фоновых потоках), а не после него */
     if (vox && typeof getVox === 'function' && $('#voiceEngine').value !== 'synth') { S.track = track; getVox({ sampleRate: SR, length: Math.ceil(SR * (track.duration + 3.4)), numberOfChannels: 2 }).catch((e) => console.warn('голос заранее', e)); }
     const { buffer } = await renderTrack(rt, (p) => setStatus('Рендерю звук…', .05 + p * .9, true));
-    if (rt !== track) for (const k of ['dbg', 'rv', 'dl', 'wetPct', 'pack']) track[k] = rt[k];
+    if (rt !== track) for (const k of ['dbg', 'rv', 'dl', 'wetPct', 'pack', 'sk', 'skName']) track[k] = rt[k];
     if ($('#autoFx') && $('#autoFx').checked) rollFx(false);
     S.track = track; S.raw = buffer; S.rawFull = vox ? null : buffer; S.rawIsBacking = !!vox; S.rawVox = vox ? buffer : null;
     if (vox) { S.rawVoxFor = track; S.rawVoxKey = $('#lyrics').value.trim() + '|' + $('#voiceMode').value; }
@@ -6623,7 +6666,7 @@ self.onmessage = async (e) => { const m = e.data; try {
   const dsCache = new Map();
   async function dsSing(tok, dur, f0h, spk, opt) {
     const P = dsPhones(tok, dur, opt && opt.lang), f0 = dsF0(f0h, P.T), A = window.TSAndroid;
-    const q = JSON.stringify({ ph: P.ph, dur: P.fr, f0, spk, steps: (opt && opt.steps) || (S.hq ? 10 : 6), depth: 0.3, gender: (opt && opt.gender) || 0 });
+    const q = JSON.stringify({ ph: P.ph, dur: P.fr, f0, spk, steps: (opt && opt.steps) || (S.hq ? 10 : 6), depth: 0.3, gender: (opt && opt.gender) || 0, expr: window.__dsExpr != null ? window.__dsExpr : 0.85, psteps: S.hq ? 10 : 6 });
     let pr = dsCache.get(q);
     if (!pr) { pr = (async () => { const id = A.dsSubmit(q), r = await fetch('https://appassets.androidplatform.net/ds/out/' + id);
         if (!r.ok) throw new Error('певческая модель: ' + (await r.text()).slice(0, 200)); return new Float32Array(await r.arrayBuffer()); })();
@@ -7964,7 +8007,7 @@ self.onmessage = async (e) => { const m = e.data; try {
   const ROLE_RU = { verse: 'куплет', flow: 'куплет', peak: 'припев', drop: 'дроп', build: 'подъём', lift: 'подъём', break: 'брейк', intro: 'интро', outro: 'аутро', other: 'прочее' };
   globalThis.mixNeedsFn = (stats) => mixNeeds(stats, !!(document.querySelector('#voiceMode') && document.querySelector('#voiceMode').value === 'rap'));
   function mixNeeds(stats, rap) {
-    const tgt = (rap ? 4.5 : 4.5) + (globalThis.GENE ? GENE('voxOver') : 0), need = {}; for (const [r, z] of Object.entries(stats || {})) { const d = tgt - z.db; if (d > 1.5) need[r] = Math.min(6, d); else if (z.db > tgt + 4) need[r] = -Math.min(5, z.db - tgt - 2); }   /* голос, торчащий над битом, — тоже не «вместе» */
+    const tgt = (window.__voxTgt != null ? window.__voxTgt : rap ? 6 : 7)   /* замер: при +4.5 дБ студия топила голос, в миксе разбиралось 48–60% слов, при +7…8 — до 69% */ + (globalThis.GENE ? GENE('voxOver') : 0), need = {}; for (const [r, z] of Object.entries(stats || {})) { const d = tgt - z.db; if (d > 1.5) need[r] = Math.min(6, d); else if (z.db > tgt + 4) need[r] = -Math.min(5, z.db - tgt - 2); }   /* голос, торчащий над битом, — тоже не «вместе» */
     return need;
   }
   function studioShow(J) {

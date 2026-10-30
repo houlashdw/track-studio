@@ -35,6 +35,7 @@ jobs:
         run: |
           mkdir -p android/app/src/main/assets/www
           cp app/index.html android/app/src/main/assets/www/index.html
+          [ -d app/smp ] && cp -r app/smp android/app/src/main/assets/www/ || true
       - name: Сборка APK
         run: gradle -p android assembleRelease --no-daemon --stacktrace
       - name: Проверка подписи и манифеста

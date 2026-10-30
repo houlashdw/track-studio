@@ -1,0 +1,398 @@
+{
+"kick": [
+{
+"f": "kick_00.ogg",
+"src": "tidalcycles_uzu-drumkit",
+"len": 0.9
+},
+{
+"f": "kick_01.ogg",
+"src": "tidalcycles_uzu-drumkit",
+"len": 0.44
+},
+{
+"f": "kick_02.ogg",
+"src": "tidalcycles_uzu-drumkit",
+"len": 0.28
+},
+{
+"f": "kick_03.ogg",
+"src": "tidalcycles_uzu-drumkit",
+"len": 0.33
+},
+{
+"f": "kick_04.ogg",
+"src": "tidalcycles_uzu-drumkit",
+"len": 0.19
+},
+{
+"f": "kick_05.ogg",
+"src": "tidalcycles_uzu-drumkit",
+"len": 0.3
+},
+{
+"f": "kick_06.ogg",
+"src": "tidalcycles_uzu-drumkit",
+"len": 0.33
+},
+{
+"f": "kick_07.ogg",
+"src": "tidalcycles_uzu-drumkit",
+"len": 0.15
+},
+{
+"f": "kick_08.ogg",
+"src": "tidalcycles_sounds-tr808-fischer",
+"len": 0.9
+},
+{
+"f": "kick_09.ogg",
+"src": "tidalcycles_sounds-tr808-fischer",
+"len": 0.9
+},
+{
+"f": "kick_10.ogg",
+"src": "tidalcycles_sounds-tr808-fischer",
+"len": 0.5
+},
+{
+"f": "kick_11.ogg",
+"src": "tidalcycles_sounds-tr808-fischer",
+"len": 0.9
+},
+{
+"f": "kick_12.ogg",
+"src": "Boochi44_free-drum-samples",
+"len": 0.25
+},
+{
+"f": "kick_13.ogg",
+"src": "Boochi44_free-drum-samples",
+"len": 0.9
+},
+{
+"f": "kick_14.ogg",
+"src": "Boochi44_free-drum-samples",
+"len": 0.5
+},
+{
+"f": "kick_15.ogg",
+"src": "Boochi44_free-drum-samples",
+"len": 0.9
+},
+{
+"f": "kick_16.ogg",
+"src": "Boochi44_free-drum-samples",
+"len": 0.25
+},
+{
+"f": "kick_17.ogg",
+"src": "Boochi44_free-drum-samples",
+"len": 0.5
+},
+{
+"f": "kick_18.ogg",
+"src": "Boochi44_free-drum-samples",
+"len": 0.9
+},
+{
+"f": "kick_19.ogg",
+"src": "Boochi44_free-drum-samples",
+"len": 0.25
+}
+],
+"snare": [
+{
+"f": "snare_00.ogg",
+"src": "tidalcycles_uzu-drumkit",
+"len": 0.43
+},
+{
+"f": "snare_01.ogg",
+"src": "tidalcycles_uzu-drumkit",
+"len": 0.22
+},
+{
+"f": "snare_02.ogg",
+"src": "tidalcycles_uzu-drumkit",
+"len": 0.17
+},
+{
+"f": "snare_03.ogg",
+"src": "tidalcycles_uzu-drumkit",
+"len": 0.08
+},
+{
+"f": "snare_04.ogg",
+"src": "tidalcycles_uzu-drumkit",
+"len": 0.14
+},
+{
+"f": "snare_05.ogg",
+"src": "tidalcycles_sounds-tr808-fischer",
+"len": 0.25
+},
+{
+"f": "snare_06.ogg",
+"src": "tidalcycles_sounds-tr808-fischer",
+"len": 0.5
+},
+{
+"f": "snare_07.ogg",
+"src": "tidalcycles_sounds-tr808-fischer",
+"len": 0.25
+},
+{
+"f": "snare_08.ogg",
+"src": "tidalcycles_sounds-tr808-fischer",
+"len": 0.5
+},
+{
+"f": "snare_09.ogg",
+"src": "Boochi44_free-drum-samples",
+"len": 0.25
+},
+{
+"f": "snare_10.ogg",
+"src": "Boochi44_free-drum-samples",
+"len": 0.25
+},
+{
+"f": "snare_11.ogg",
+"src": "Boochi44_free-drum-samples",
+"len": 0.5
+},
+{
+"f": "snare_12.ogg",
+"src": "Boochi44_free-drum-samples",
+"len": 0.5
+},
+{
+"f": "snare_13.ogg",
+"src": "Boochi44_free-drum-samples",
+"len": 0.5
+},
+{
+"f": "snare_14.ogg",
+"src": "Boochi44_free-drum-samples",
+"len": 0.25
+},
+{
+"f": "snare_15.ogg",
+"src": "Boochi44_free-drum-samples",
+"len": 0.25
+}
+],
+"clap": [
+{
+"f": "clap_00.ogg",
+"src": "tidalcycles_uzu-drumkit",
+"len": 0.12
+},
+{
+"f": "clap_01.ogg",
+"src": "tidalcycles_uzu-drumkit",
+"len": 0.46
+},
+{
+"f": "clap_02.ogg",
+"src": "tidalcycles_sounds-tr808-fischer",
+"len": 0.7
+},
+{
+"f": "clap_03.ogg",
+"src": "Boochi44_free-drum-samples",
+"len": 0.25
+}
+],
+"hat": [
+{
+"f": "hat_00.ogg",
+"src": "tidalcycles_uzu-drumkit",
+"len": 0.04
+},
+{
+"f": "hat_01.ogg",
+"src": "tidalcycles_uzu-drumkit",
+"len": 0.35
+},
+{
+"f": "hat_02.ogg",
+"src": "tidalcycles_uzu-drumkit",
+"len": 0.35
+},
+{
+"f": "hat_03.ogg",
+"src": "tidalcycles_uzu-drumkit",
+"len": 0.09
+},
+{
+"f": "hat_04.ogg",
+"src": "tidalcycles_uzu-drumkit",
+"len": 0.12
+},
+{
+"f": "hat_05.ogg",
+"src": "tidalcycles_sounds-tr808-fischer",
+"len": 0.25
+},
+{
+"f": "hat_06.ogg",
+"src": "Boochi44_free-drum-samples",
+"len": 0.25
+}
+],
+"ohat": [
+{
+"f": "ohat_00.ogg",
+"src": "tidalcycles_uzu-drumkit",
+"len": 1.0
+},
+{
+"f": "ohat_01.ogg",
+"src": "tidalcycles_uzu-drumkit",
+"len": 0.44
+},
+{
+"f": "ohat_02.ogg",
+"src": "tidalcycles_uzu-drumkit",
+"len": 0.37
+},
+{
+"f": "ohat_03.ogg",
+"src": "tidalcycles_uzu-drumkit",
+"len": 0.46
+},
+{
+"f": "ohat_04.ogg",
+"src": "tidalcycles_sounds-tr808-fischer",
+"len": 0.25
+},
+{
+"f": "ohat_05.ogg",
+"src": "tidalcycles_sounds-tr808-fischer",
+"len": 0.75
+},
+{
+"f": "ohat_06.ogg",
+"src": "Boochi44_free-drum-samples",
+"len": 0.25
+},
+{
+"f": "ohat_07.ogg",
+"src": "Boochi44_free-drum-samples",
+"len": 0.75
+}
+],
+"perc": [
+{
+"f": "perc_00.ogg",
+"src": "tidalcycles_uzu-drumkit",
+"len": 0.12
+},
+{
+"f": "perc_01.ogg",
+"src": "tidalcycles_uzu-drumkit",
+"len": 0.02
+},
+{
+"f": "perc_02.ogg",
+"src": "tidalcycles_uzu-drumkit",
+"len": 0.03
+},
+{
+"f": "perc_03.ogg",
+"src": "tidalcycles_uzu-drumkit",
+"len": 0.46
+},
+{
+"f": "perc_04.ogg",
+"src": "tidalcycles_uzu-drumkit",
+"len": 0.41
+},
+{
+"f": "perc_05.ogg",
+"src": "tidalcycles_uzu-drumkit",
+"len": 0.6
+},
+{
+"f": "perc_06.ogg",
+"src": "tidalcycles_sounds-tr808-fischer",
+"len": 0.25
+},
+{
+"f": "perc_07.ogg",
+"src": "tidalcycles_sounds-tr808-fischer",
+"len": 0.25
+},
+{
+"f": "perc_08.ogg",
+"src": "tidalcycles_sounds-tr808-fischer",
+"len": 0.25
+},
+{
+"f": "perc_09.ogg",
+"src": "Boochi44_free-drum-samples",
+"len": 0.6
+},
+{
+"f": "perc_10.ogg",
+"src": "Boochi44_free-drum-samples",
+"len": 0.25
+},
+{
+"f": "perc_11.ogg",
+"src": "Boochi44_free-drum-samples",
+"len": 0.6
+},
+{
+"f": "perc_12.ogg",
+"src": "Boochi44_free-drum-samples",
+"len": 0.6
+},
+{
+"f": "perc_13.ogg",
+"src": "Boochi44_free-drum-samples",
+"len": 0.6
+},
+{
+"f": "perc_14.ogg",
+"src": "Boochi44_free-drum-samples",
+"len": 0.6
+}
+],
+"crash": [
+{
+"f": "crash_00.ogg",
+"src": "tidalcycles_uzu-drumkit",
+"len": 0.86
+},
+{
+"f": "crash_01.ogg",
+"src": "tidalcycles_uzu-drumkit",
+"len": 2.0
+},
+{
+"f": "crash_02.ogg",
+"src": "tidalcycles_uzu-drumkit",
+"len": 0.93
+},
+{
+"f": "crash_03.ogg",
+"src": "Boochi44_free-drum-samples",
+"len": 1.5
+}
+],
+"brk": [
+{
+"f": "brk_00.ogg",
+"src": "tidalcycles_uzu-drumkit",
+"len": 2.91
+}
+],
+"_credits": {
+"tidalcycles_sounds-tr808-fischer": "TR-808 samples by Edward Loveall — CC0",
+"tidalcycles_uzu-drumkit": "uzu-drumkit (Switch Angel, Mot4i, Ludens) — public domain (Unlicense)",
+"Boochi44_free-drum-samples": "free-drum-samples by Boochi44 — CC0"
+}
+}

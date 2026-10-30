@@ -59,7 +59,7 @@ public class MainActivity extends Activity {
         WebView.setWebContentsDebuggingEnabled(true);
 
         ds = new DsEngine(getFilesDir());
-        new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> ds.preload(), 4000);
+        new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> { ds.preload(); ds.installPitch(); }, 4000);
         web = new WebView(this);
         web.setBackgroundColor(Color.parseColor(BG));
         WebSettings s = web.getSettings();
@@ -99,6 +99,7 @@ public class MainActivity extends Activity {
         if (p.endsWith(".png")) return "image/png";
         if (p.endsWith(".svg")) return "image/svg+xml";
         if (p.endsWith(".wasm")) return "application/wasm";
+        if (p.endsWith(".ogg")) return "audio/ogg";
         if (p.endsWith(".txt") || p.endsWith(".md")) return "text/plain";
         return "application/octet-stream";
     }
