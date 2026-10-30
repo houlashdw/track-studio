@@ -544,6 +544,7 @@ short lines in English…
         <label class="fld inl" for="look"><select id="look" aria-label="Звук"><option value="bright">Яркий</option><option value="retro">Ретро</option></select></label>
       </div>
       <button id="make" type="button" class="pri big" data-testid="create-track-btn">Создать трек</button>
+      <label class="chk sm" style="margin:8px 2px 0;display:flex"><input type="checkbox" id="quick" checked data-testid="quick"><span>Быстрая проба — трек ~45 с (вдвое быстрее; сними для полной песни)</span></label>
       <div class="scroller acts2">
         <button id="reroll" type="button" class="ghost" data-testid="reroll-btn">Ещё вариант</button>
         <button id="mutate" type="button" class="ghost gone" data-testid="mutate-btn">Микс</button>
@@ -979,6 +980,7 @@ function mulberry32(seed) {
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
 }
+function quickOn() { const q = typeof document !== 'undefined' && document.querySelector && document.querySelector('#quick'); return !!(q && q.checked); }
 function hashStr(s) {
   let h = 2166136261 >>> 0;
   for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
@@ -3378,8 +3380,8 @@ async function buildTrack(label) {
     if ($('#autoFx') && $('#autoFx').checked) rollFx(false);
     S.track = track; S.raw = buffer; S.rawFull = vox ? null : buffer; S.rawIsBacking = !!vox; S.rawVox = vox ? buffer : null;
     if (vox) { S.rawVoxFor = track; S.rawVoxKey = $('#lyrics').value.trim() + '|' + $('#voiceMode').value; }
-    if (vox) { S.buffer = buffer; S.peaks = computePeaks(buffer, 1600); S.occ = computeOcc(track); drawWave(0); $('#player').dataset.ready = '1'; setBusy(false); play(0); setBusy(true); setStatus('Играет бит — голос дописывается…', .7, true); }
-    { const full = await applyFx(buffer), at = S.playing ? pos() * S.spd : null; S.buffer = full; if (at != null) { play(at / S.spd); vox && (S.skipAutoplay = true); } }
+    if (vox) { S.buffer = buffer; S.peaks = computePeaks(buffer, 1600); S.occ = computeOcc(track); drawWave(0); $('#player').dataset.ready = '1'; liveStart(); setBusy(false); play(0); setBusy(true); setStatus('Играет бит — строки голоса вступают по мере готовности…', .7, true); }
+    { let full; try { full = await applyFx(buffer); } finally { liveEnd(); } const at = S.playing ? pos() * S.spd : null; S.buffer = full; if (at != null) { play(at / S.spd); vox && (S.skipAutoplay = true); } }
     S.peaks = computePeaks(buffer, 1600); S.occ = computeOcc(track);
     const v = { name: label || spec.title, spec: JSON.parse(JSON.stringify(spec)), track, buffer, peaks: S.peaks, occ: S.occ };
     S.versions.push(v); if (S.versions.length > 2) S.versions.shift();
@@ -3521,6 +3523,19 @@ function initAudio() {
   if (S.ctx) { if (S.ctx.state === 'suspended') S.ctx.resume(); return; }
   try { S.ctx = new (window.AudioContext || window.webkitAudioContext)(); S.analyser = S.ctx.createAnalyser(); S.analyser.fftSize = 256; S.analyser.smoothingTimeConstant = .8; { const lim = S.ctx.createDynamicsCompressor(); lim.threshold.value = -2; lim.knee.value = 0; lim.ratio.value = 20; lim.attack.value = .001; lim.release.value = .12; S.analyser.connect(lim); lim.connect(S.ctx.destination); } } catch (e) { console.warn(e); }
 }
+/* голос по мере готовности: пока трек дописывается, каждая готовая строка сразу звучит поверх бита */
+const LIVE = { on: false, list: [], srcs: [] };
+function liveStop() { for (const x of LIVE.srcs) try { x.stop(); } catch (e) { } LIVE.srcs = []; }
+function liveSched(it) {
+  if (!LIVE.on || !S.playing || !S.ctx || !S.analyser) return; const now = S.ctx.currentTime, at = S.t0 + it.t, end = it.t + it.buf.duration; if (pos() >= end - 0.05) return;
+  const src = S.ctx.createBufferSource(), g = S.ctx.createGain(); src.buffer = it.buf; g.gain.value = it.g; src.connect(g); g.connect(S.analyser);
+  if (at >= now) src.start(at); else src.start(now, now - at); LIVE.srcs.push(src);
+}
+function liveStart() { liveStop(); LIVE.list = []; LIVE.on = true; }
+function liveEnd() { liveStop(); LIVE.on = false; LIVE.list = []; }
+globalThis.liveAdd = (y, sr, t, maxSec) => { try { if (!LIVE.on) return; initAudio(); if (!S.ctx) return; const n = Math.max(1, Math.min(y.length, Math.floor(maxSec * sr)));
+  let pk = 0; for (let i = 0; i < n; i += 4) { const a = Math.abs(y[i]); if (a > pk) pk = a; }
+  const b = S.ctx.createBuffer(1, n, sr); b.copyToChannel(y.subarray(0, n), 0); const it = { buf: b, t, g: pk > 0 ? Math.min(2, 0.55 / pk) : 1 }; LIVE.list.push(it); liveSched(it); } catch (e) { } };
 function play(offset) {
   if (!S.buffer) return; initAudio(); if (!S.ctx) return;
   stop(true);
@@ -3528,8 +3543,9 @@ function play(offset) {
   S.offset = clamp(offset, 0, S.buffer.duration - .05); S.t0 = S.ctx.currentTime - S.offset;
   src.onended = () => { if (S.src === src) { S.playing = false; S.src = null; S.offset = 0; updTransport(); drawWave(0); } };
   src.start(0, S.offset); S.src = src; S.playing = true; updTransport(); loop();
+  if (LIVE.on) for (const it of LIVE.list) liveSched(it);
 }
-function stop(keep) { try { window.speechSynthesis && speechSynthesis.cancel(); } catch { } S.lyrLast = null; if (S.src) { const s = S.src; S.src = null; s.onended = null; try { s.stop(); } catch { } } S.playing = false; if (!keep) updTransport(); }
+function stop(keep) { try { window.speechSynthesis && speechSynthesis.cancel(); } catch { } liveStop(); S.lyrLast = null; if (S.src) { const s = S.src; S.src = null; s.onended = null; try { s.stop(); } catch { } } S.playing = false; if (!keep) updTransport(); }
 function pos() { return S.playing && S.ctx ? S.ctx.currentTime - S.t0 : S.offset; }
 function updTransport() { $('#playBtn').textContent = S.playing ? 'Пауза' : 'Играть'; $('#playBtn').disabled = !S.buffer; $('#dlWav').disabled = !S.buffer; $('#dlMp3').disabled = !S.buffer; $('#dlJson').disabled = !S.spec; }
 function loop() {
@@ -4018,6 +4034,7 @@ async function init() {
   const ex = $('#examples'); EXAMPLES.forEach((t) => { const b = el('button', 'ex', t.split(/[,:]/)[0]); b.type = 'button'; b.title = t; b.onclick = () => { $('#prompt').value = t; $('#prompt').dispatchEvent(new Event('input')); $('#prompt').focus(); }; ex.append(b); });
   const saved = store.get('trk-prompt'); $('#prompt').value = saved || EXAMPLES[0];
   $('#len').oninput = (e) => { $('#lenOut').textContent = fmtTime(e.target.value); };
+  { const q = $('#quick'); if (q) { try { const v = localStorage.getItem('ts_quick'); if (v != null) q.checked = v === '1'; } catch (e) { } q.onchange = () => { try { localStorage.setItem('ts_quick', q.checked ? '1' : '0'); } catch (e) { } }; } }
   $('#lenOut').textContent = fmtTime($('#len').value);
   $('#make').onclick = makeFromPrompt;
   $('#aixBtn').onclick = aixRun; dsUI(); $('#prompt').addEventListener('input', updateUnderstood); $('#voiceMode').addEventListener('change', updateUnderstood); $('#modeSeg').addEventListener('click', () => setTimeout(updateUnderstood, 0)); updateUnderstood();
@@ -4877,7 +4894,7 @@ document.addEventListener('DOMContentLoaded', init);
       if (mode === 'off' || !txt || !len) return;
       const syl = parseBlocks(txt).reduce((a, b) => a + b.lines.reduce((x, l) => x + sylN(l), 0), 0);
       const bpmN = (S.spec && S.spec.bpm) || 120, need = (syl / sylRate(bpmN, mode === 'rap')) * 1.6 + 16;
-      len.value = String(clamp(Math.round(Math.max(90, need) / 5) * 5, 60, 150));
+      const q = $q('#quick') && $q('#quick').checked; len.value = q ? '45' : String(clamp(Math.round(Math.max(90, need) / 5) * 5, 60, 150));
     } catch (e) { console.warn('len', e); }
   }
   document.addEventListener('click', (e) => { if (e.target.closest && e.target.closest('#make,#reroll,#mutate,#experiment,#surprise')) fitLen(); }, true);
@@ -6830,7 +6847,7 @@ self.onmessage = async (e) => { const m = e.data; try {
           dP = S.hq ? dsSing(tok, dur, buildF0('d', nDS, det).f0, { arc: 0.6, voltage: 0.4 }, { gender: GD, lang }) : null;
           const hb = nDS.map((m, k) => { const tt = it.t0 + tV[k], w = soundAt(ctx.track, ctx.spec, tt), sc = SCALES[ctx.spec.scale] || SCALES.minor, kk = (((ctx.spec.key + keyOffAt(ctx.track, tt)) % 12) + 12) % 12;
             let b2 = m - 3, bs = -1; for (const c2 of [m - 3, m - 4, m - 5]) { const pc = ((c2 % 12) + 12) % 12, v = (sc.semis.includes((pc - kk + 12) % 12) ? 1 : 0) + w[pc]; if (v > bs) { bs = v; b2 = c2; } } return b2; });
-          hP = rap ? null : dsSing(tok, dur, buildF0('h', hb, -4).f0, { spark: 0.5, arc: 0.5 }, { gender: GD, lang, steps: S.hq ? 10 : 4 });
+          hP = rap || quickOn() ? null : dsSing(tok, dur, buildF0('h', hb, -4).f0, { spark: 0.5, arc: 0.5 }, { gender: GD, lang, steps: S.hq ? 10 : 4 });
         }
         let y = await yP; const g = norm(y); for (let i = 0; i < y.length; i++) y[i] *= g;
         const late = (x, sec) => { const n = Math.round(sec * 44100), o = new Float32Array(x.length); o.set(x.subarray(0, Math.max(0, x.length - n)), n); return o; };
@@ -7023,7 +7040,7 @@ self.onmessage = async (e) => { const m = e.data; try {
       const start = it.t0 - L.lead + (speech ? 0.005 : 0.0), nextT = i + 1 < items.length ? items[i + 1].t0 : N / sr, maxSec = Math.max(it.t1, nextT - 0.02) - start;
       if (L.flow) S.flowLines.push({ t0: it.t0, bars: it.bars, ...L.flow });
       if (L.sr !== sr) { try { const ib = new AudioBuffer({ numberOfChannels: 1, length: L.y.length, sampleRate: L.sr }); ib.getChannelData(0).set(L.y); const oc = new OfflineAudioContext(1, Math.ceil(L.y.length * sr / L.sr), sr), bs = oc.createBufferSource(); bs.buffer = ib; bs.connect(oc.destination); bs.start(); L.y = (await oc.startRendering()).getChannelData(0); L.sr = sr; } catch (e) { } }
-      addResampled(m, L.y, L.sr, sr, start, 1, maxSec); if (L.h) { addResampled(h1, L.h, L.sr, sr, start + 0.006, 0.3, maxSec); anyH = true; }
+      addResampled(m, L.y, L.sr, sr, start, 1, maxSec); if (globalThis.liveAdd) liveAdd(L.y, L.sr, start, maxSec); if (L.h) { addResampled(h1, L.h, L.sr, sr, start + 0.006, 0.3, maxSec); anyH = true; }
       if (L.d) { addResampled(d1, L.d, L.sr, sr, start + 0.013, 0.3, maxSec); anyD = true; }   /* дубль чуть позже ведущего — как вторая запись */
       /* припев/дроп: дубль из той же озвучки (задержка + чуть другой тон через ресэмпл) — без второй озвучки */
       if (LK.double && S.voxDoubles !== false && !(globalThis.__kv2 && globalThis.__kv2.sing && !window.__noNotes) && ['peak', 'drop'].includes(roleAt(it.t0 + 0.01))) {   /* дубль из той же записи = флэнджер («под водой»): в нотном режиме не делаем */ addResampled(h1, L.y, L.sr * 1.003, sr, start + 0.017, 0.5, maxSec); anyH = true; dbl = true; }
@@ -8093,7 +8110,7 @@ self.onmessage = async (e) => { const m = e.data; try {
       if (voiced) { const gl = (S.voxFx && S.voxFx.glue) || '', tp = S.voxTape || ''; const th = S.voxFx && S.voxFx.throws ? 'эхо-броски ×' + S.voxFx.throws : '', pf = globalThis.vfxProfile ? vfxProfile(sp) : null;
         add('Окраска', true, ['реверб и дилей бита', pf && pf.sat >= 0.15 ? 'насыщение ' + Math.round(pf.sat * 100) + '%' : '', S.voxSec || '', th, tp].filter(Boolean).join(' · ')); }
       for (const r of rep.out) if (r.did) add('Мастеринг', r.ok, r.text.replace(/\s*\(.*?\)/g, '') + ' → ' + r.did);
-      if (auto && (fixMix || todo.length)) {
+      if (auto && (fixMix || todo.length) && !quickOn()) {   /* быстрая проба: без второго сведения — поправка уйдёт в следующий трек */
         const f = { ...rep.fix }, vr = { ...((S.fix && S.fix.voxRole) || {}) }; const carve0 = (S.fix && S.fix.carve) || 0; let carve = carve0;
         for (const [r, d] of Object.entries(need)) { vr[r] = clamp((vr[r] || 0) + d, -6, 8); if (d > 2) carve = Math.min(0.3, Math.max(carve, carve0 + 0.025 * d)); }
         S.fix = { ...(S.fix || {}), ...f, voxRole: vr, carve, active: true };
