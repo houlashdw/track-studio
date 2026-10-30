@@ -111,7 +111,7 @@ public class MainActivity extends Activity {
             if (u == null || !HOST.equals(u.getHost())) return null;
             String p = u.getPath();
             /* певческая модель: готовый звук строки (float32, 44.1 кГц) — запрос ждёт, пока модель досчитает */
-            if (p != null && p.startsWith("/ds/out/")) {
+            if (p != null && (p.startsWith("/ds/out/") || p.startsWith("/kv/out/"))) {
                 Map<String, String> h = new HashMap<>();
                 h.put("Access-Control-Allow-Origin", "*");
                 h.put("Cache-Control", "no-store");
@@ -336,6 +336,22 @@ public class MainActivity extends Activity {
         public String dsSubmit(String json) {
             return ds.submit(json);
         }
+
+        /* речевая модель Kokoro — нативно (процессор, все ядра), без браузерного движка */
+        @JavascriptInterface
+        public String kvStatus() { return ds.kvStatus(); }
+
+        @JavascriptInterface
+        public boolean kvBegin(String key) { return ds.kvBegin(key); }
+
+        @JavascriptInterface
+        public boolean kvChunk(String b64) { return ds.kvChunk(b64); }
+
+        @JavascriptInterface
+        public String kvFinish(String meta) { return ds.kvFinish(meta); }
+
+        @JavascriptInterface
+        public String kvSubmit(String json) { return ds.kvSubmit(json); }
 
         @JavascriptInterface
         public String platform() {

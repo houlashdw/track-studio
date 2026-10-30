@@ -63,6 +63,106 @@ public class DsEngine {
         if (new File(dir, "pitch/ok").exists()) pstate = "installed";
     }
 
+
+    /* ================= Kokoro (речь, рэп) нативно ================= */
+    volatile OrtSession kv;
+    volatile String kvKey = null;
+    int kvElem = 1; String kvDurOut = null;
+    FileOutputStream kvOut;
+    File kvDir() { File d = new File(dir.getParentFile(), "kv"); d.mkdirs(); return d; }
+    String kvStatus() {
+        try {
+            if (kvKey == null) { File m = new File(kvDir(), "meta.json"); if (m.exists() && new File(kvDir(), "model.onnx").exists()) { JSONObject j = new JSONObject(readText(m)); kvKey = j.optString("key", null); kvElem = j.optInt("elem", 1); kvDurOut = j.optString("durOut", null); } }
+            JSONObject o = new JSONObject(); o.put("key", kvKey == null ? JSONObject.NULL : kvKey); o.put("loaded", kv != null); return o.toString();
+        } catch (Exception e) { return "{\"key\":null}"; }
+    }
+    static String readText(File f) throws IOException { byte[] b = new byte[(int) f.length()]; try (FileInputStream in = new FileInputStream(f)) { int o = 0, k; while (o < b.length && (k = in.read(b, o, b.length - o)) > 0) o += k; } return new String(b, "UTF-8"); }
+    synchronized boolean kvBegin(String key) {
+        try { if (kvOut != null) kvOut.close(); } catch (IOException e) { }
+        try { kvKey = null; new File(kvDir(), "meta.json").delete(); kvOut = new FileOutputStream(new File(kvDir(), "model.part")); return true; } catch (IOException e) { kvOut = null; return false; }
+    }
+    synchronized boolean kvChunk(String b64) {
+        if (kvOut == null) return false;
+        try { kvOut.write(android.util.Base64.decode(b64, android.util.Base64.DEFAULT)); return true; } catch (Exception e) { return false; }
+    }
+    synchronized String kvFinish(String meta) {
+        try {
+            if (kvOut == null) return "error: нет записи"; kvOut.close(); kvOut = null;
+            File part = new File(kvDir(), "model.part"), dst = new File(kvDir(), "model.onnx");
+            synchronized (llock) { if (kv != null) { kv.close(); kv = null; } }
+            dst.delete(); if (!part.renameTo(dst)) return "error: не записался файл";
+            try (FileOutputStream o = new FileOutputStream(new File(kvDir(), "meta.json"))) { o.write(meta.getBytes("UTF-8")); }
+            JSONObject j = new JSONObject(meta); kvKey = j.optString("key", null); kvElem = j.optInt("elem", 1); kvDurOut = j.optString("durOut", null);
+            return "ok";
+        } catch (Exception e) { return "error: " + e.getMessage(); }
+    }
+    String kvSubmit(String json) {
+        String id = "k" + nidA.incrementAndGet();
+        jobs.put(id, run.submit(() -> kvGen(new JSONObject(json))));
+        return id;
+    }
+    void dsRelease() {   /* память телефона: две большие модели разом не держим */
+        try { if (ac != null) ac.close(); } catch (Exception e) { } try { if (vc != null) vc.close(); } catch (Exception e) { }
+        try { if (pl != null) pl.close(); } catch (Exception e) { } try { if (pp != null) pp.close(); } catch (Exception e) { }
+        ac = vc = pl = pp = null; if (state.equals("ready")) state = "installed";
+    }
+    void kvLoad() throws Exception {
+        synchronized (llock) {
+            if (kv != null) return;
+            if (kvKey == null) kvStatus();
+            File m = new File(kvDir(), "model.onnx"); if (!m.exists()) throw new IllegalStateException("речевая модель не перенесена");
+            dsRelease();
+            if (env == null) env = OrtEnvironment.getEnvironment();
+            OrtSession.SessionOptions so = new OrtSession.SessionOptions();
+            so.setIntraOpNumThreads(threads()); so.setOptimizationLevel(OrtSession.SessionOptions.OptLevel.BASIC_OPT); so.setMemoryPatternOptimization(false);
+            kv = env.createSession(m.getAbsolutePath(), so);
+            android.util.Log.i("TrackStudio", "kokoro native ready, elem " + kvElem + ", dur " + kvDurOut);
+        }
+    }
+    OnnxTensor fT(float[] a, long[] shape) throws Exception {
+        if (kvElem != 10) return OnnxTensor.createTensor(env, FloatBuffer.wrap(a), shape);
+        ByteBuffer bb = ByteBuffer.allocateDirect(a.length * 2).order(ByteOrder.nativeOrder());
+        for (float x : a) bb.putShort(android.util.Half.toHalf(x)); bb.rewind();
+        return OnnxTensor.createTensor(env, bb, shape, ai.onnxruntime.OnnxJavaType.FLOAT16);
+    }
+    static float[] toF(OnnxTensor t) {
+        ai.onnxruntime.OnnxJavaType ty = t.getInfo().type;
+        if (ty == ai.onnxruntime.OnnxJavaType.FLOAT16) { java.nio.ShortBuffer sb = t.getByteBuffer().order(ByteOrder.nativeOrder()).asShortBuffer(); float[] o = new float[sb.remaining()]; for (int i = 0; i < o.length; i++) o[i] = android.util.Half.toFloat(sb.get(i)); return o; }
+        if (ty == ai.onnxruntime.OnnxJavaType.INT64) { LongBuffer lb = t.getLongBuffer(); float[] o = new float[lb.remaining()]; for (int i = 0; i < o.length; i++) o[i] = lb.get(i); return o; }
+        if (ty == ai.onnxruntime.OnnxJavaType.INT32) { java.nio.IntBuffer ib = t.getIntBuffer(); float[] o = new float[ib.remaining()]; for (int i = 0; i < o.length; i++) o[i] = ib.get(i); return o; }
+        FloatBuffer fb = t.getFloatBuffer(); float[] o = new float[fb.remaining()]; fb.get(o); return o;
+    }
+    /* ответ: [число длительностей, длительности…, звук 24 кГц…] */
+    float[] kvGen(JSONObject q) throws Exception {
+        try { kvLoad(); } catch (Throwable t) { android.util.Log.e("TrackStudio", "kokoro load", t); throw new Exception("речевая модель не загрузилась: " + t); }
+        JSONArray I = q.getJSONArray("ids"), St = q.getJSONArray("style"); int T = I.length();
+        long[] ids = new long[T]; for (int i = 0; i < T; i++) ids[i] = I.getLong(i);
+        float[] st = new float[256]; for (int i = 0; i < 256; i++) st[i] = (float) St.getDouble(i);
+        JSONArray Du = q.optJSONArray("dur"), F = q.optJSONArray("f0");
+        long[] dur; long[] dshape; if (Du != null) { dur = new long[T]; for (int i = 0; i < T; i++) dur[i] = Math.max(0, Du.getLong(i)); dshape = new long[]{1, T}; } else { dur = new long[]{1}; dshape = new long[]{1, 1}; }
+        float[] f0; if (F != null) { f0 = new float[F.length()]; for (int i = 0; i < f0.length; i++) f0[i] = (float) F.getDouble(i); } else f0 = new float[]{0};
+        Map<String, OnnxTensor> in = new HashMap<>();
+        try {
+            in.put("input_ids", OnnxTensor.createTensor(env, LongBuffer.wrap(ids), new long[]{1, T}));
+            in.put("style", OnnxTensor.createTensor(env, FloatBuffer.wrap(st), new long[]{1, 256}));
+            in.put("speed", OnnxTensor.createTensor(env, FloatBuffer.wrap(new float[]{(float) q.optDouble("speed", 1)}), new long[]{1}));
+            in.put("dur_in", OnnxTensor.createTensor(env, LongBuffer.wrap(dur), dshape));
+            in.put("dur_mix", OnnxTensor.createTensor(env, LongBuffer.wrap(new long[]{Du != null ? 1 : 0}), new long[]{1}));
+            in.put("f0_in", fT(f0, new long[]{1, 1, f0.length}));
+            in.put("f0_mix", fT(new float[]{F != null ? (float) q.optDouble("f0mix", 1) : 0f}, new long[]{1}));
+            java.util.Set<String> names = kv.getInputNames(); for (String k : new java.util.ArrayList<>(in.keySet())) if (!names.contains(k)) in.remove(k).close();
+            try (OrtSession.Result r = kv.run(in)) {
+                float[] w = null, d = new float[0];
+                for (Map.Entry<String, ai.onnxruntime.OnnxValue> e : r) { String k = e.getKey(); OnnxTensor t = (OnnxTensor) e.getValue();
+                    if (k.equals("waveform")) w = toF(t); else if (kvDurOut != null && k.equals(kvDurOut)) d = toF(t); }
+                if (w == null) w = toF((OnnxTensor) r.get(0));
+                float[] o = new float[1 + d.length + w.length]; o[0] = d.length; System.arraycopy(d, 0, o, 1, d.length); System.arraycopy(w, 0, o, 1 + d.length, w.length);
+                for (int i = 1 + d.length; i < o.length; i++) if (!Float.isFinite(o[i])) o[i] = 0f;
+                return o;
+            }
+        } finally { for (OnnxTensor t : in.values()) t.close(); }
+    }
+
     String status() {   /* без блокировки: страница опрашивает статус, пока модель грузится */
         try {
             JSONObject o = new JSONObject();
@@ -281,6 +381,7 @@ public class DsEngine {
     void load() throws Exception { synchronized (llock) { load0(); } }
     void load0() throws Exception {
         if (ac != null) return;
+        if (kv != null) { try { kv.close(); } catch (Exception e) { } kv = null; }
         if (!new File(dir, "ok").exists()) throw new IllegalStateException("модель не скачана");
         env = OrtEnvironment.getEnvironment();
         OrtSession.SessionOptions so = new OrtSession.SessionOptions();

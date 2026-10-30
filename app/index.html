@@ -5662,7 +5662,7 @@ return async function genp(tts, m) {
   }
   const gpuBad = () => { try { localStorage.setItem(GPU_BAD, String(Date.now())); } catch (e) { } };
   const poolSize = () => { const hc = navigator.hardwareConcurrency || 4, dm = navigator.deviceMemory || 4; return hc >= 8 && dm >= 6 ? 3 : hc >= 4 ? 2 : 1; };
-  const modeLabel = () => (KV2.on ? (KV2.mode === 'gpu' ? 'GPU' : 'CPU') + ' · ноты' : KW.mode === 'gpu' || KW.mode === 'gpu-main' ? 'GPU' : KW.mode === 'wasm' ? 'CPU×' + Math.max(1, KW.ws.filter((r) => r.ready).length) : 'CPU');
+  const modeLabel = () => (KV2.on ? (KV2.mode === 'native' ? 'телефон' : KV2.mode === 'gpu' ? 'GPU' : 'CPU') + ' · ноты' : KW.mode === 'gpu' || KW.mode === 'gpu-main' ? 'GPU' : KW.mode === 'wasm' ? 'CPU×' + Math.max(1, KW.ws.filter((r) => r.ready).length) : 'CPU');
   async function kwInit(onP) {
     if (await gpuOk()) {
       for (const id of [KOKORO_ID, KOKORO_ID0]) {
@@ -5825,6 +5825,11 @@ self.onmessage = async (e) => { const m = e.data; try {
     const bytes = new Uint8Array(await blob.arrayBuffer());
     S = await ort.InferenceSession.create(bytes, { executionProviders: [m.device], graphOptimizationLevel: 'all' }); ELEM = r.f0Elem; DOUT = r.durOut; FOUT = r.f0Out;
     self.postMessage({ t: 'done', id: m.id, info: r.info + ' · ort ' + (CDN.split('@')[1] || '?').split('/')[0], from: g.from, saved: g.saved !== false, elem: ELEM });
+  } else if (m.t === 'prep') {
+    const g = await getBlob(m.url, (a, b) => self.postMessage({ t: 'prog', loaded: a, total: b }));
+    let u8 = new Uint8Array(await g.b.arrayBuffer()); const r = singSurgery(u8); const blob = new Blob(r.parts); u8 = null; r.parts = null;
+    const buf = await blob.arrayBuffer();
+    self.postMessage({ t: 'done', id: m.id, buf, info: r.info, elem: r.f0Elem, durOut: r.durOut, from: g.from }, [buf]);
   } else if (m.t === 'gen') {
     const ids = [0]; for (const ch of m.ipa) { const v = VOCAB[ch]; if (v != null) ids.push(v); } ids.push(0); const T = ids.length;
     if (T < 3) throw new Error('пустая строка звуков'); if (T > 510) throw new Error('строка длиннее 510 звуков');
@@ -5854,6 +5859,7 @@ self.onmessage = async (e) => { const m = e.data; try {
   }
   function kv2Call(msg, opts) {
     opts = opts || {};
+    if (KV2.native && msg.t === 'gen') return kvNatGen(msg);
     if (!KV2.w) return Promise.reject(new Error('модель не запущена'));
     return new Promise((res, rej) => { const id = ++KV2.nid; msg.id = id; const j = { id, msg, gen: opts.gen || 0, res, rej, onP: opts.onP, to: 0, wd: 0, tms: window.__kvT || opts.timeout || 180000 };
       KV2.pend.set(id, j); if (!j.gen) { const k = KV2.q.findIndex((x) => x.gen); if (k >= 0) KV2.q.splice(k, 0, j); else KV2.q.push(j); } else KV2.q.push(j); kv2Pump(); });
@@ -5870,8 +5876,54 @@ self.onmessage = async (e) => { const m = e.data; try {
       if (bg && KV2.mode === 'gpu') setTimeout(kv2Pump, 180); else kv2Pump(); };
     KV2.w.onerror = (e) => { const err = new Error('поток голоса: ' + ((e && e.message) || 'ошибка')); for (const j of KV2.pend.values()) { clearTimeout(j.to); j.rej(err); } KV2.pend.clear(); KV2.busy = false; };
   }
+  /* ---------- Kokoro нативно (приложение Android): процессор телефона, все ядра, без браузерного движка (wasm/видеочип давали сбои и шли в один поток) ---------- */
+  const kvNat = { vc: new Map() };
+  function kvVpack(id) { if (kvNat.vc.has(id)) return kvNat.vc.get(id); if (typeof VOICE_PACK === 'undefined') return null; const k = VOICE_PACK.ids.indexOf(id); if (k < 0) return null;
+    if (!kvNat.u) { const bs = atob(VOICE_PACK.b64), u8 = new Uint8Array(bs.length); for (let i = 0; i < bs.length; i++) u8[i] = bs.charCodeAt(i); kvNat.u = new Uint16Array(u8.buffer); }
+    const n = VOICE_PACK.rows * 256, u = kvNat.u.subarray(k * n, (k + 1) * n), o = new Float32Array(n);
+    for (let i = 0; i < n; i++) { const h = u[i], e = (h >> 10) & 31, m = h & 1023, sg = h & 0x8000 ? -1 : 1; o[i] = e === 0 ? sg * m * 2 ** -24 : e === 31 ? sg * Infinity : sg * (1 + m / 1024) * 2 ** (e - 15); }
+    kvNat.vc.set(id, o); return o; }
+  function kvBlend(mix) { const key = JSON.stringify(mix); if (kvNat.vc.has(key)) return kvNat.vc.get(key); let o = null, ws = 0;
+    for (const [id, w] of mix) { const v = kvVpack(id); if (!v) continue; if (!o) o = new Float32Array(v.length); const n = Math.min(o.length, v.length); for (let i = 0; i < n; i++) o[i] += v[i] * w; ws += w; }
+    if (!o) { o = kvVpack('af_heart'); ws = 1; } else if (Math.abs(ws - 1) > 1e-3) for (let i = 0; i < o.length; i++) o[i] /= ws; kvNat.vc.set(key, o); return o; }
+  function kvCenter() { if (kvNat.vc.has('_c')) return kvNat.vc.get('_c'); const vs = ['af_heart', 'af_bella', 'af_sarah', 'af_nicole', 'if_sara', 'am_michael'].map(kvVpack).filter(Boolean);
+    const o = vs.length ? new Float32Array(Math.min(...vs.map((v) => v.length))) : null; if (o) for (const v of vs) for (let i = 0; i < o.length; i++) o[i] += v[i] / vs.length; kvNat.vc.set('_c', o); return o; }
+  function kvStyle(tim, pro, a, n) { const t = kvBlend(tim), p = kvBlend(pro || tim), c = Math.abs(a - 1) > 0.01 ? kvCenter() : null, rows = Math.floor(Math.min(t.length, p.length, c ? c.length : 1e9) / 256), off = Math.min(n, rows - 1) * 256, st = new Array(256);
+    for (let i = 0; i < 128; i++) st[i] = t[off + i]; for (let i = 128; i < 256; i++) { const q = p[off + i]; st[i] = c ? c[off + i] + a * (q - c[off + i]) : q; } return st; }
+  async function kvNatGen(m) {
+    const ids = [0]; for (const ch of m.ipa) { const v = KVOCAB[ch]; if (v != null) ids.push(v); } ids.push(0); const T = ids.length;
+    if (T < 3) throw new Error('пустая строка звуков'); if (T > 510) throw new Error('строка длиннее 510 звуков');
+    if (m.dur && m.dur.length !== T) throw new Error('длительностей ' + m.dur.length + ', звуков ' + T);
+    const q = { ids, style: kvStyle(m.tim, m.pro, m.alpha || 1, T - 2).map((x) => +x.toFixed(6)), speed: m.speed || 1, dur: m.dur || null, f0: m.f0 ? m.f0.map((x) => +(+x).toFixed(2)) : null, f0mix: m.f0 ? (m.f0mix == null ? 1 : m.f0mix) : 0 };
+    const id = TSAndroid.kvSubmit(JSON.stringify(q)), r = await fetch('https://appassets.androidplatform.net/kv/out/' + id);
+    if (!r.ok) throw new Error('голос: ' + (await r.text()).slice(0, 200));
+    const a = new Float32Array(await r.arrayBuffer()), nd = a[0] | 0;
+    return { pcm: a.slice(1 + nd), dur: nd ? Array.from(a.subarray(1, 1 + nd)) : null, sr: 24000 };
+  }
+  async function kvNativeInit(onP) {
+    const key = 'kv1|' + KV2_URL(true) + '|' + hashStr(singSurgery.toString()); let st = {}; try { st = JSON.parse(TSAndroid.kvStatus()); } catch (e) { }
+    if (st.key !== key) {
+      kv2Spawn(); let r0; try { r0 = await kv2Call({ t: 'prep', url: KV2_URL(true), cdns: ORT_CDNS }, { onP, timeout: 900000 }); } finally { kv2Kill(); }
+      const u8 = new Uint8Array(r0.buf), CH = 3 << 19; if (!TSAndroid.kvBegin(key)) throw new Error('нет места для модели');
+      for (let i = 0; i < u8.length; i += CH) { const s2 = u8.subarray(i, i + CH); let bin = ''; for (let k = 0; k < s2.length; k += 32768) bin += String.fromCharCode.apply(null, s2.subarray(k, k + 32768));
+        if (!TSAndroid.kvChunk(btoa(bin))) throw new Error('модель не записалась'); if (onP) onP(i + s2.length, u8.length); await new Promise((r) => setTimeout(r, 0)); }
+      const ok = TSAndroid.kvFinish(JSON.stringify({ key, elem: r0.elem, durOut: r0.durOut, info: r0.info })); if (ok !== 'ok') throw new Error(ok); KV2.info = r0.info;
+    }
+    KV2.native = true;
+    try {
+      const V = { tim: [['af_heart', 1]], pro: [['af_heart', 1]], alpha: 1 };
+      const r = await kvNatGen({ ipa: TEST_IPA, ...V, speed: 1 }); if (!pcmSane(r.pcm, 24000) || !r.dur) throw new Error('проверка речи не прошла');
+      const d2 = r.dur.map((x) => Math.max(1, Math.round(x * 1.5))), Fr = d2.reduce((a, b) => a + b, 0);
+      const r2 = await kvNatGen({ ipa: TEST_IPA, ...V, dur: d2, f0: new Array(2 * Fr).fill(300), f0mix: 1 });
+      if (Math.abs(r2.pcm.length - Fr * 600) > 1200 || !pcmSane(r2.pcm, 24000)) throw new Error('проверка пения не прошла');
+    } catch (e) { KV2.native = false; throw e; }
+    KV2.on = true; KV2.sing = true; KV2.mode = 'native'; KV2.info = (KV2.info || 'Kokoro') + ' · нативно'; KV2.from = 'файл приложения';
+    console.log('голос Kokoro: нативно на процессоре телефона');
+  }
   async function kv2Init(onP) {
     let off = false; try { off = localStorage.getItem('ts-kv2-off') === '1'; } catch (e) { } if (off) throw new Error('нотный голос выключен');
+    if (window.TSAndroid && TSAndroid.kvStatus && !window.__noKvNative) { let bad = false; try { bad = localStorage.getItem('ts-kvnat-bad') === '2'; } catch (e) { }
+      if (!bad) { try { await kvNativeInit(onP); return; } catch (e) { console.warn('нативный голос не вышел — браузерный движок', e); KV2.natWhy = String((e && e.message) || e); try { const n = +(localStorage.getItem('ts-kvnat-bad') || 0) + 1; localStorage.setItem('ts-kvnat-bad', String(n)); } catch (er) { } } } }
     let gpu = false; try { gpu = await gpuOk(); } catch (e) { }
     try { if (localStorage.getItem('ts-kv2-gpubad') === ORT_CDNS[0]) gpu = false; } catch (e) { }   /* эта версия на этом видеочипе уже падала — сразу процессор */
     const tries = (gpu ? [['webgpu', false]] : []).concat([['wasm', true]]); let last = null;
@@ -6666,7 +6718,7 @@ self.onmessage = async (e) => { const m = e.data; try {
   const dsCache = new Map();
   async function dsSing(tok, dur, f0h, spk, opt) {
     const P = dsPhones(tok, dur, opt && opt.lang), f0 = dsF0(f0h, P.T), A = window.TSAndroid;
-    const q = JSON.stringify({ ph: P.ph, dur: P.fr, f0, spk, steps: (opt && opt.steps) || (S.hq ? 10 : 6), depth: 0.3, gender: (opt && opt.gender) || 0, expr: window.__dsExpr != null ? window.__dsExpr : 0.85, psteps: S.hq ? 10 : 6 });
+    const q = JSON.stringify({ ph: P.ph, dur: P.fr, f0, spk, steps: (opt && opt.steps) || (S.hq ? 10 : 6), depth: 0.3, gender: (opt && opt.gender) || 0, expr: opt && opt.expr != null ? opt.expr : window.__dsExpr != null ? window.__dsExpr : 0.85, psteps: S.hq ? 10 : 6 });
     let pr = dsCache.get(q);
     if (!pr) { pr = (async () => { const id = A.dsSubmit(q), r = await fetch('https://appassets.androidplatform.net/ds/out/' + id);
         if (!r.ok) throw new Error('певческая модель: ' + (await r.text()).slice(0, 200)); return new Float32Array(await r.arrayBuffer()); })();
@@ -6681,6 +6733,9 @@ self.onmessage = async (e) => { const m = e.data; try {
     let lp = 0; for (let i = 0; i < o.length; i++) { lp += 0.55 * (o[i] - lp); o[i] = lp; }   /* чуть темнее лида — не спорит с ним */
     return o;
   }
+  /* рэп тоже голосом Canary (без заиканий Kokoro); выключатель — в настройках певческой модели */
+  function dsRapOn() { if (window.__dsRap != null) return !!window.__dsRap; try { return localStorage.getItem('ts_dsrap') === '1'; } catch (e) { return false; } }   /* замер: рэп Canary 63–74% слов против 95% у Kokoro — по умолчанию выключено */
+  globalThis.dsRapOn = dsRapOn;
   globalThis.dsSing = dsSing; globalThis.dsPhones = dsPhones; globalThis.dsF0 = dsF0;
   async function renderNoteLine(it, ctx, lv, emo) {
     const rap = ctx.mode === 'rap', sd = ctx.track.stepDur, D = ctx.dna, P = ctx.plan, hot = ['peak', 'drop'].includes(ctx.role) || (!!ctx.cho && !window.__noCho);
@@ -6761,20 +6816,21 @@ self.onmessage = async (e) => { const m = e.data; try {
     };
     const F0M = buildF0('', notes, 0), f0 = F0M.f0, hk = F0M.hk, nat = F0M.nat;
     /* пение — настоящей певческой моделью, если она есть (приложение Android) */
-    if (!rap && DSX.ok && !window.__noDS) {
+    if ((!rap || dsRapOn()) && DSX.ok && !window.__noDS) {
       try {
         /* аниме-регистр: мелодия выше на ~3–4 полутона (в ладу бита — каждая нота заново подгоняется к гамме) */
-        const top0 = Math.max(...notes0), up = window.__dsUp != null ? window.__dsUp : clamp(77 - top0, 0, 4), nDS = up ? notes0.map((m, k) => fitMidi(m + up, ctx.track, ctx.spec, it.t0 + tV[k], sy[k].stress >= 0.6, 1.5, nl[k])) : notes0;
+        const top0 = Math.max(...notes0), up = window.__dsUp != null ? window.__dsUp : rap ? clamp(66 - top0, 0, 3) : clamp(77 - top0, 0, 4), nDS = up ? notes0.map((m, k) => fitMidi(m + up, ctx.track, ctx.spec, it.t0 + tV[k], sy[k].stress >= 0.6, 1.5, nl[k])) : notes0;
         const f0d = buildF0('', nDS, 0).f0, norm = (x) => { let e = 0, n = 0, pk = 0; for (let i = 0; i < x.length; i++) { const a = Math.abs(x[i]); if (a > pk) pk = a; } for (let i = 0; i < x.length; i++) if (Math.abs(x[i]) > 0.02 * pk) { e += x[i] * x[i]; n++; } const r = n ? Math.sqrt(e / n) : 0; return r > 0 ? Math.min(0.95 / pk, 0.22 / r) * 10 ** ((lv.db || 0) / 20) : 1; };
         const VO = window.__dsVO || { voltage: 0.7, arc: 0.3 }, GD = window.__dsGD != null ? window.__dsGD : 0.08;   /* «Voltage» — самый яркий подголос Canary (замер: центроид 910 Гц против 577), лёгкий сдвиг формант вверх */
-        const yP = dsSing(tok, dur, f0d, VO, { gender: GD, lang });
+        const RX = rap ? (window.__dsRapExpr != null ? window.__dsRapExpr : 0.35) : undefined;   /* рэп: модель высоты слегка — живая интонация речи, а не распев */
+        const yP = dsSing(tok, dur, f0d, VO, { gender: GD, lang, expr: RX });
         let dP = null, hP = null;
         if (hot && S.voxStack !== false && !window.__noStack) {
           const Rd = mulberry32((hashStr(it.tx + '|stk') ^ (ctx.spec.seed & 0xffff)) >>> 0), det = (Rd() < 0.5 ? -1 : 1) * (6 + Rd() * 6);
           dP = S.hq ? dsSing(tok, dur, buildF0('d', nDS, det).f0, { arc: 0.6, voltage: 0.4 }, { gender: GD, lang }) : null;
           const hb = nDS.map((m, k) => { const tt = it.t0 + tV[k], w = soundAt(ctx.track, ctx.spec, tt), sc = SCALES[ctx.spec.scale] || SCALES.minor, kk = (((ctx.spec.key + keyOffAt(ctx.track, tt)) % 12) + 12) % 12;
             let b2 = m - 3, bs = -1; for (const c2 of [m - 3, m - 4, m - 5]) { const pc = ((c2 % 12) + 12) % 12, v = (sc.semis.includes((pc - kk + 12) % 12) ? 1 : 0) + w[pc]; if (v > bs) { bs = v; b2 = c2; } } return b2; });
-          hP = dsSing(tok, dur, buildF0('h', hb, -4).f0, { spark: 0.5, arc: 0.5 }, { gender: GD, lang, steps: S.hq ? 10 : 4 });
+          hP = rap ? null : dsSing(tok, dur, buildF0('h', hb, -4).f0, { spark: 0.5, arc: 0.5 }, { gender: GD, lang, steps: S.hq ? 10 : 4 });
         }
         let y = await yP; const g = norm(y); for (let i = 0; i < y.length; i++) y[i] *= g;
         const late = (x, sec) => { const n = Math.round(sec * 44100), o = new Float32Array(x.length); o.set(x.subarray(0, Math.max(0, x.length - n)), n); return o; };
@@ -6861,7 +6917,7 @@ self.onmessage = async (e) => { const m = e.data; try {
     const rap = ctx.mode === 'rap', LK = ctx.look, sd = ctx.track.stepDur, lv = lineVariation(it, ctx);
     const TF = globalThis.TEACH ? TEACH.flow() : null, tDens = clamp(SKv('spd', 1), 0.8, 1.35);
     const emo = { ...ctx.emo, dens: (ctx.emo.dens || 1) * lv.dens * tDens, gate: Math.min(0.95, ctx.emo.gate * lv.gateK) };
-    if ((KV2.sing || (DSX.ok && !rap && !window.__noDS)) && !window.__noNotes) return renderNoteLine(it, ctx, lv, emo);
+    if ((KV2.sing || (DSX.ok && (!rap || dsRapOn()) && !window.__noDS)) && !window.__noNotes) return renderNoteLine(it, ctx, lv, emo);
     let { units, sy } = flowUnits(it.tx); if (!sy.length) return null;
     const B = await lineAudio(it.tx, ctx.plan); if (!B || !B.pcms.length) return null;
     /* одна строка — один вызов нейросети (раньше по слову + повтор: в 6–10 раз дольше) */
@@ -6941,7 +6997,7 @@ self.onmessage = async (e) => { const m = e.data; try {
   async function renderNeural(raw, speech) {
     const sr = raw.sampleRate, N = raw.length, items = lyricPlan(), prompt = $q('#prompt') ? $q('#prompt').value : '';
     const plan = synthPlan($q('#lyrics').value, prompt, speech ? 'rap' : 'sing'), D = plan.D, LK = lookOf(D, speech), V = VOICES.kru; globalThis.VOXDNA = D;
-    dsState(); DSX.used = 0; const dsOn = DSX.ok && !speech && !window.__noDS; DSX.on = dsOn;   /* пение певческой моделью — Kokoro (163 МБ) не грузим вовсе */
+    dsState(); DSX.used = 0; const dsOn = DSX.ok && (!speech || dsRapOn()) && !window.__noDS; DSX.on = dsOn;   /* пение певческой моделью — Kokoro (163 МБ) не грузим вовсе */
     if (dsOn && KV2.w && !window.__dbgNotes) { try { kv2Kill(); KV2.initP = null; } catch (e) { } }   /* память телефона — певческой модели (Kokoro понадобится снова только для рэпа) */
     if (!window.__mockTTS && !dsOn && items.some((it) => lineEng(it.tx) !== 'none')) { await ensureVoice((g, t) => dlUI(g, t)); dlUI(1, 1, true); }
     S.voxLangs = [...new Set(items.map((it) => lineLang(it.tx)))];
