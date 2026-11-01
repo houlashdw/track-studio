@@ -3,3 +3,8 @@
 - uzu-drumkit by Switch Angel, Mot4i, Ludens (github.com/tidalcycles/uzu-drumkit) — public domain (Unlicense)
 - free-drum-samples by Boochi44 (github.com/Boochi44/free-drum-samples) — CC0 1.0
 Звуки обрезаны, нормализованы и перекодированы в OGG.
+Личные киты владельца приложения (только для личного использования в этом приватном приложении, не распространять):
+- DJ XERO drum kit (jumpstyle/hardstyle/hardtekk)
+- DETROIT DRUM KIT by @dopekit (drumkits.shop)
+- @4EVRX CAST A SPELL 300 kit
+Ходы аккордов и ритмы мелодий выведены из MIDI «BLACKOUT» by @ogwaxtri — credit: @ogwaxtri.
