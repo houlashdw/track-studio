@@ -2802,7 +2802,7 @@ async function renderTrack(track, onProgress) {
   }
   let pk = 0; for (let i = 0; i < N; i += 2) { const q = Math.max(Math.abs(A.dL[i]), Math.abs(A.dR[i])); if (q > pk) pk = q; }
   P(.96); await tick();
-  const mst = await masterV2(A.dL, A.dR, N, SR, track.isBacking ? { prep: true, noRef: true, lufs: -11.5, ceil: .9, space: 1 + spec.space, atmo: .05 + .09 * spec.space } : { prep: true, lufs: -11.5 + 1.5 * clamp(spec.energy, 0, 1), space: 1 + spec.space * 1.2, atmo: .06 + .11 * spec.space });
+  const mst = await masterV2(A.dL, A.dR, N, SR, track.isBacking ? { prep: true, prepOnly: !window.__oldBack, noRef: true, lufs: -11.5, ceil: .9, space: 1 + spec.space, atmo: .05 + .09 * spec.space } : { prep: true, lufs: -11.5 + 1.5 * clamp(spec.energy, 0, 1), space: 1 + spec.space * 1.2, atmo: .06 + .11 * spec.space });
   const gain = 1, rms = 0; track.dbg = CFG.dbg; track.rv = CFG.rvRatio; track.dl = CFG.dlRatio; track.master = mst;
   const buf = new AudioBuffer({ numberOfChannels: 2, length: N, sampleRate: SR }), oL = buf.getChannelData(0), oR = buf.getChannelData(1);
   for (let i = 0; i < N; i++) { oL[i] = A.dL[i]; oR[i] = A.dR[i]; }
@@ -3732,7 +3732,7 @@ async function glueBus(buf) {
   /* общая шина: компрессия и маленькая комната на всём миксе, чтобы голос и музыка звучали в одном пространстве */
   try {
     const oc = new OfflineAudioContext(2, buf.length, buf.sampleRate), s = oc.createBufferSource(); s.buffer = buf;
-    const comp = oc.createDynamicsCompressor(); comp.threshold.value = -16; comp.knee.value = 12; comp.ratio.value = 2.2; comp.attack.value = .02; comp.release.value = .22;
+    const dt = globalThis.vocalDirt && S.spec ? vocalDirt(S.spec) : 0, comp = oc.createDynamicsCompressor(); comp.threshold.value = -16 - 6 * dt; comp.knee.value = 10; comp.ratio.value = 2.2 + 2.5 * dt; comp.attack.value = .02 - .01 * dt; comp.release.value = .22 - .1 * dt;   /* грязные жанры — плотнее склеиваются шиной */
     s.connect(comp); comp.connect(oc.destination); s.start(); return await oc.startRendering();
   } catch (e) { return buf; }
 }
@@ -7720,6 +7720,8 @@ self.onmessage = async (e) => { const m = e.data; try {
       widen(L, R, N, opt.wide == null ? 0.32 : opt.wide); await tick();
     }
     { const h = hp4(110); for (let i = 0; i < N; i++) { const m = (L[i] + R[i]) * 0.5, sd = run(h, (L[i] - R[i]) * 0.5); L[i] = m + sd; R[i] = m - sd; } }
+    /* бит под голос мастерится ОДИН раз — вместе с голосом: здесь только подготовка, без лимитера и мультибэнда (как сводят в студии: бит + вокал → общая шина → мастер) */
+    if (opt.prepOnly) { const m1 = kLufs(L, R, N); scale(L, R, N, fromDb(-14 - m1)); return { lufs: -14, prepOnly: true }; }
     /* учитель: баланс частот, ширина и громкость тянутся к выученным эталонам */
     if (!opt.noRef && globalThis.TEACH) { try { const ti = await TEACH.master(L, R, N, sr, opt); if (ti) { info.teach = ti; if (ti.lufs != null) opt = { ...opt, lufs: ti.lufs }; } } catch (e) { console.warn('teacher master', e); } }
     if (opt.lowDb || opt.highDb) { const lo = () => { const A_ = 10 ** ((opt.lowDb || 0) / 40), w0 = 2 * Math.PI * 180 / SR, c = Math.cos(w0), sn = Math.sin(w0), al = sn / 2 * Math.SQRT2, sa = 2 * Math.sqrt(A_) * al, q = new BQ(), a0 = (A_ + 1) + (A_ - 1) * c + sa;
