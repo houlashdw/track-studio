@@ -338,7 +338,7 @@ public class DsEngine {
     static int threads() { int c = Runtime.getRuntime().availableProcessors(); return Math.max(2, Math.min(4, c - 2)); }   /* пара ядер остаётся телефону и интерфейсу */
 
     /* живая высота: ноты из нашей мелодии → модель высоты рисует кривую как поёт человек */
-    float[] pitchCurve(String[] names, long[] dur, float[] f0, double expr, long steps) throws Exception {
+    float[] pitchCurve(String[] names, long[] dur, float[] f0, double expr, long steps, double tune) throws Exception {
         int n = names.length, T = f0.length; long[] tok = new long[n]; Integer sp = pph.get("SP");
         for (int i = 0; i < n; i++) { Integer t = pph.get(names[i]); tok[i] = t != null ? t : (sp != null ? sp : 0); }
         float[] m = new float[T]; int[] r = new int[T];
@@ -370,7 +370,11 @@ public class DsEngine {
                 Map<String, OnnxTensor> all = new HashMap<>(pi); all.put("encoder_out", enc);
                 try (OrtSession.Result pr = pp.run(all)) {
                     FloatBuffer b = ((OnnxTensor) pr.get(0)).getFloatBuffer(); float[] o = new float[T];
-                    for (int i = 0; i < T && b.hasRemaining(); i++) { float q = b.get(); o[i] = Float.isFinite(q) ? (float) (440.0 * Math.pow(2, (q - 69) / 12.0)) : f0[i]; }
+                    /* строй: середины нот подтягиваем к ноте (голос не «плавает»), подъезды в начале ноты оставляем живыми */
+                    int[] noteOf = new int[T], into = new int[T]; { int f = 0; for (int k = 0; k < N; k++) for (int j = 0; j < nd[k] && f < T; j++, f++) { noteOf[f] = k; into[f] = j; } }
+                    for (int i = 0; i < T && b.hasRemaining(); i++) { float q = b.get(); if (!Float.isFinite(q)) { o[i] = f0[i]; continue; }
+                        double tgt = nm[noteOf[i]], w = into[i] < 5 ? 0 : Math.min(1, (into[i] - 5) / 6.0) * tune; double mm = q + (tgt - q) * w;
+                        o[i] = (float) (440.0 * Math.pow(2, (mm - 69) / 12.0)); }
                     return o;
                 }
             }
@@ -450,7 +454,7 @@ public class DsEngine {
         for (int i = 0; i < T; i++) { f0[i] = (float) F.getDouble(i); vel[i] = 1f; }
         double expr = q.optDouble("expr", 0);
         if (expr > 0) {
-            try { loadPitch(); if (pp != null) { String[] nm = new String[n]; for (int i = 0; i < n; i++) nm[i] = P.getString(i); f0 = pitchCurve(nm, dur, f0, expr, q.optLong("psteps", 8)); } }
+            try { loadPitch(); if (pp != null) { String[] nm = new String[n]; for (int i = 0; i < n; i++) nm[i] = P.getString(i); f0 = pitchCurve(nm, dur, f0, expr, q.optLong("psteps", 8), q.optDouble("tune", 0.6)); } }
             catch (Throwable t) { android.util.Log.w("TrackStudio", "pitch", t); }
         }
         if (q.has("gender")) { double g = q.getDouble("gender"); for (int i = 0; i < T; i++) gender[i] = (float) g; }

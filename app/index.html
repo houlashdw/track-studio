@@ -6747,7 +6747,7 @@ self.onmessage = async (e) => { const m = e.data; try {
   const dsCache = new Map();
   async function dsSing(tok, dur, f0h, spk, opt) {
     const P = dsPhones(tok, dur, opt && opt.lang), f0 = dsF0(f0h, P.T), A = window.TSAndroid;
-    const q = JSON.stringify({ ph: P.ph, dur: P.fr, f0, spk, steps: (opt && opt.steps) || (S.hq ? 10 : 6), depth: 0.3, gender: (opt && opt.gender) || 0, expr: opt && opt.expr != null ? opt.expr : window.__dsExpr != null ? window.__dsExpr : 0.85, psteps: S.hq ? 10 : 6 });
+    const q = JSON.stringify({ ph: P.ph, dur: P.fr, f0, spk, steps: (opt && opt.steps) || (S.hq ? 10 : 6), depth: 0.3, gender: (opt && opt.gender) || 0, expr: opt && opt.expr != null ? opt.expr : window.__dsExpr != null ? window.__dsExpr : 0.85, psteps: S.hq ? 10 : 6, tune: opt && opt.tune != null ? opt.tune : 0.6 });
     let pr = dsCache.get(q);
     if (!pr) { pr = (async () => { const id = A.dsSubmit(q), r = await fetch('https://appassets.androidplatform.net/ds/out/' + id);
         if (!r.ok) throw new Error('певческая модель: ' + (await r.text()).slice(0, 200)); return new Float32Array(await r.arrayBuffer()); })();
@@ -6755,13 +6755,12 @@ self.onmessage = async (e) => { const m = e.data; try {
     return (await pr).slice();
   }
   /* дабл без второго прогона модели: та же дорожка с плавающей задержкой 8–20 мс и лёгким «плаванием» высоты — как второй дубль */
-  function dsDouble(y, sr, seed) {
-    const R = mulberry32(seed >>> 0), o = new Float32Array(y.length), base = 0.012 * sr, dep = 0.004 * sr, f1 = 0.21 + R() * 0.2, f2 = 0.53 + R() * 0.3, p1 = R() * 6.28, p2 = R() * 6.28;
-    for (let i = 0; i < y.length; i++) { const d = base + dep * (0.65 * Math.sin(p1 + (6.2832 * f1 * i) / sr) + 0.35 * Math.sin(p2 + (6.2832 * f2 * i) / sr)), x = i - d, j = Math.floor(x), w = x - j;
-      o[i] = j >= 0 && j + 1 < y.length ? y[j] * (1 - w) + y[j + 1] * w : 0; }
-    let lp = 0; for (let i = 0; i < o.length; i++) { lp += 0.55 * (o[i] - lp); o[i] = lp; }   /* чуть темнее лида — не спорит с ним */
+  function dsDouble(y, sr, seed) {   /* дабл без «плавания»: раньше задержка качалась 8–20 мс — звучало как флэнджер/«замедленная плёнка» */
+    const R = mulberry32(seed >>> 0), d = Math.round((0.014 + R() * 0.008) * sr), o = new Float32Array(y.length); let lp = 0;
+    for (let i = d; i < y.length; i++) { lp += 0.5 * (y[i - d] - lp); o[i] = lp * 0.8; }
     return o;
   }
+
   /* рэп тоже голосом Canary (без заиканий Kokoro); выключатель — в настройках певческой модели */
   function dsRapOn() { if (window.__dsRap != null) return !!window.__dsRap; try { return localStorage.getItem('ts_dsrap') === '1'; } catch (e) { return false; } }   /* замер: рэп Canary 63–74% слов против 95% у Kokoro — по умолчанию выключено */
   globalThis.dsRapOn = dsRapOn;
@@ -6799,7 +6798,7 @@ self.onmessage = async (e) => { const m = e.data; try {
       let b = m + 3, bs = -1; for (const c of [m + 3, m + 4, m + 5]) { const pc = ((c % 12) + 12) % 12, v = (sc.semis.includes((pc - key + 12) % 12) ? 1 : 0) + w[pc]; if (v > bs) { bs = v; b = c; } } return b; });
     /* потолок модели: выше ~370 Гц она срывается на октаву вниз (замер: 470 Гц — 96% мимо). Поём ниже, поднимаем чистым сдвигом после */
     const top = Math.max(...notes), modelShift = top > 69 ? Math.min(6, top - 69) : 0, notes0 = notes.slice(); if (modelShift) notes = notes.map((m) => m - modelShift);
-    const NT = noteTimes(tok, sy, tV, nl, rap ? clamp(emo.gate || 0.8, 0.6, 0.95) : 0.97), FR = 0.025, a0 = NT.a0;
+    const NT = noteTimes(tok, sy, tV, nl, rap ? clamp(emo.gate || 0.8, 0.6, 0.95) : window.__sgGate || 0.97), FR = 0.025, a0 = NT.a0;
     /* кадры: накопленное округление границ, паузы-пады по краям */
     const bnd = (t) => Math.round((t - a0) / FR); let prevB = bnd(NT.onS[0]); const dur = [Math.max(1, prevB)], kOf = [-1]; prevB = Math.max(1, prevB);
     for (let j = 0; j < tok.length; j++) { const sp = NT.span[j]; let b = sp ? bnd(sp[1]) : prevB; if (b < prevB) b = prevB; dur.push(b - prevB); prevB = b; kOf.push(NT.sylOf[j]); }
@@ -6859,7 +6858,7 @@ self.onmessage = async (e) => { const m = e.data; try {
         const f0d = VOCX ? vocF0(nDS) : buildF0('', nDS, 0).f0, norm = (x) => { let e = 0, n = 0, pk = 0; for (let i = 0; i < x.length; i++) { const a = Math.abs(x[i]); if (a > pk) pk = a; } for (let i = 0; i < x.length; i++) if (Math.abs(x[i]) > 0.02 * pk) { e += x[i] * x[i]; n++; } const r = n ? Math.sqrt(e / n) : 0; return r > 0 ? Math.min(0.95 / pk, 0.22 / r) * 10 ** ((lv.db || 0) / 20) : 1; };
         const VO = window.__dsVO || { voltage: 0.7, arc: 0.3 }, GD = window.__dsGD != null ? window.__dsGD : 0.08;   /* замер: выше регистр (+6) и gender 0.14 — разборчивость 85→42%; держим как у аниме-голоса */   /* «Voltage» — самый яркий подголос Canary (замер: центроид 910 Гц против 577), лёгкий сдвиг формант вверх */
         const RX = rap ? (window.__dsRapExpr != null ? window.__dsRapExpr : 0.35) : VOCX ? 0 : undefined;   /* рэп: модель высоты слегка — живая интонация речи, а не распев */
-        const yP = dsSing(tok, dur, f0d, VO, { gender: GD, lang, expr: RX });
+        const yP = dsSing(tok, dur, f0d, VO, { gender: GD, lang, expr: RX, tune: window.__dsTune != null ? window.__dsTune : 0.6 });
         let dP = null, hP = null;
         if (hot && S.voxStack !== false && !window.__noStack) {
           const Rd = mulberry32((hashStr(it.tx + '|stk') ^ (ctx.spec.seed & 0xffff)) >>> 0), det = (Rd() < 0.5 ? -1 : 1) * (6 + Rd() * 6);
@@ -6869,6 +6868,17 @@ self.onmessage = async (e) => { const m = e.data; try {
           hP = rap || quickOn() ? null : dsSing(tok, dur, buildF0('h', hb, -4).f0, { spark: 0.5, arc: 0.5 }, { gender: GD, lang, steps: S.hq ? 10 : 4 });
         }
         let y = await yP; const g = norm(y); for (let i = 0; i < y.length; i++) y[i] *= g;
+        /* подача: ровная громкость внутри фразы (конец фразы не «садится»), акценты на сильных долях и ударных слогах, чёткая атака слога, припев нарастает к концу строки */
+        if (!window.__noShape) { const sr = 44100, N = y.length, at = (t) => Math.round((t - a0) * sr), env = new Float32Array(N), W = Math.round(0.05 * sr);
+          { let acc = 0; const q = []; for (let i = 0; i < N; i++) { acc += y[i] * y[i]; if (i >= W) acc -= y[i - W] * y[i - W]; env[i] = Math.sqrt(Math.max(0, acc) / W); } }
+          const vs = []; for (let k = 0; k < sy.length; k++) { const i0 = at(NT.vS[k]), i1 = at(NT.vE[k]); if (i1 > i0 && i0 >= 0 && i1 <= N) vs.push(env[Math.min(N - 1, (i0 + i1) >> 1)]); }
+          vs.sort((p, q) => p - q); const ref = vs.length ? vs[Math.floor(vs.length * 0.7)] : 0;
+          if (ref > 0) { const gn = new Float32Array(N).fill(1), bar = 16 * sd;
+            for (let k = 0; k < sy.length; k++) { const i0 = Math.max(0, at(NT.vS[k])), i1 = Math.min(N, at(NT.vE[k])); if (i1 <= i0) continue;
+              const ph = ((it.t0 + tV[k]) % bar + bar) % bar, strong = ph < 0.04 || Math.abs(ph - bar / 2) < 0.04, acc = (sy[k].stress >= 1 ? 1.12 : 1) * (strong ? 1.12 : 1) * (hot ? 1 + 0.12 * (k / Math.max(1, sy.length - 1)) : 1);
+              for (let i = i0; i < i1; i++) { const lv = clamp(Math.pow(ref / Math.max(env[i], ref * 0.15), 0.55), 0.8, 1.7), a = i - i0 < 0.035 * sr ? 1 + 0.25 * (1 - (i - i0) / (0.035 * sr)) : 1; gn[i] = lv * acc * a; } }
+            let g0 = 1; const c = 1 - Math.exp(-1 / (0.012 * sr)); for (let i = 0; i < N; i++) { g0 += c * (gn[i] - g0); y[i] *= g0; }
+            let pk = 0; for (let i = 0; i < N; i++) pk = Math.max(pk, Math.abs(y[i])); if (pk > 0.98) for (let i = 0; i < N; i++) y[i] *= 0.98 / pk; } }
         if (VOCX) { const pr = new BQ(), sh = new BQ(), hp = new BQ().hp(170, 0.7); { const w = TAU * 3200 / 44100, A = 10 ** (2.5 / 40), al = Math.sin(w) / (2 * 1.1), a0p = 1 + al / A; pr.b0 = (1 + al * A) / a0p; pr.b1 = -2 * Math.cos(w) / a0p; pr.b2 = (1 - al * A) / a0p; pr.a1 = pr.b1; pr.a2 = (1 - al / A) / a0p; }
           { const w = TAU * 7500 / 44100, A = 10 ** (3.5 / 40), c = Math.cos(w), al = Math.sin(w) / 2 * Math.SQRT2, sa = 2 * Math.sqrt(A) * al, a0s = (A + 1) - (A - 1) * c + sa;
             sh.b0 = A * ((A + 1) + (A - 1) * c + sa) / a0s; sh.b1 = -2 * A * ((A - 1) + (A + 1) * c) / a0s; sh.b2 = A * ((A + 1) + (A - 1) * c - sa) / a0s; sh.a1 = 2 * ((A - 1) - (A + 1) * c) / a0s; sh.a2 = ((A + 1) - (A - 1) * c - sa) / a0s; }
@@ -7769,7 +7779,7 @@ self.onmessage = async (e) => { const m = e.data; try {
       } } catch (e) { console.warn('лента', e); }
     if (vf.vwide !== 50) { const k = vf.vwide / 50, l = out.getChannelData(0), r = out.getChannelData(1); for (let i = 0; i < out.length; i++) { const m = (l[i] + r[i]) * 0.5, sd = (l[i] - r[i]) * 0.5 * k; l[i] = m + sd; r[i] = m - sd; } }
     /* эффекты под жанр: плейт + дилей в темп, откалиброваны и приглушены под голосом */
-    try {
+    if (!window.__voxDry) try {
       const l = out.getChannelData(0), r = out.getChannelData(1); S.voxSec = ''; try { if (globalThis.sectionVoxFx) S.voxSec = sectionVoxFx(l, r, sr, vfxProfile(sp)); } catch (e) { console.warn('секции голоса', e); }
       try { const pm = vfxProfile(sp); if (pm.mic > 0) { cheapMic(l, r, sr, pm.mic); S.voxSec = (S.voxSec ? S.voxSec + ', ' : '') + 'дешёвый микрофон'; } } catch (e) { console.warn('микрофон', e); }
       const fx = await vocalFx(l, r, sr, sp, bpm(), vf);
