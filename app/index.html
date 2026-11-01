@@ -6576,8 +6576,16 @@ self.onmessage = async (e) => { const m = e.data; try {
     return { y: yo, sr: srx, lead: PRE, syl: sy.length, h: hy, flow: { triplet: false, n: sy.length, pos: [], U: 16, tOn, lv, chunks: chunks.length, end: t } };
   }
   /* вдох перед строкой: тихий шум 0.6–6 кГц, близкий микрофон */
-  function inhaleAt(m, sr, t0, amp) {
-    const n = Math.round(sr * 0.2), a0 = Math.round(t0 * sr); if (a0 < 0 || a0 + n >= m.length || !(amp > 0)) return;
+  /* эмоция подачи по промпту (числа — по разбору вокальных приёмов): грусть — легато; агрессия — чеканно и ровно; нежность — мягкая атака; восторг — светлее, с акцентами */
+  function vMood() { const p = (($q('#prompt') && $q('#prompt').value) || '').toLowerCase();
+    if (/агрес|зл[оая]|ярост|rage|angry|жестк|жёстк|дрилл|drill|фонк|phonk/.test(p)) return { id: 'aggr', gate: 0.85, tune: 0.85, acc: 1.22, atk: 0.45, gd: 0.08 };
+    if (/груст|печал|sad|тоск|одинок|lonely|меланх|melanch|слёз|слез/.test(p)) return { id: 'sad', gate: 0.995, tune: 0.5, acc: 1.06, atk: 0.12, gd: 0.06 };
+    if (/нежн|tender|soft|ласк|колыбел|lullaby|тих/.test(p)) return { id: 'soft', gate: 0.97, tune: 0.5, acc: 1.04, atk: 0, gd: 0.08 };
+    if (/восторг|эйфор|euphor|счаст|happy|радост|опенинг|opening|energ|энерг/.test(p)) return { id: 'joy', gate: 0.93, tune: 0.65, acc: 1.16, atk: 0.3, gd: 0.08 };
+    return { id: '', gate: 0.97, tune: 0.6, acc: 1.12, atk: 0.25, gd: 0.08 }; }
+  globalThis.vMood = vMood;
+  function inhaleAt(m, sr, t0, amp, dur) {
+    const n = Math.round(sr * (dur || 0.2)), a0 = Math.round(t0 * sr); if (a0 < 0 || a0 + n >= m.length || !(amp > 0)) return;
     const R = mulberry32((a0 ^ 0x1ba1e) >>> 0); let l1 = 0, l2 = 0;
     for (let i = 0; i < n; i++) { const u = i / n, env = Math.sin(Math.PI * Math.min(1, u * 1.15)) ** 2 * (u < 0.55 ? 1 : 1 - (u - 0.55) / 0.45 * 0.5), z = R() * 2 - 1; l1 += 0.45 * (z - l1); l2 += 0.04 * (l1 - l2); m[a0 + i] += (l1 - l2) * env * amp * 2.2; }
   }
@@ -6798,7 +6806,7 @@ self.onmessage = async (e) => { const m = e.data; try {
       let b = m + 3, bs = -1; for (const c of [m + 3, m + 4, m + 5]) { const pc = ((c % 12) + 12) % 12, v = (sc.semis.includes((pc - key + 12) % 12) ? 1 : 0) + w[pc]; if (v > bs) { bs = v; b = c; } } return b; });
     /* потолок модели: выше ~370 Гц она срывается на октаву вниз (замер: 470 Гц — 96% мимо). Поём ниже, поднимаем чистым сдвигом после */
     const top = Math.max(...notes), modelShift = top > 69 ? Math.min(6, top - 69) : 0, notes0 = notes.slice(); if (modelShift) notes = notes.map((m) => m - modelShift);
-    const NT = noteTimes(tok, sy, tV, nl, rap ? clamp(emo.gate || 0.8, 0.6, 0.95) : window.__sgGate || 0.97), FR = 0.025, a0 = NT.a0;
+    const NT = noteTimes(tok, sy, tV, nl, rap ? clamp(emo.gate || 0.8, 0.6, 0.95) : window.__sgGate || (DSX.ok && !window.__noDS ? Math.min(vMood().gate, 60 / (4 * sd) >= 140 ? 0.92 : 1) : 0.97)), FR = 0.025, a0 = NT.a0;
     /* кадры: накопленное округление границ, паузы-пады по краям */
     const bnd = (t) => Math.round((t - a0) / FR); let prevB = bnd(NT.onS[0]); const dur = [Math.max(1, prevB)], kOf = [-1]; prevB = Math.max(1, prevB);
     for (let j = 0; j < tok.length; j++) { const sp = NT.span[j]; let b = sp ? bnd(sp[1]) : prevB; if (b < prevB) b = prevB; dur.push(b - prevB); prevB = b; kOf.push(NT.sylOf[j]); }
@@ -6856,9 +6864,9 @@ self.onmessage = async (e) => { const m = e.data; try {
             if (vlen > 0.36 && into > 0.22) m += 0.16 * Math.min(1, (into - 0.22) / 0.1) * Math.sin(2 * Math.PI * 5.8 * (into - 0.22));
             o[h] = 440 * 2 ** ((m - 69) / 12); } return o; };
         const f0d = VOCX ? vocF0(nDS) : buildF0('', nDS, 0).f0, norm = (x) => { let e = 0, n = 0, pk = 0; for (let i = 0; i < x.length; i++) { const a = Math.abs(x[i]); if (a > pk) pk = a; } for (let i = 0; i < x.length; i++) if (Math.abs(x[i]) > 0.02 * pk) { e += x[i] * x[i]; n++; } const r = n ? Math.sqrt(e / n) : 0; return r > 0 ? Math.min(0.95 / pk, 0.22 / r) * 10 ** ((lv.db || 0) / 20) : 1; };
-        const VO = window.__dsVO || { voltage: 0.7, arc: 0.3 }, GD = window.__dsGD != null ? window.__dsGD : 0.08;   /* замер: выше регистр (+6) и gender 0.14 — разборчивость 85→42%; держим как у аниме-голоса */   /* «Voltage» — самый яркий подголос Canary (замер: центроид 910 Гц против 577), лёгкий сдвиг формант вверх */
+        const VO = window.__dsVO || { voltage: 0.7, arc: 0.3 }, GD = window.__dsGD != null ? window.__dsGD : vMood().gd;   /* замер: выше регистр (+6) и gender 0.14 — разборчивость 85→42%; держим как у аниме-голоса */   /* «Voltage» — самый яркий подголос Canary (замер: центроид 910 Гц против 577), лёгкий сдвиг формант вверх */
         const RX = rap ? (window.__dsRapExpr != null ? window.__dsRapExpr : 0.35) : VOCX ? 0 : undefined;   /* рэп: модель высоты слегка — живая интонация речи, а не распев */
-        const yP = dsSing(tok, dur, f0d, VO, { gender: GD, lang, expr: RX, tune: window.__dsTune != null ? window.__dsTune : 0.6 });
+        const yP = dsSing(tok, dur, f0d, VO, { gender: GD, lang, expr: RX, tune: window.__dsTune != null ? window.__dsTune : vMood().tune });
         let dP = null, hP = null;
         if (hot && S.voxStack !== false && !window.__noStack) {
           const Rd = mulberry32((hashStr(it.tx + '|stk') ^ (ctx.spec.seed & 0xffff)) >>> 0), det = (Rd() < 0.5 ? -1 : 1) * (6 + Rd() * 6);
@@ -6869,14 +6877,14 @@ self.onmessage = async (e) => { const m = e.data; try {
         }
         let y = await yP; const g = norm(y); for (let i = 0; i < y.length; i++) y[i] *= g;
         /* подача: ровная громкость внутри фразы (конец фразы не «садится»), акценты на сильных долях и ударных слогах, чёткая атака слога, припев нарастает к концу строки */
-        if (!window.__noShape) { const sr = 44100, N = y.length, at = (t) => Math.round((t - a0) * sr), env = new Float32Array(N), W = Math.round(0.05 * sr);
+        if (!window.__noShape) { const MD = vMood(), sr = 44100, N = y.length, at = (t) => Math.round((t - a0) * sr), env = new Float32Array(N), W = Math.round(0.05 * sr);
           { let acc = 0; const q = []; for (let i = 0; i < N; i++) { acc += y[i] * y[i]; if (i >= W) acc -= y[i - W] * y[i - W]; env[i] = Math.sqrt(Math.max(0, acc) / W); } }
           const vs = []; for (let k = 0; k < sy.length; k++) { const i0 = at(NT.vS[k]), i1 = at(NT.vE[k]); if (i1 > i0 && i0 >= 0 && i1 <= N) vs.push(env[Math.min(N - 1, (i0 + i1) >> 1)]); }
           vs.sort((p, q) => p - q); const ref = vs.length ? vs[Math.floor(vs.length * 0.7)] : 0;
           if (ref > 0) { const gn = new Float32Array(N).fill(1), bar = 16 * sd;
             for (let k = 0; k < sy.length; k++) { const i0 = Math.max(0, at(NT.vS[k])), i1 = Math.min(N, at(NT.vE[k])); if (i1 <= i0) continue;
-              const ph = ((it.t0 + tV[k]) % bar + bar) % bar, strong = ph < 0.04 || Math.abs(ph - bar / 2) < 0.04, acc = (sy[k].stress >= 1 ? 1.12 : 1) * (strong ? 1.12 : 1) * (hot ? 1 + 0.12 * (k / Math.max(1, sy.length - 1)) : 1);
-              for (let i = i0; i < i1; i++) { const lv = clamp(Math.pow(ref / Math.max(env[i], ref * 0.15), 0.55), 0.8, 1.7), a = i - i0 < 0.035 * sr ? 1 + 0.25 * (1 - (i - i0) / (0.035 * sr)) : 1; gn[i] = lv * acc * a; } }
+              const ph = ((it.t0 + tV[k]) % bar + bar) % bar, strong = ph < 0.04 || Math.abs(ph - bar / 2) < 0.04, acc = (sy[k].stress >= 1 ? MD.acc : 1) * (strong ? MD.acc : 1) * (hot ? 1 + 0.12 * (k / Math.max(1, sy.length - 1)) : 1);
+              for (let i = i0; i < i1; i++) { const lv = clamp(Math.pow(ref / Math.max(env[i], ref * 0.15), 0.55), 0.8, 1.7), a = i - i0 < 0.035 * sr ? 1 + MD.atk * (1 - (i - i0) / (0.035 * sr)) : 1; gn[i] = lv * acc * a; } }
             let g0 = 1; const c = 1 - Math.exp(-1 / (0.012 * sr)); for (let i = 0; i < N; i++) { g0 += c * (gn[i] - g0); y[i] *= g0; }
             let pk = 0; for (let i = 0; i < N; i++) pk = Math.max(pk, Math.abs(y[i])); if (pk > 0.98) for (let i = 0; i < N; i++) y[i] *= 0.98 / pk; } }
         if (VOCX) { const pr = new BQ(), sh = new BQ(), hp = new BQ().hp(170, 0.7); { const w = TAU * 3200 / 44100, A = 10 ** (2.5 / 40), al = Math.sin(w) / (2 * 1.1), a0p = 1 + al / A; pr.b0 = (1 + al * A) / a0p; pr.b1 = -2 * Math.cos(w) / a0p; pr.b2 = (1 - al * A) / a0p; pr.a1 = pr.b1; pr.a2 = (1 - al / A) / a0p; }
@@ -7066,7 +7074,7 @@ self.onmessage = async (e) => { const m = e.data; try {
       const sec = (S.track.sections || []).find((s) => it.t0 >= s.t0 && it.t0 < s.t1) || {}, lineK = items.filter((q) => q.t0 < it.t0 && q.t0 >= (sec.t0 || 0)).length;
       return renderFlowLine(it, { ...ctxBase, harm, role: sec.role, cho: !!it.cho, secIdx: sec.idx || 0, lineK, eng: lineEng(it.tx), lang: lineLang(it.tx) }).catch((e) => { console.warn('line', it.tx, e); S.lineErr = (e && e.message) || String(e); return null; }).then((L) => { doneL++; return L; });
     });
-    const m = new Float32Array(N), h1 = new Float32Array(N), d1 = new Float32Array(N); let anyH = false, anyD = false, syl = 0, prevEnd = -9, dbl = false;
+    const m = new Float32Array(N), h1 = new Float32Array(N), d1 = new Float32Array(N); let anyH = false, anyD = false, syl = 0, prevEnd = -9, prevVoxEnd = -9, dbl = false;
     for (let i = 0; i < items.length; i++) {
       const it = items[i], L = await jobs[i];
       if (!L) continue;
@@ -7078,6 +7086,9 @@ self.onmessage = async (e) => { const m = e.data; try {
       /* припев/дроп: дубль из той же озвучки (задержка + чуть другой тон через ресэмпл) — без второй озвучки */
       if (LK.double && S.voxDoubles !== false && !(globalThis.__kv2 && globalThis.__kv2.sing && !window.__noNotes) && ['peak', 'drop'].includes(roleAt(it.t0 + 0.01))) {   /* дубль из той же записи = флэнджер («под водой»): в нотном режиме не делаем */ addResampled(h1, L.y, L.sr * 1.003, sr, start + 0.017, 0.5, maxSec); anyH = true; dbl = true; }
       if (S.voxInhale && LK.inhale && it.t0 - prevEnd > 0.4) inhaleAt(m, sr, start + L.lead * 0.5 - 0.2, pkOf(L.y) * 0.1 * LK.inhale);
+      if (dsOn && !speech && !window.__noBreath && L.flow && L.flow.tOn && L.flow.tOn.length) { const bpmN = 60 / (4 * S.track.stepDur), bd = bpmN >= 140 ? 0.12 : bpmN <= 95 ? 0.35 : 0.22, v0 = it.t0 + L.flow.tOn[0] - 0.03;   /* вдох перед фразой: в быстрых песнях короткий, в медленных глубже */
+        if (v0 - bd - 0.04 > prevVoxEnd) inhaleAt(m, sr, v0 - bd, pkOf(L.y) * (vMood().id === 'sad' || vMood().id === 'soft' ? 0.09 : 0.06), bd); }
+      if (L.flow) prevVoxEnd = it.t0 + (L.flow.end || 0);
       prevEnd = it.t1;
       /* эдлибы по настроению: короткое слово в паузе после строки, тише */
       if (!dsOn && S.voxAdlibs !== false && (S.voxAdlibs || D.excl) && !(globalThis.__kv2 && globalThis.__kv2.sing && !window.__noNotes) && L.flow && ctxBase.emo.adl.length && i % 2 === 1) {   /* в нотном режиме без речевых вставок: звучали чужеродно */ try { const w = ctxBase.emo.adl[(i >> 1) % ctxBase.emo.adl.length], T = await say(w + (ctxBase.emo.excl ? '!' : '.'), D, 'shout'), xa = trim(T.pcm, T.sr), te = it.t0 + (L.flow.end || L.flow.tOn[L.flow.tOn.length - 1]) + 0.12, nx = i + 1 < items.length ? items[i + 1].t0 - 0.65 : 1e9; if (te < it.t1 + 0.3 && te + xa.length / T.sr < nx) { addResampled(h1, xa, T.sr, sr, te, 0.55, 0.6); anyH = true; } } catch (e) { } }
