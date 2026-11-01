@@ -61,6 +61,7 @@ public class DsEngine {
         dir = new File(base, "ds");
         if (new File(dir, "ok").exists()) state = "installed";
         if (new File(dir, "pitch/ok").exists()) pstate = "installed";
+        if (new File(new File(base.getAbsoluteFile(), "renri"), "ok").exists()) rnState = "installed";
     }
 
 
@@ -170,6 +171,7 @@ public class DsEngine {
             o.put("progress", progress);
             o.put("loaded", ac != null);
             o.put("pitch", pstate);
+            o.put("renri", rnState); o.put("rprogress", rnProgress);
             o.put("pprogress", pprogress);
             return o.toString();
         } catch (Exception e) {
@@ -436,8 +438,80 @@ public class DsEngine {
         return f.get();
     }
 
+
+    /* ================= второй голос: Yamine Renri (DiffSinger старого формата) ================= */
+    static final String NSF = "https://github.com/openvpi/vocoders/releases/download/nsf-hifigan-44.1k-hop512-128bin-2024.02/nsf_hifigan_44.1k_hop512_128bin_2024.02.oudep";
+    volatile String rnState = "none"; volatile double rnProgress = 0;
+    volatile OrtSession rac, rvc; final Map<String, Integer> rph = new HashMap<>();
+    File rnDir() { File d = new File(dir.getParentFile(), "renri"); d.mkdirs(); return d; }
+    File base0() { return dir.getParentFile(); }
+    static void copyOut(InputStream in, File dst, long[] got, long total, DsEngine e) throws IOException {
+        File part = new File(dst.getPath() + ".part");
+        try (OutputStream o = new FileOutputStream(part)) { byte[] buf = new byte[1 << 16]; int k; while ((k = in.read(buf)) > 0) { o.write(buf, 0, k); if (e != null && total > 0) { got[0] += k; } } }
+        dst.delete(); if (!part.renameTo(dst)) throw new IOException("не записался " + dst.getName());
+    }
+    /* голос — из zip, который пользователь скачал сам (выбран в «Файлах»); вокодер — с релиза openvpi */
+    void installRenri(android.content.ContentResolver cr, android.net.Uri uri) {
+        if (rnState.equals("busy")) return; rnState = "busy"; rnProgress = 0;
+        new Thread(() -> {
+            try {
+                File d = rnDir(); new File(d, "ok").delete(); long total = 315_000_000L;
+                try (android.database.Cursor c = cr.query(uri, null, null, null, null)) { if (c != null && c.moveToFirst()) { int i = c.getColumnIndex(android.provider.OpenableColumns.SIZE); if (i >= 0 && !c.isNull(i)) total = c.getLong(i); } } catch (Exception ex) { }
+                final long T = total; final long[] got = {0};
+                InputStream raw = new InputStream() { final InputStream in = cr.openInputStream(uri);
+                    @Override public int read() throws IOException { int b = in.read(); if (b >= 0) { got[0]++; } return b; }
+                    @Override public int read(byte[] b, int o, int n) throws IOException { int k = in.read(b, o, n); if (k > 0) { got[0] += k; rnProgress = Math.min(0.8, 0.8 * got[0] / (double) T); } return k; }
+                    @Override public void close() throws IOException { in.close(); } };
+                boolean ac = false, ph = false;
+                try (ZipInputStream z = new ZipInputStream(raw)) { ZipEntry e;
+                    while ((e = z.getNextEntry()) != null) { String n = e.getName().replace('\\', '/'); if (e.isDirectory() || n.contains("/dsdur/") || n.contains("/dsvariance/") || n.contains("/dspitch/")) continue;
+                        if (n.endsWith(".onnx") && !ac) { copyOut(z, new File(d, "acoustic.onnx"), new long[1], 0, null); ac = true; }
+                        else if (n.endsWith("phonemes.txt") && !ph) { copyOut(z, new File(d, "phonemes.txt"), new long[1], 0, null); ph = true; } } }
+                if (!ac || !ph) throw new IOException("в архиве нет модели голоса");
+                rnProgress = 0.82;
+                HttpURLConnection c = (HttpURLConnection) new URL(NSF).openConnection(); c.setInstanceFollowRedirects(true); c.setConnectTimeout(30000); c.setReadTimeout(60000);
+                boolean vc = false;
+                try (ZipInputStream z = new ZipInputStream(c.getInputStream())) { ZipEntry e; while ((e = z.getNextEntry()) != null) if (e.getName().endsWith(".onnx")) { copyOut(z, new File(d, "vocoder.onnx"), new long[1], 0, null); vc = true; break; } }
+                if (!vc) throw new IOException("вокодер не скачался");
+                new FileOutputStream(new File(d, "ok")).close(); rnProgress = 1; rnState = "installed";
+            } catch (Exception ex) { rnState = "error: " + ex.getMessage(); android.util.Log.w("TrackStudio", "renri", ex); }
+        }).start();
+    }
+    void rnLoad() throws Exception {
+        synchronized (llock) {
+            if (rac != null) return;
+            File d = rnDir(); if (!new File(d, "ok").exists()) throw new IllegalStateException("голос Renri не установлен");
+            if (ac != null) { try { ac.close(); } catch (Exception e) { } try { vc.close(); } catch (Exception e) { } ac = null; vc = null; }   /* память: Canary-акустика не нужна */
+            if (kv != null) { try { kv.close(); } catch (Exception e) { } kv = null; }
+            if (env == null) env = OrtEnvironment.getEnvironment();
+            OrtSession.SessionOptions so = new OrtSession.SessionOptions(); so.setIntraOpNumThreads(threads()); so.setOptimizationLevel(OrtSession.SessionOptions.OptLevel.BASIC_OPT); so.setMemoryPatternOptimization(false);
+            rac = env.createSession(new File(d, "acoustic.onnx").getAbsolutePath(), so);
+            rvc = env.createSession(new File(d, "vocoder.onnx").getAbsolutePath(), so);
+            rph.clear(); try (BufferedReader r = new BufferedReader(new FileReader(new File(d, "phonemes.txt")))) { String l; int i = 0; while ((l = r.readLine()) != null) { l = l.trim(); if (l.isEmpty()) continue; rph.put(l, i++); } }
+        }
+    }
+    float[] singRenri(JSONObject q, float[] f0, long[] dur) throws Exception {
+        rnLoad(); JSONArray R = q.getJSONArray("rph"); int n = R.length(); long[] tok = new long[n]; Integer sp = rph.get("SP");
+        for (int i = 0; i < n; i++) { Integer t = rph.get(R.getString(i)); tok[i] = t != null ? t : (sp != null ? sp : 0); }
+        int T = f0.length; Map<String, OnnxTensor> in = new HashMap<>();
+        try {
+            in.put("tokens", OnnxTensor.createTensor(env, LongBuffer.wrap(tok), new long[]{1, n}));
+            in.put("durations", OnnxTensor.createTensor(env, LongBuffer.wrap(dur), new long[]{1, n}));
+            in.put("f0", OnnxTensor.createTensor(env, FloatBuffer.wrap(f0), new long[]{1, T}));
+            in.put("speedup", OnnxTensor.createTensor(env, LongBuffer.wrap(new long[]{q.optLong("speedup", 100)}), new long[]{}));
+            float[] mel; long[] ms;
+            try (OrtSession.Result r = rac.run(in)) { OnnxTensor m = (OnnxTensor) r.get(0); ms = m.getInfo().getShape(); FloatBuffer b = m.getFloatBuffer(); mel = new float[b.remaining()]; b.get(mel); }
+            Map<String, OnnxTensor> vin = new HashMap<>();
+            try { vin.put("mel", OnnxTensor.createTensor(env, FloatBuffer.wrap(mel), ms)); vin.put("f0", OnnxTensor.createTensor(env, FloatBuffer.wrap(f0), new long[]{1, T}));
+                try (OrtSession.Result r = rvc.run(vin)) { FloatBuffer b = ((OnnxTensor) r.get(0)).getFloatBuffer(); float[] w = new float[b.remaining()]; b.get(w); for (int i = 0; i < w.length; i++) if (!Float.isFinite(w[i])) w[i] = 0; return w; } }
+            finally { for (OnnxTensor t : vin.values()) t.close(); }
+        } finally { for (OnnxTensor t : in.values()) t.close(); }
+    }
+
     float[] sing(JSONObject q) throws Exception {
-        try { load(); } catch (Throwable t) { android.util.Log.e("TrackStudio", "ds load failed", t); ac = null; throw new Exception("модель не загрузилась: " + t); }
+        boolean RN = "renri".equals(q.optString("voice")) && rnState.equals("installed");
+        if (!RN) try { load(); } catch (Throwable t) { android.util.Log.e("TrackStudio", "ds load failed", t); ac = null; throw new Exception("модель не загрузилась: " + t); }
+        if (RN && env == null) env = OrtEnvironment.getEnvironment();
         JSONArray P = q.getJSONArray("ph"), Dd = q.getJSONArray("dur"), F = q.getJSONArray("f0");
         int n = P.length(), T = F.length();
         long[] tok = new long[n], dur = new long[n];
@@ -457,6 +531,7 @@ public class DsEngine {
             try { loadPitch(); if (pp != null) { String[] nm = new String[n]; for (int i = 0; i < n; i++) nm[i] = P.getString(i); f0 = pitchCurve(nm, dur, f0, expr, q.optLong("psteps", 8), q.optDouble("tune", 0.6)); } }
             catch (Throwable t) { android.util.Log.w("TrackStudio", "pitch", t); }
         }
+        if (RN) return singRenri(q, f0, dur);
         if (q.has("gender")) { double g = q.getDouble("gender"); for (int i = 0; i < T; i++) gender[i] = (float) g; }
         /* голос: смесь эмбеддингов (arc/spark/voltage) */
         float[] e = new float[256];

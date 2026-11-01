@@ -44,7 +44,7 @@ public class MainActivity extends Activity {
     static final String HOST = "appassets.androidplatform.net";
     static final String START = "https://" + HOST + "/index.html";
     static final String BG = "#111113";
-    static final int PICK = 41;
+    static final int PICK = 41, PICK_RN = 42;
 
     WebView web;
     ValueCallback<Uri[]> pending;
@@ -196,6 +196,7 @@ public class MainActivity extends Activity {
 
     @Override
     protected void onActivityResult(int req, int res, Intent data) {
+        if (req == PICK_RN) { if (res == RESULT_OK && data != null && data.getData() != null) ds.installRenri(getContentResolver(), data.getData()); return; }
         if (req != PICK) {
             super.onActivityResult(req, res, data);
             return;
@@ -320,6 +321,12 @@ public class MainActivity extends Activity {
         @JavascriptInterface
         public void toast(final String t) {
             runOnUiThread(() -> Toast.makeText(MainActivity.this, t, Toast.LENGTH_SHORT).show());
+        }
+
+        @JavascriptInterface
+        public void rnPick() {
+            runOnUiThread(() -> { Intent i = new Intent(Intent.ACTION_GET_CONTENT); i.addCategory(Intent.CATEGORY_OPENABLE); i.setType("*/*");
+                try { startActivityForResult(Intent.createChooser(i, "Выбери zip голоса Yamine Renri (hop512)"), PICK_RN); } catch (Exception e) { } });
         }
 
         @JavascriptInterface
