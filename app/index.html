@@ -5537,7 +5537,7 @@ self.onmessage = async (e) => { const m = e.data; try {
   /* тембр: молодой и чистый; японский голос в смеси давал акцент (замер: −5…−13% разборчивости английского) */
   /* тембр певицы (замер на 18 строках): heart/sky/bella — чистота голоса (HNR) 8.4 дБ, держит ноты до ~F#4; tebukuro/jessica/heart — 11.5 дБ (меньше сипа и «каши»),
      разборчивость та же (90%), чисто поёт на 3 полутона выше (95% нот в тон до A4) — меньше сдвига высоты обработкой, голос натуральнее */
-  const TIMBRE = (() => { let v = 1; try { v = localStorage.getItem('ts_vt') === '0' ? 0 : 1; } catch (e) { } return v ? [['jf_tebukuro', 0.45], ['jf_alpha', 0.2], ['af_jessica', 0.2], ['af_heart', 0.15]] : [['jf_tebukuro', 0.35], ['af_jessica', 0.35], ['af_heart', 0.3]]; })();
+  const TIMBRE = (() => { let v = 1; try { v = localStorage.getItem('ts_vt') === '0' ? 0 : 1; } catch (e) { } return [['jf_tebukuro', 0.35], ['af_jessica', 0.35], ['af_heart', 0.3]]; })();
   /* интонация — только от английских голосов: японская давала акцент (замер Whisper: уверенность −0.12 против −0.06 у чистого английского).
      Высокий «аниме»-тон, размах интонации, автотюн в тональность бита и изгиб в конце строки — обработкой (sh, ex, tu, bd). */
   const ARCH = {
@@ -6782,7 +6782,7 @@ self.onmessage = async (e) => { const m = e.data; try {
       for (let k = 0; k < N; k++) { cr[k] = Math.log(Math.hypot(re[k], im[k]) + 1e-9); ci[k] = 0; }
       fft(cr, ci, true); for (let k = L; k <= N - L; k++) { cr[k] = 0; ci[k] = 0; } fft(cr, ci, false);
       for (let k = 0; k <= K; k++) env[k] = cr[k];
-      for (let k = 1; k < K; k++) { const x = k / a, i0 = Math.floor(x), w = x - i0, e2 = env[i0] * (1 - w) + env[Math.min(K, i0 + 1)] * w, g = Math.exp(Math.max(-2.3, Math.min(2.3, e2 - env[k])));
+      for (let k = 1; k < K; k++) { const x = k / a, i0 = Math.floor(x), w = x - i0, e2 = env[i0] * (1 - w) + env[Math.min(K, i0 + 1)] * w, g = Math.exp(Math.max(-1.2, Math.min(1.2, e2 - env[k])));
         re[k] *= g; im[k] *= g; re[N - k] = re[k]; im[N - k] = -im[k]; }
       fft(re, im, true);
       for (let i = 0; i < N; i++) { const j = p + i; if (j >= 0) { out[j] += re[i] * win[i]; wsum[j] += win[i] * win[i]; } }
@@ -6885,7 +6885,7 @@ self.onmessage = async (e) => { const m = e.data; try {
         /* аниме-регистр: мелодия выше на ~3–4 полутона (в ладу бита — каждая нота заново подгоняется к гамме) */
         /* синт-айдол (как вокалоид): ноты ровно по высоте, быстрый «цифровой» переход, вибрато только на долгих нотах — ровное и позднее, голос выше и светлее */
         const VOCX = !rap && nvStyle() === 'vocaloid' && !window.__noVocX;
-        const top0 = Math.max(...notes0), up = window.__dsUp != null ? window.__dsUp : rap ? clamp(66 - top0, 0, 3) : VOCX ? clamp(75 - top0, 0, 3) : clamp(77 - top0, 0, 4), nDS = up ? notes0.map((m, k) => fitMidi(m + up, ctx.track, ctx.spec, it.t0 + tV[k], sy[k].stress >= 0.6, 1.5, nl[k])) : notes0;
+        const top0 = Math.max(...notes0), up = window.__dsUp != null ? window.__dsUp : rap ? clamp(66 - top0, 0, 3) : VOCX ? clamp(75 - top0, 0, 3) : clamp((vtOn() ? (window.__vtTop || 77) : 77) - top0, 0, vtOn() ? 6 : 4), nDS = up ? notes0.map((m, k) => fitMidi(m + up, ctx.track, ctx.spec, it.t0 + tV[k], sy[k].stress >= 0.6, 1.5, nl[k])) : notes0;
         const vocF0 = (nts) => { const o = new Array(F0M.hk.length).fill(0), GL = 0.032;
           for (let h = 0; h < o.length; h++) { const k = F0M.hk[h]; if (k < 0) continue; const t = a0 + (h + 0.5) * FR / 2, into = t - NT.vS[k], vlen = NT.vE[k] - NT.vS[k]; let m = nts[k];
             if (k > 0 && into < GL) { const x = clamp((into + 0.008) / GL, 0, 1); m = nts[k - 1] + (m - nts[k - 1]) * (x * x * (3 - 2 * x)); }
@@ -7108,7 +7108,7 @@ self.onmessage = async (e) => { const m = e.data; try {
       if (!L) continue;
       const start = it.t0 - L.lead + (speech ? 0.005 : 0.0), nextT = i + 1 < items.length ? items[i + 1].t0 : N / sr, maxSec = Math.max(it.t1, nextT - 0.02) - start;
       if (L.flow) S.flowLines.push({ t0: it.t0, bars: it.bars, ...L.flow });
-      if (vtOn() && !L.vt) { const vs = (L.ds ? 2.5 : 2) * vtOn(); try { L.y = vtFormant(L.y, L.sr, vs); if (L.d) L.d = vtFormant(L.d, L.sr, vs); if (L.h) L.h = vtFormant(L.h, L.sr, vs); L.vt = 1; } catch (e) { console.warn('vt', e); } }
+      if (vtOn() && L.ds && !L.vt) {   /* только пение: на рэпе (Kokoro) фильтр давал «отрыжку» */ const vs = (window.__vtS != null ? window.__vtS : 4.5) * vtOn(); try { L.y = vtFormant(L.y, L.sr, vs); if (L.d) L.d = vtFormant(L.d, L.sr, vs); if (L.h) L.h = vtFormant(L.h, L.sr, vs); L.vt = 1; } catch (e) { console.warn('vt', e); } }
       if (L.sr !== sr) { try { const ib = new AudioBuffer({ numberOfChannels: 1, length: L.y.length, sampleRate: L.sr }); ib.getChannelData(0).set(L.y); const oc = new OfflineAudioContext(1, Math.ceil(L.y.length * sr / L.sr), sr), bs = oc.createBufferSource(); bs.buffer = ib; bs.connect(oc.destination); bs.start(); L.y = (await oc.startRendering()).getChannelData(0); L.sr = sr; } catch (e) { } }
       addResampled(m, L.y, L.sr, sr, start, 1, maxSec); if (globalThis.liveAdd) liveAdd(L.y, L.sr, start, maxSec); if (L.h) { addResampled(h1, L.h, L.sr, sr, start + 0.006, 0.3, maxSec); anyH = true; }
       if (L.d) { addResampled(d1, L.d, L.sr, sr, start + 0.013, 0.3, maxSec); anyD = true; }   /* дубль чуть позже ведущего — как вторая запись */
