@@ -7538,6 +7538,32 @@ self.onmessage = async (e) => { const m = e.data; try {
     p.mic = 0; if (/дешев\S* микро|дешёв\S* микро|гарнитур|headset|cheap mic|bit.?crush|бит.?краш|клиппинг|clipping|убит\S* микро|рублев\S* (микро|гарнитур)/.test(t)) p.mic = /сильн|жестк|жёстк|heavy|убит|макс/.test(t) ? 0.85 : 0.6;
     if (/шёпот|шепот|whisper/.test(t)) p.sat = 0; return p;
   };
+  /* «склейка» голоса с битом: голос проходит через ту же грязь, что и бит — насыщение, клип, биткраш, плотная компрессия.
+     Степень — по жанру, грязи бита (grit, дисторшн) и словам промпта; чистые жанры остаются чистыми */
+  globalThis.vocalDirt = function (spec) {
+    const st = (spec && spec.style) || '', t = ((document.querySelector('#prompt') || {}).value || '').toLowerCase();
+    const base = { hardtekk: .7, gabber: .75, jumpstyle: .5, hardstyle: .45, glitch: .55, industrial: .6, phonk: .45, rage: .5, dubstep: .45, dnb: .3, hoodtrap: .25, drill: .25, trap: .18, melancore: .2, techno: .25, jersey: .2 }[st] || 0;
+    const f = (spec && spec.feat) || {}; let d = Math.max(base, (spec && spec.grit || 0) * 0.7, (f.dist || 0) * 0.9);
+    if (/грязн|dirty|спид|speed|убит|distort|дисторш|перегруз|жестк|жёстк|hard|рейв|rave|breakcore|брейккор/.test(t)) d = Math.max(d, 0.6);
+    if (/чист|clean|\bdry\b|сух|нежн|soft/.test(t)) d = Math.min(d, 0.12);
+    return window.__dirt != null ? window.__dirt : Math.max(0, Math.min(1, d));
+  };
+  globalThis.vocalGlue = function (l, r, sr, d) {
+    if (!(d > 0.05)) return '';
+    const drv = 1 + 7 * d, tn = Math.tanh(drv), wet = 0.25 + 0.55 * d, crush = d > 0.5, hold = d > 0.75 ? 3 : 2, q = 2 ** (d > 0.75 ? 7 : 9), cmix = crush ? 0.18 + 0.35 * (d - 0.5) : 0;
+    let pk = 0; for (let i = 0; i < l.length; i += 3) pk = Math.max(pk, Math.abs(l[i]), Math.abs(r[i])); if (!pk) return ''; const g0 = 0.9 / pk;
+    for (const x of [l, r]) {
+      const hp = new BQ().hp(160 * (SR / sr), 0.7), lp = new BQ().lp(Math.max(6000, 15000 - 7000 * d) * (SR / sr), 0.7); let held = 0, env = 0; const at = 1 - Math.exp(-1 / (0.002 * sr)), rl = 1 - Math.exp(-1 / (0.06 * sr));
+      for (let i = 0; i < x.length; i++) {
+        const dry = x[i]; let y = hp.p(dry * g0); y = Math.tanh(y * drv) / tn;
+        if (crush) { if (i % hold === 0) held = Math.round(y * q) / q; y = y * (1 - cmix) + held * cmix; }
+        y = lp.p(y);
+        const a = Math.abs(y); env += (a > env ? at : rl) * (a - env); const gr = env > 0.35 ? Math.pow(0.35 / env, 0.6) : 1;   /* плотная компрессия ~1:2.5 выше порога */
+        x[i] = (dry * (1 - wet) + (y * gr / g0) * wet * 1.15);
+      }
+    }
+    return 'склейка с битом ' + Math.round(d * 100) + '%' + (crush ? ' · биткраш' : '');
+  };
   /* по секциям: «телефон» в куплетах, ширина в припевах (копии только в боковом канале — в моно не «плывёт») */
   globalThis.sectionVoxFx = function (l, r, sr, prof) {
     const secs = (S.track && S.track.sections) || [], N = l.length, k0 = SR / sr; if (!secs.length) return '';
@@ -7838,6 +7864,7 @@ self.onmessage = async (e) => { const m = e.data; try {
     /* эффекты под жанр: плейт + дилей в темп, откалиброваны и приглушены под голосом */
     if (!window.__voxDry) try {
       const l = out.getChannelData(0), r = out.getChannelData(1); S.voxSec = ''; try { if (globalThis.sectionVoxFx) S.voxSec = sectionVoxFx(l, r, sr, vfxProfile(sp)); } catch (e) { console.warn('секции голоса', e); }
+      try { const gd = vocalDirt(sp), gl = vocalGlue(l, r, sr, gd); if (gl) S.voxSec = (S.voxSec ? S.voxSec + ', ' : '') + gl; } catch (e) { console.warn('склейка', e); }
       try { const pm = vfxProfile(sp); if (pm.mic > 0) { cheapMic(l, r, sr, pm.mic); S.voxSec = (S.voxSec ? S.voxSec + ', ' : '') + 'дешёвый микрофон'; } } catch (e) { console.warn('микрофон', e); }
       const fx = await vocalFx(l, r, sr, sp, bpm(), vf);
       for (let i = 0; i < out.length; i++) { l[i] += fx.L[i]; r[i] += fx.R[i]; }
