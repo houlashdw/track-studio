@@ -321,7 +321,7 @@ public class DsEngine {
         HttpURLConnection c = (HttpURLConnection) new URL(PACK).openConnection(); c.setInstanceFollowRedirects(true); c.setRequestMethod("HEAD"); c.setConnectTimeout(30000);
         packLen = c.getContentLengthLong(); c.disconnect(); if (packLen <= 0) throw new IOException("размер пака неизвестен"); return packLen;
     }
-    void installPitch() { if (pstate.equals("installed") || pstate.equals("downloading") || !state.equals("installed") && !state.equals("ready")) return; new Thread(this::installPitchSync).start(); }
+    void installPitch() { if (pstate.equals("installed") || pstate.equals("downloading") || !state.equals("installed") && !state.equals("ready") && !rnState.equals("installed")) return;   /* Renri тоже поёт живее с моделью высоты (~125 МБ кусками), Canary для этого не нужен */ new Thread(this::installPitchSync).start(); }
 
     void loadPitch() throws Exception { synchronized (llock) { loadPitch0(); } }
     void loadPitch0() throws Exception {
@@ -473,7 +473,7 @@ public class DsEngine {
                 boolean vc = false;
                 try (ZipInputStream z = new ZipInputStream(c.getInputStream())) { ZipEntry e; while ((e = z.getNextEntry()) != null) if (e.getName().endsWith(".onnx")) { copyOut(z, new File(d, "vocoder.onnx"), new long[1], 0, null); vc = true; break; } }
                 if (!vc) throw new IOException("вокодер не скачался");
-                new FileOutputStream(new File(d, "ok")).close(); rnProgress = 1; rnState = "installed";
+                new FileOutputStream(new File(d, "ok")).close(); rnProgress = 1; rnState = "installed"; installPitch();
             } catch (Exception ex) { rnState = "error: " + ex.getMessage(); android.util.Log.w("TrackStudio", "renri", ex); }
         }).start();
     }

@@ -3286,7 +3286,8 @@ function dsUI() {
       msg.innerHTML = '🎤 Пение — ' + (rn && cur === 'renri' ? 'Renri' : 'Canary') + (s.pitch === 'installed' ? ' · живая подача' : '') + ' ✓' + rnUI + ' <label class="chk sm" style="display:inline-flex;margin-left:8px"><input type="checkbox" id="dsHQ"' + (S.hq ? ' checked' : '') + '><span>макс. качество (в 2–3 раза дольше)</span></label>';
       $('#dsHQ').onchange = (e) => { S.hq = e.target.checked; try { localStorage.setItem('ts_hq', S.hq ? '1' : ''); } catch (er) { } }; btn.hidden = true; bar.hidden = true; if (globalThis.DSX) { DSX.ok = true; } return true; }
     if (s.state === 'downloading') { msg.textContent = (s.pitch === 'downloading' ? 'Качаю живую подачу… ' + Math.round((s.pprogress || 0) * 100) : 'Качаю певческую модель… ' + Math.round(s.progress * 100)) + '% (один раз, ~650 МБ)'; btn.hidden = true; bar.hidden = false; bar.firstElementChild.style.width = Math.round(s.progress * 100) + '%'; return false; }
-    if (s.renri === 'installed') { if (globalThis.DSX) { DSX.ok = true; DSX.rn = true; } msg.innerHTML = '🎤 Пение — Yamine Renri ✓ <span class="sm">(Canary можно докачать для живой подачи)</span>'; btn.hidden = false; btn.textContent = 'Скачать Canary'; bar.hidden = true; return true; }
+    if (s.renri === 'installed' && s.pitch === 'downloading') { if (globalThis.DSX) { DSX.ok = true; DSX.rn = true; } msg.textContent = '🎤 Renri ✓ · докачиваю живую подачу… ' + Math.round((s.pprogress || 0) * 100) + '% (~125 МБ, один раз; петь уже можно)'; btn.hidden = true; bar.hidden = false; bar.firstElementChild.style.width = Math.round((s.pprogress || 0) * 100) + '%'; return false; }
+    if (s.renri === 'installed') { if (globalThis.DSX) { DSX.ok = true; DSX.rn = true; } msg.innerHTML = '🎤 Пение — Yamine Renri' + (s.pitch === 'installed' ? ' · живая подача' : '') + ' ✓ <span class="sm">(Canary — второй голос, по желанию; английские строки он поёт чище)</span>'; btn.hidden = false; btn.textContent = 'Скачать Canary'; bar.hidden = true; return true; }
     msg.innerHTML = (/^error/.test(s.state) ? 'Не скачалось (' + escH(s.state.slice(7, 90)) + '). ' : '') + '🎤 Певческий голос: <b>Yamine Renri</b> — из твоего zip (hop512), или <b>Canary</b> — скачать ~520 МБ'
       + '<div style="margin-top:8px"><button type="button" class="pri ex" id="rnBtn2">Renri из файла</button></div>' + (/^error/.test(s.renri || '') ? '<div class="sm">Renri не встал: ' + escH(s.renri.slice(7, 90)) + '</div>' : '');
     setTimeout(() => { const rb = $('#rnBtn2'); if (rb) rb.onclick = () => { try { TSAndroid.rnPick(); } catch (e) { } setTimeout(poll, 1500); }; }, 0);
@@ -4554,7 +4555,7 @@ document.addEventListener('DOMContentLoaded', init);
       return o;
     };
     await new Promise((r) => setTimeout(r, 0));
-    const H1 = scaleLayer(h1), H2 = scaleLayer(h2), DB = scaleLayer(P.layers && P.layers.d);
+    const H1 = scaleLayer(h1), H2 = scaleLayer(h2), DB = scaleLayer(P.layers && P.layers.d), dSide = !!(P.layers && P.layers.dSide);
     await new Promise((r) => setTimeout(r, 0));
     const spc = S.spec.space == null ? 0.4 : S.spec.space;
     const out = new AudioBuffer({ numberOfChannels: 2, length: N, sampleRate: sr });
@@ -4575,8 +4576,10 @@ document.addEventListener('DOMContentLoaded', init);
       const wideL = 0;
       const wideR = 0;
       const dbv = DB ? DB[i] * 0.42 * hG : 0;   /* дубль — справа, гармония — слева: стерео припева как в студии */
-      const dryL = y[i] + wideL + harm * hG * 1.25 + dbv * 0.45;
-      const dryR = y[i] + wideR + harm * hG * 0.45 + dbv * 1.25;
+      /* дубль-копия того же голоса (быстрый режим) — только в «сайде»: в моно (динамик телефона) он вычитается и не даёт гребёнки, которая смазывала согласные (замер: разборчивость −0.05…−0.1) */
+      const dSL = dSide ? dbv * 0.85 : dbv * 0.45, dSR = dSide ? -dbv * 0.85 : dbv * 1.25;
+      const dryL = y[i] + wideL + harm * hG * 1.25 + dSL;
+      const dryR = y[i] + wideR + harm * hG * 0.45 + dSR;
       const delIn = (dryL + dryR) * 0.5;
       const delayed = i >= dly ? dBuf[i - dly] : 0;
       fbL += 0.35 * (delayed - fbL);
@@ -6752,6 +6755,12 @@ self.onmessage = async (e) => { const m = e.data; try {
     const isV = (p) => DS_VOW.has(p) || DS_VOW2.has(p) || p === 'SP';
     for (let i = 0; i < ph.length; i++) { if (isV(ph[i]) || fr[i] >= 6) continue; let need = 6 - fr[i];
       for (const j of [i - 1, i + 1]) { if (j < 0 || j >= ph.length || !isV(ph[j])) continue; const give = Math.min(need, Math.max(0, fr[j] - 5)); fr[j] -= give; fr[i] += give; need -= give; if (need <= 0) break; } }
+    /* разборчивость (замер русским распознавателем: та же строка с ровными длительностями — «Город спит», с нашими — каша):
+       гласная не короче ~105 мс, согласная не короче ~50 мс; время берём у самых длинных звуков строки (сумма не меняется) */
+    if (!window.__noMinDur) { const vMin = 9, cMin = 4, isVow = (p) => DS_VOW.has(p) || DS_VOW2.has(p);
+      for (let pass = 0; pass < 3; pass++) for (let i = 0; i < ph.length; i++) { if (ph[i] === 'SP' || ph[i] === 'AP') continue; const mn = isVow(ph[i]) ? vMin : cMin; let need = mn - fr[i]; if (need <= 0) continue;
+        const order = fr.map((f, j) => [f - (ph[j] === 'SP' ? 6 : isVow(ph[j]) ? vMin + 6 : cMin + 2), Math.abs(j - i), j]).filter((x) => x[0] > 0 && x[2] !== i).sort((p, q) => q[0] - p[0] || p[1] - q[1]);
+        for (const [spare, , j] of order) { const g = Math.min(need, spare); fr[j] -= g; fr[i] += g; need -= g; if (need <= 0) break; } } }
     return { ph, fr, T: prev, sec: t + dur[dur.length - 1] * 0.025 };
   }
   /* наша кривая высоты (12.5 мс, 0 = глухой) → непрерывная кривая на кадрах Canary */
@@ -6769,7 +6778,7 @@ self.onmessage = async (e) => { const m = e.data; try {
   /* второй голос — Yamine Renri: свои имена фонем; русские гласные — японские «чистые» A1/I1/U1/E1/O1 */
   const RN_MAP = { aa: 'aa', ae: 'ae', ah: 'ah', ax: 'ah', ao: 'ao2', eh: 'eh', er: 'er2', ih: 'ih', iy: 'iy', uh: 'uh', uw: 'uw', ow: 'ow', ay: 'ay', aw: 'aw', ey: 'ey', oy: 'OY2', a: 'A1', oh: 'O1', uu: 'U1', ee: 'I1',
     b: 'B2', d: 'D2', f: 'F2', g: 'G2', k: 'K2', l: 'L2', m: 'M2', n: 'N2', p: 'P2', r: 'R2', rr: 'R2', rj: 'R2', ly: 'L2', ny: 'N2', s: 'S2', t: 'T2', v: 'V2', w: 'W2', y: 'Y2', z: 'Z2',
-    sh: 'SH2', ch: 'CH2', zh: 'ZH2', jh: 'jh', th: 'th', dh: 'dh', hh: 'hh', hx: 'hh', ng: 'ng', ts: 'CH2', dx: 'D2', cl: 'cl', SP: 'SP', AP: 'AP' };
+    sh: 'SH2', ch: 'CH2', zh: 'ZH2', jh: 'jh', th: 'th', dh: 'dh', hh: 'hh', hx: 'hh', ng: 'ng', ts: 'CH2', dx: 'D2', q: 'cl', cl: 'cl', SP: 'SP', AP: 'AP' };
   const dsVoice = () => { let v = 'renri'; try { v = localStorage.getItem('ts_dsvoice') || 'renri'; } catch (e) { } return v === 'renri' && DSX.rn ? 'renri' : 'canary'; };
   globalThis.dsVoice = dsVoice;
   async function dsSing(tok, dur, f0h, spk, opt) {
@@ -6944,7 +6953,7 @@ self.onmessage = async (e) => { const m = e.data; try {
         if (dP) { try { db = await dP; for (let i = 0; i < db.length; i++) db[i] *= g; db = late(db, 0.012 + Rl() * 0.018); } catch (er) { console.warn('дубль', er); } }
         if (hP) { try { hy = await hP; for (let i = 0; i < hy.length; i++) hy[i] *= g; hy = late(hy, 0.006 + Rl() * 0.012); } catch (er) { console.warn('гармония', er); } }
         TS.total++; TS.done++; DSX.used = (DSX.used || 0) + 1;
-        return { y, sr: 44100, ds: 1, lead: -a0, syl: sy.length, h: hy, d: db, flow: { triplet, n: sy.length, pos: F.pos.map((q) => q.p), U: F.U, tOn: tV, lv, end: NT.vE[NT.vE.length - 1] } };
+        return { y, sr: 44100, ds: 1, lead: -a0, syl: sy.length, h: hy, d: db, dc: !dP, flow: { triplet, n: sy.length, pos: F.pos.map((q) => q.p), U: F.U, tOn: tV, lv, end: NT.vE[NT.vE.length - 1] } };
       } catch (er) { console.warn('певческая модель — пою Kokoro', er); DSX.fail = String((er && er.message) || er); }
     }
     const V = e.job.V, f0mix = voc || !rap ? 1 : clamp(0.5 + (D.tune || 0.5) * 0.45 + (hot ? 0.1 : 0), 0.5, 0.95), ipa = tok.join('');
@@ -7121,7 +7130,7 @@ self.onmessage = async (e) => { const m = e.data; try {
       const sec = (S.track.sections || []).find((s) => it.t0 >= s.t0 && it.t0 < s.t1) || {}, lineK = items.filter((q) => q.t0 < it.t0 && q.t0 >= (sec.t0 || 0)).length;
       return renderFlowLine(it, { ...ctxBase, harm, role: sec.role, cho: !!it.cho, secIdx: sec.idx || 0, lineK, eng: lineEng(it.tx), lang: lineLang(it.tx) }).catch((e) => { console.warn('line', it.tx, e); S.lineErr = (e && e.message) || String(e); return null; }).then((L) => { doneL++; return L; });
     });
-    const m = new Float32Array(N), h1 = new Float32Array(N), d1 = new Float32Array(N); let anyH = false, anyD = false, syl = 0, prevEnd = -9, prevVoxEnd = -9, dbl = false;
+    const m = new Float32Array(N), h1 = new Float32Array(N), d1 = new Float32Array(N); let anyH = false, anyD = false, dCopy = false, syl = 0, prevEnd = -9, prevVoxEnd = -9, dbl = false;
     for (let i = 0; i < items.length; i++) {
       const it = items[i], L = await jobs[i];
       if (!L) continue;
@@ -7130,7 +7139,7 @@ self.onmessage = async (e) => { const m = e.data; try {
       if (vtOn() && L.ds && !L.vt) {   /* только пение: на рэпе (Kokoro) фильтр давал «отрыжку» */ const vs = (window.__vtS != null ? window.__vtS : 4.5) * vtOn(); try { L.y = vtFormant(L.y, L.sr, vs); if (L.d) L.d = vtFormant(L.d, L.sr, vs); if (L.h) L.h = vtFormant(L.h, L.sr, vs); L.vt = 1; } catch (e) { console.warn('vt', e); } }
       if (L.sr !== sr) { try { const ib = new AudioBuffer({ numberOfChannels: 1, length: L.y.length, sampleRate: L.sr }); ib.getChannelData(0).set(L.y); const oc = new OfflineAudioContext(1, Math.ceil(L.y.length * sr / L.sr), sr), bs = oc.createBufferSource(); bs.buffer = ib; bs.connect(oc.destination); bs.start(); L.y = (await oc.startRendering()).getChannelData(0); L.sr = sr; } catch (e) { } }
       addResampled(m, L.y, L.sr, sr, start, 1, maxSec); if (globalThis.liveAdd) liveAdd(L.y, L.sr, start, maxSec); if (L.h) { addResampled(h1, L.h, L.sr, sr, start + 0.006, 0.3, maxSec); anyH = true; }
-      if (L.d) { addResampled(d1, L.d, L.sr, sr, start + 0.013, 0.3, maxSec); anyD = true; }   /* дубль чуть позже ведущего — как вторая запись */
+      if (L.d) { addResampled(d1, L.d, L.sr, sr, start + 0.013, 0.3, maxSec); anyD = true; if (L.dc) dCopy = true; }   /* дубль чуть позже ведущего — как вторая запись */
       /* припев/дроп: дубль из той же озвучки (задержка + чуть другой тон через ресэмпл) — без второй озвучки */
       if (LK.double && S.voxDoubles !== false && !(globalThis.__kv2 && globalThis.__kv2.sing && !window.__noNotes) && ['peak', 'drop'].includes(roleAt(it.t0 + 0.01))) {   /* дубль из той же записи = флэнджер («под водой»): в нотном режиме не делаем */ addResampled(h1, L.y, L.sr * 1.003, sr, start + 0.017, 0.5, maxSec); anyH = true; dbl = true; }
       if (S.voxInhale && LK.inhale && it.t0 - prevEnd > 0.4) inhaleAt(m, sr, start + L.lead * 0.5 - 0.2, pkOf(L.y) * 0.1 * LK.inhale);
@@ -7148,7 +7157,7 @@ self.onmessage = async (e) => { const m = e.data; try {
     if (!syl) throw new Error('ни одна строка не озвучилась: ' + (S.lineErr || 'причина неизвестна'));
     await new Promise((r) => setTimeout(r, 0)); try { if (!window.__noAir) exciteAir(m, sr, 0.14 * (1 - 0.8 * (window.__noTone ? 0 : Math.max(0.3, globalThis.vocalDirt && S.spec ? vocalDirt(S.spec) : 0)))); } catch (e) { console.warn('air', e); } await new Promise((r) => setTimeout(r, 0)); 
     S.vch = { id: 'anime', name: 'Аниме · ' + D.name, why: 'по промпту', pres: D.pres, air: D.air, dbl: 0.34 + (D.double ? 0.06 : 0), harm: 1, spark: 0.26, breath: D.breath };
-    const P = { male: false, segs: [], meta: [], total: syl, dropped: 0, dbl, layers: { h1: anyH ? h1 : null, h2: null, d: anyD ? d1 : null } };
+    const P = { male: false, segs: [], meta: [], total: syl, dropped: 0, dbl, layers: { h1: anyH ? h1 : null, h2: null, d: anyD ? d1 : null, dSide: dCopy && !window.__dMid } };
     S.voxFail = null; S.voxInfo = 'Аниме · ' + D.name + ' · ' + (speech ? (rapDelivery() === 'line' ? 'строкой целиком' : 'фразами в бит') : 'пение');
     const res = await globalThis.voxFinish(m, raw, P, speech);
     res.syl = syl; res.flavor = 'neuro:kru'; return res;
@@ -7608,7 +7617,7 @@ self.onmessage = async (e) => { const m = e.data; try {
       const cv = oc.createConvolver(); cv.buffer = plateIR(oc, Math.min(3, P.size * userSize * 1.2 * rvSz), rvPre, 0.7);
       s.connect(hp); hp.connect(lp); lp.connect(cv); cv.connect(oc.destination); s.start();
       const w = await oc.startRendering(), a = w.getChannelData(0), b = w.getChannelData(1);
-      for (let i = 0; i < N; i++) { const d = 1 - 0.6 * Math.min(1, env[i] * 2.5); wetL[i] = a[i] * d; wetR[i] = b[i] * d; }
+      const duk = window.__revDuck != null ? window.__revDuck : 0.78; for (let i = 0; i < N; i++) { const d = 1 - duk * Math.min(1, env[i] * 2.5); wetL[i] = a[i] * d; wetR[i] = b[i] * d; }   /* реверб глубже уходит под голос (было 0.6): слова не тонут, хвосты расцветают в паузах */
     } catch (e) { console.warn('vox rev', e); }
     const cal = (L, R, tdb) => { let de = 0, we = 0; for (let i = 0; i < N; i += 2) { de += mono[i] * mono[i]; we += (L[i] * L[i] + R[i] * R[i]) * 0.5; } const k = we > 0 ? Math.sqrt(10 ** (tdb / 10) * de / we) : 0; for (let i = 0; i < N; i++) { L[i] *= k; R[i] *= k; } };
     cal(wetL, wetR, P.rev + userRev + G('revAdj', 0));
