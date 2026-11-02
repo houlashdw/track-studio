@@ -3278,6 +3278,13 @@ async function aixRun() {
   } finally { btn.disabled = false; AIX.onP = null; }
 }
 
+/* русский для Renri: пак из Colab (RVC-тембр + русский голос Piper) */
+function ruUIhtml(s) {
+  if (s.renri !== 'installed') return '';
+  if (s.ru === 'installed') return '<div class="sm" style="margin-top:4px">🇷🇺 Русский для Renri ✓ <span class="sm">(русские строки — чистое произношение)</span></div>';
+  if (s.ru === 'busy') return '<div class="sm" style="margin-top:4px">🇷🇺 Ставлю русский пак… ' + Math.round((s.ruprogress || 0) * 100) + '%</div>';
+  return '<div style="margin-top:6px"><button type="button" class="ex" id="ruBtn" onclick="try{TSAndroid.ruPick()}catch(e){};setTimeout(dsUI,2500)">+ Русский для Renri (renri_ru_pack.zip из Colab)</button>' + (/^error/.test(s.ru || '') ? ' <span class="sm">не вышло: ' + escH(String(s.ru).slice(7, 90)) + '</span>' : '') + '</div>';
+}
 /* певческая модель в приложении: строка с кнопкой «Скачать» и прогрессом */
 function dsUI() {
   const row = $('#dsRow'); if (!row || !window.TSAndroid || !window.TSAndroid.dsStatus) return;
@@ -3291,17 +3298,17 @@ function dsUI() {
       const rnUI = rn ? '<label class="chk sm" style="display:flex;margin-top:6px">Голос: <select id="dsVoiceSel" style="margin-left:6px"><option value="renri"' + (cur === 'renri' ? ' selected' : '') + '>Yamine Renri (аниме)</option><option value="canary"' + (cur !== 'renri' ? ' selected' : '') + '>Canary</option></select></label><label class="chk sm" style="display:flex;margin-top:4px"><input type="checkbox" id="dsRapChk"' + (globalThis.dsRapOn && dsRapOn() ? ' checked' : '') + '><span>рэп тоже этим голосом (без Kokoro)</span></label>'
         : '<div style="margin-top:6px"><button type="button" class="ex" id="rnBtn">+ голос Yamine Renri из файла (zip hop512)</button>' + (/^error/.test(s.renri || '') ? ' <span class="sm">не вышло: ' + escH(s.renri.slice(7, 80)) + '</span>' : '') + '</div>';
       setTimeout(() => { const sel = $('#dsVoiceSel'); if (sel) sel.onchange = () => { try { localStorage.setItem('ts_dsvoice', sel.value); } catch (e) { } }; const rc = $('#dsRapChk'); if (rc) rc.onchange = () => { try { localStorage.setItem('ts_dsrap', rc.checked ? '1' : '0'); } catch (e) { } }; const rb = $('#rnBtn'); if (rb) rb.onclick = () => { try { TSAndroid.rnPick(); } catch (e) { } setTimeout(poll, 1500); }; }, 0);
-      msg.innerHTML = '🎤 Пение — ' + (rn && cur === 'renri' ? 'Renri' : 'Canary') + (s.pitch === 'installed' ? ' · живая подача' : '') + ' ✓' + rnUI + ' <label class="chk sm" style="display:inline-flex;margin-left:8px"><input type="checkbox" id="dsHQ"' + (S.hq ? ' checked' : '') + '><span>макс. качество (в 2–3 раза дольше)</span></label>';
+      msg.innerHTML = '🎤 Пение — ' + (rn && cur === 'renri' ? 'Renri' : 'Canary') + (s.pitch === 'installed' ? ' · живая подача' : '') + ' ✓' + rnUI + ruUIhtml(s) + ' <label class="chk sm" style="display:inline-flex;margin-left:8px"><input type="checkbox" id="dsHQ"' + (S.hq ? ' checked' : '') + '><span>макс. качество (в 2–3 раза дольше)</span></label>';
       $('#dsHQ').onchange = (e) => { S.hq = e.target.checked; try { localStorage.setItem('ts_hq', S.hq ? '1' : ''); } catch (er) { } }; btn.hidden = true; bar.hidden = true; if (globalThis.DSX) { DSX.ok = true; } return true; }
     if (s.state === 'downloading') { msg.textContent = (s.pitch === 'downloading' ? 'Качаю живую подачу… ' + Math.round((s.pprogress || 0) * 100) : 'Качаю певческую модель… ' + Math.round(s.progress * 100)) + '% (один раз, ~650 МБ)'; btn.hidden = true; bar.hidden = false; bar.firstElementChild.style.width = Math.round(s.progress * 100) + '%'; return false; }
     if (s.renri === 'installed' && s.pitch === 'downloading') { if (globalThis.DSX) { DSX.ok = true; DSX.rn = true; } msg.textContent = '🎤 Renri ✓ · докачиваю живую подачу… ' + Math.round((s.pprogress || 0) * 100) + '% (~125 МБ, один раз; петь уже можно)'; btn.hidden = true; bar.hidden = false; bar.firstElementChild.style.width = Math.round((s.pprogress || 0) * 100) + '%'; return false; }
-    if (s.renri === 'installed') { if (globalThis.DSX) { DSX.ok = true; DSX.rn = true; } msg.innerHTML = '🎤 Пение — Yamine Renri' + (s.pitch === 'installed' ? ' · живая подача' : '') + ' ✓ <span class="sm">(Canary — второй голос, по желанию)</span><label class="chk sm" style="display:flex;margin-top:4px"><input type="checkbox" id="dsRapChk"' + (globalThis.dsRapOn && dsRapOn() ? ' checked' : '') + '><span>рэп тоже этим голосом (без Kokoro)</span></label>'; setTimeout(() => { const rc = $('#dsRapChk'); if (rc) rc.onchange = () => { try { localStorage.setItem('ts_dsrap', rc.checked ? '1' : '0'); } catch (e) { } }; }, 0); btn.hidden = false; btn.textContent = 'Скачать Canary'; bar.hidden = true; return true; }
+    if (s.renri === 'installed') { if (globalThis.DSX) { DSX.ok = true; DSX.rn = true; } msg.innerHTML = '🎤 Пение — Yamine Renri' + (s.pitch === 'installed' ? ' · живая подача' : '') + ' ✓ <span class="sm">(Canary — второй голос, по желанию)</span><label class="chk sm" style="display:flex;margin-top:4px"><input type="checkbox" id="dsRapChk"' + (globalThis.dsRapOn && dsRapOn() ? ' checked' : '') + '><span>рэп тоже этим голосом (без Kokoro)</span></label>' + ruUIhtml(s); setTimeout(() => { const rc = $('#dsRapChk'); if (rc) rc.onchange = () => { try { localStorage.setItem('ts_dsrap', rc.checked ? '1' : '0'); } catch (e) { } }; }, 0); btn.hidden = false; btn.textContent = 'Скачать Canary'; bar.hidden = true; return true; }
     msg.innerHTML = (/^error/.test(s.state) ? 'Не скачалось (' + escH(s.state.slice(7, 90)) + '). ' : '') + '🎤 Певческий голос: <b>Yamine Renri</b> — из твоего zip (hop512), или <b>Canary</b> — скачать ~520 МБ'
       + '<div style="margin-top:8px"><button type="button" class="pri ex" id="rnBtn2">Renri из файла</button></div>' + (/^error/.test(s.renri || '') ? '<div class="sm">Renri не встал: ' + escH(s.renri.slice(7, 90)) + '</div>' : '');
     setTimeout(() => { const rb = $('#rnBtn2'); if (rb) rb.onclick = () => { try { TSAndroid.rnPick(); } catch (e) { } setTimeout(poll, 1500); }; }, 0);
     btn.hidden = false; btn.textContent = 'Скачать Canary'; bar.hidden = true; return true; };
   btn.onclick = () => { try { TSAndroid.dsInstall(); } catch (e) { } poll(); };
-  const poll = () => { if (!draw()) setTimeout(poll, 1000); };
+  const poll = () => { const done = draw(); let busy = false; try { busy = JSON.parse(TSAndroid.dsStatus()).ru === 'busy'; } catch (e) { } if (!done || busy) setTimeout(poll, 1000); };
   poll();
 }
 /* --- сборка трека --- */
@@ -6728,7 +6735,7 @@ self.onmessage = async (e) => { const m = e.data; try {
      Ноты, слоги и тайминг — наши (как для Kokoro), модель только поёт. Рэп остаётся на Kokoro. */
   const DSX = { ok: false, st: null, last: 0 };
   globalThis.DSX = DSX;
-  function dsState() { const A = window.TSAndroid; if (!A || !A.dsStatus) return null; try { const s = JSON.parse(A.dsStatus()); DSX.st = s; DSX.rn = s.renri === 'installed'; DSX.ok = s.state === 'installed' || s.state === 'ready' || DSX.rn; return s; } catch (e) { return null; } }
+  function dsState() { const A = window.TSAndroid; if (!A || !A.dsStatus) return null; try { const s = JSON.parse(A.dsStatus()); DSX.st = s; DSX.rn = s.renri === 'installed'; DSX.ru = s.ru === 'installed'; DSX.ok = s.state === 'installed' || s.state === 'ready' || DSX.rn; return s; } catch (e) { return null; } }
   const DS_V1 = { 'ɑ': 'aa', 'æ': 'ae', 'ʌ': 'ah', 'ɐ': 'ah', 'ə': 'ax', 'ᵊ': 'ax', 'ɔ': 'ao', 'ɛ': 'eh', 'e': 'eh', 'ɜ': 'er', 'ɝ': 'er', 'ɚ': 'er', 'ɪ': 'ih', 'ᵻ': 'ih', 'i': 'iy', 'ʊ': 'uh', 'u': 'uw', 'o': 'ow', 'a': 'aa',
     'A': 'ey', 'I': 'ay', 'W': 'aw', 'Y': 'oy', 'O': 'ow', 'Q': 'ow', 'p': 'p', 'b': 'b', 't': 't', 'd': 'd', 'k': 'k', 'g': 'g', 'ɡ': 'g', 'f': 'f', 'v': 'v', 's': 's', 'z': 'z', 'h': 'hh', 'x': 'hh',
     'm': 'm', 'n': 'n', 'l': 'l', 'ɫ': 'l', 'w': 'w', 'θ': 'th', 'ð': 'dh', 'ʃ': 'sh', 'ʒ': 'zh', 'ŋ': 'ng', 'ɹ': 'r', 'r': 'r', 'j': 'y', 'ɾ': 'dx', 'ʔ': 'q', 'ʤ': 'jh', 'ʧ': 'ch', 'ʣ': 'jh', 'ʦ': 'ch' };
@@ -6798,6 +6805,42 @@ self.onmessage = async (e) => { const m = e.data; try {
         if (!r.ok) throw new Error('певческая модель: ' + (await r.text()).slice(0, 200)); return new Float32Array(await r.arrayBuffer()); })();
       dsCache.set(q, pr); pr.catch(() => dsCache.delete(q)); if (dsCache.size > 60) dsCache.delete(dsCache.keys().next().value); }
     return (await pr).slice();
+  }
+  /* ===== Renri по-русски: русская речь Piper (нативное произношение) укладывается в ноты/флоу → тембр Renri (RVC из Colab-пака), высота — наша.
+     Гласная каждого слога начинается ровно на ноте (NT.vS) и тянется до NT.vE; согласные — своей длины перед гласной (если тесно — берут у прошлой гласной). */
+  const RUPV = new Set(['a', 'o', 'u', 'e', 'i', 'y', 'ɨ', 'ɪ', 'ʊ', 'ʌ', 'ə', 'ɐ', 'ɛ', 'ɑ', 'æ', 'ɵ', 'ʉ']);
+  const ruOn = (lang) => lang === 'ru' && DSX.ru && dsVoice() === 'renri' && !window.__noRu;
+  async function ruLine(text, NT, a0, f0h) {
+    const A = window.TSAndroid, base = 'https://appassets.androidplatform.net/ds/out/';
+    const t = String(text).replace(/\+/g, '').replace(/\[[^\]]*\]/g, '').trim(); if (!t) return null;
+    const ph = (await NEURO.phOne(t, 'ru')).phonemes; if (!ph || !ph.length) return null;
+    const getF = async (id) => { const r = await fetch(base + id); if (!r.ok) throw new Error('русский голос: ' + (await r.text()).slice(0, 160)); return new Float32Array(await r.arrayBuffer()); };
+    const nr = await getF(A.ruNat(JSON.stringify({ ph }))), N = nr[0] | 0, tp = Array.from(nr.subarray(1, 1 + N)), nat = Array.from(nr.subarray(1 + N, 1 + 2 * N));
+    const FRs = 256 / 22050, K = NT.vS.length, isV = (j) => tp[j] >= 0 && RUPV.has(ph[tp[j]]);
+    const tv = []; for (let j = 0; j < N; j++) if (isV(j) && (j === 0 || tp[j - 1] !== tp[j])) tv.push(j);
+    if (tv.length !== K) { DSX.ruMiss = (DSX.ruMiss || 0) + 1; return null; }   /* слоги не совпали — эта строка поётся как раньше */
+    const out = new Float64Array(N); let prevEnd = 0;
+    for (let k = 0; k < K; k++) {
+      const j0 = k ? tv[k - 1] + 1 : 0, j1 = tv[k], cons = [], pads = [];
+      for (let j = j0; j < j1; j++) (tp[j] >= 0 ? cons : pads).push(j);
+      const on = NT.vS[k] - a0, off = Math.max(on + 0.04, NT.vE[k] - a0); let room = on - prevEnd;
+      /* согласные — не короче естественных (иначе «горим» → «гаян»): место берём у конца прошлой гласной (до 70%) */
+      const cn = cons.map((j) => Math.max(nat[j] * FRs, RUPV.has(ph[tp[j]]) || /[ˈˌ,."!? ]/.test(ph[tp[j]]) ? nat[j] * FRs : 0.045)), natc = cn.reduce((x, y) => x + y, 0), want = natc;
+      if (k && cons.length && room < want + 0.02) { const pv = out[tv[k - 1]], take = Math.min(want + 0.02 - room, pv * 0.7); out[tv[k - 1]] = pv - take; room += take; }
+      const cl = cons.length ? Math.min(natc, Math.max(0.025 * cons.length, room * 0.95)) : 0, sc = natc > 0 ? cl / natc : 0;
+      cons.forEach((j, q) => { out[j] = cn[q] * sc; });
+      const gap = Math.max(0, room - cl); if (pads.length) for (const j of pads) out[j] = gap / pads.length; else if (cons.length) out[cons[0]] += gap;
+      out[j1] = off - on; prevEnd = off;
+    }
+    for (let j = tv[K - 1] + 1; j < N; j++) out[j] = nat[j] * FRs;
+    const fr = []; let acc = 0, prevF = 0; for (let j = 0; j < N; j++) { acc += out[j]; const f = Math.max(prevF, Math.round(acc / FRs)); fr.push(f - prevF); prevF = f; }
+    /* высота по 10 мс из того же контура, что и у Renri (ноты/речевая интонация, тюнинг); дыры (глухие) — держим соседнюю ноту */
+    const T = Math.ceil(prevF * FRs * 100) + 2, f0 = new Array(T).fill(0), H = f0h.length, hs = 0.0125;
+    for (let i = 0; i < T; i++) { const h = Math.floor((i / 100) / hs); f0[i] = h < H ? f0h[h] : 0; }
+    let last = 0; for (let i = 0; i < T; i++) { if (f0[i] > 0) last = f0[i]; else f0[i] = last; } last = 0; for (let i = T - 1; i >= 0; i--) { if (f0[i] > 0 && last === 0) last = f0[i]; if (f0[i] === 0) f0[i] = last; }
+    for (let i = 0; i < T; i++) f0[i] = +f0[i].toFixed(1);
+    const y = await getF(A.ruSing(JSON.stringify({ ph, dur: fr, f0, shift: 1.5, noise: 0.4, noiseW: 0.4 })));
+    DSX.ruUsed = (DSX.ruUsed || 0) + 1; return y;
   }
   /* дабл без второго прогона модели: та же дорожка с плавающей задержкой 8–20 мс и лёгким «плаванием» высоты — как второй дубль */
   /* «как у VTuber'ов»: сдвиг формант вверх без изменения высоты нот — голос моложе и милее, без писка.
@@ -6946,9 +6989,10 @@ self.onmessage = async (e) => { const m = e.data; try {
         const f0d = VOCX ? vocF0(nDS) : buildF0('', nDS, 0).f0, norm = (x) => { let e = 0, n = 0, pk = 0; for (let i = 0; i < x.length; i++) { const a = Math.abs(x[i]); if (a > pk) pk = a; } for (let i = 0; i < x.length; i++) if (Math.abs(x[i]) > 0.02 * pk) { e += x[i] * x[i]; n++; } const r = n ? Math.sqrt(e / n) : 0; return r > 0 ? Math.min(0.95 / pk, 0.22 / r) * 10 ** ((lv.db || 0) / 20) : 1; };
         const VO = window.__dsVO || { voltage: 0.7, arc: 0.3 }, GD = window.__dsGD != null ? window.__dsGD : vMood().gd;   /* замер: выше регистр (+6) и gender 0.14 — разборчивость 85→42%; держим как у аниме-голоса */   /* «Voltage» — самый яркий подголос Canary (замер: центроид 910 Гц против 577), лёгкий сдвиг формант вверх */
         const RX = rap ? (window.__dsRapExpr != null ? window.__dsRapExpr : 0.35)   /* замер (2 трека × 4 варианта): речевой контур + модель высоты 0.35 — лучшая разборчивость рэпа Renri (0.40 против 0.37 без контура) */ : VOCX ? (window.__vocxExpr != null ? window.__vocxExpr : 0) : undefined;   /* рэп: модель высоты слегка — живая интонация речи, а не распев */
-        const yP = dsSing(tok, dur, f0d, VO, { gender: GD, lang, expr: RX, tune: window.__dsTune != null ? window.__dsTune : vMood().tune });
+        const dsP = () => dsSing(tok, dur, f0d, VO, { gender: GD, lang, expr: RX, tune: window.__dsTune != null ? window.__dsTune : vMood().tune });
+        const RU = ruOn(lang), yP = RU ? ruLine(it.tx, NT, a0, f0d).then((y) => y || dsP()).catch((er) => { console.warn('русский голос', er); DSX.ruFail = String(er && er.message || er); return dsP(); }) : dsP();
         let dP = null, hP = null;
-        if (hot && S.voxStack !== false && !window.__noStack) {
+        if (hot && S.voxStack !== false && !window.__noStack && !RU) {
           const Rd = mulberry32((hashStr(it.tx + '|stk') ^ (ctx.spec.seed & 0xffff)) >>> 0), det = (Rd() < 0.5 ? -1 : 1) * (6 + Rd() * 6);
           dP = S.hq ? dsSing(tok, dur, buildF0('d', nDS, det).f0, { arc: 0.6, voltage: 0.4 }, { gender: GD, lang }) : null;
           const hb = nDS.map((m, k) => { const tt = it.t0 + tV[k], w = soundAt(ctx.track, ctx.spec, tt), sc = SCALES[ctx.spec.scale] || SCALES.minor, kk = (((ctx.spec.key + keyOffAt(ctx.track, tt)) % 12) + 12) % 12;

@@ -62,6 +62,7 @@ public class DsEngine {
         if (new File(dir, "ok").exists()) state = "installed";
         if (new File(dir, "pitch/ok").exists()) pstate = "installed";
         if (new File(new File(base.getAbsoluteFile(), "renri"), "ok").exists()) rnState = "installed";
+        if (new File(new File(base.getAbsoluteFile(), "ru"), "ok").exists()) ruState = "installed";
     }
 
 
@@ -171,7 +172,7 @@ public class DsEngine {
             o.put("progress", progress);
             o.put("loaded", ac != null);
             o.put("pitch", pstate);
-            o.put("renri", rnState); o.put("rprogress", rnProgress);
+            o.put("renri", rnState); o.put("rprogress", rnProgress); o.put("ru", ruState); o.put("ruprogress", ruProgress);
             o.put("pprogress", pprogress);
             return o.toString();
         } catch (Exception e) {
@@ -577,4 +578,120 @@ public class DsEngine {
             for (OnnxTensor t : in.values()) t.close();
         }
     }
+    /* ================= Renri по-русски: Piper (русский голос, длительности задаём мы) → ContentVec → RVC (тембр Renri, наша высота) =================
+       пак — zip из Colab-блокнота: rvc.onnx, contentvec.onnx, piper/ru.onnx(+json), meta.json */
+    volatile String ruState = "none"; volatile double ruProgress = 0;
+    volatile OrtSession pv, cvs, rvs; final Map<String, int[]> ruIds = new HashMap<>(); boolean pvForced = false;
+    File ruDir() { File d = new File(dir.getParentFile(), "ru"); d.mkdirs(); return d; }
+    void installRu(android.content.ContentResolver cr, android.net.Uri uri) {
+        if (ruState.equals("busy")) return; ruState = "busy"; ruProgress = 0;
+        new Thread(() -> {
+            try {
+                File d = ruDir(); new File(d, "ok").delete(); long total = 270_000_000L;
+                try (android.database.Cursor c = cr.query(uri, null, null, null, null)) { if (c != null && c.moveToFirst()) { int i = c.getColumnIndex(android.provider.OpenableColumns.SIZE); if (i >= 0 && !c.isNull(i)) total = c.getLong(i); } } catch (Exception e) { }
+                final long T = total; final long[] got = {0};
+                InputStream raw = new InputStream() { final InputStream in = cr.openInputStream(uri);
+                    @Override public int read() throws IOException { int b = in.read(); if (b >= 0) got[0]++; return b; }
+                    @Override public int read(byte[] b, int o, int n) throws IOException { int k = in.read(b, o, n); if (k > 0) { got[0] += k; ruProgress = Math.min(0.99, got[0] / (double) T); } return k; }
+                    @Override public void close() throws IOException { in.close(); } };
+                int found = 0;
+                try (ZipInputStream z = new ZipInputStream(raw)) { ZipEntry e;
+                    while ((e = z.getNextEntry()) != null) { String n = e.getName().replace('\\', '/'); if (e.isDirectory()) continue; String b = n.substring(n.lastIndexOf('/') + 1);
+                        if (b.equals("rvc.onnx") || b.equals("contentvec.onnx") || b.equals("ru.onnx") || b.equals("ru.onnx.json") || b.equals("meta.json")) { copyOut(z, new File(d, b), new long[1], 0, null); found++; } } }
+                for (String f : new String[]{"rvc.onnx", "contentvec.onnx", "ru.onnx", "ru.onnx.json"}) if (!new File(d, f).exists()) throw new IOException("в паке нет " + f);
+                synchronized (llock) { ruRelease(); }
+                new FileOutputStream(new File(d, "ok")).close(); ruProgress = 1; ruState = "installed";
+            } catch (Exception ex) { ruState = "error: " + ex.getMessage(); android.util.Log.w("TrackStudio", "ru", ex); }
+        }).start();
+    }
+    void ruRelease() { try { if (pv != null) pv.close(); if (cvs != null) cvs.close(); if (rvs != null) rvs.close(); } catch (Exception e) { } pv = cvs = rvs = null; }
+    void ruLoad() throws Exception {
+        synchronized (llock) {
+            if (pv != null) return;
+            if (env == null) env = OrtEnvironment.getEnvironment();
+            if (kv != null) { try { kv.close(); } catch (Exception e) { } kv = null; }
+            File d = ruDir(); OrtSession.SessionOptions so = new OrtSession.SessionOptions();
+            so.setIntraOpNumThreads(threads()); so.setOptimizationLevel(OrtSession.SessionOptions.OptLevel.BASIC_OPT); so.setMemoryPatternOptimization(false);
+            pv = env.createSession(new File(d, "ru.onnx").getAbsolutePath(), so);
+            pvForced = pv.getInputNames().contains("durations");
+            cvs = env.createSession(new File(d, "contentvec.onnx").getAbsolutePath(), so);
+            rvs = env.createSession(new File(d, "rvc.onnx").getAbsolutePath(), so);
+            byte[] b = java.nio.file.Files.readAllBytes(new File(d, "ru.onnx.json").toPath());
+            JSONObject m = new JSONObject(new String(b, "UTF-8")).getJSONObject("phoneme_id_map"); ruIds.clear();
+            for (java.util.Iterator<String> it = m.keys(); it.hasNext(); ) { String k = it.next(); JSONArray a = m.getJSONArray(k); int[] v = new int[a.length()]; for (int i = 0; i < v.length; i++) v[i] = a.getInt(i); ruIds.put(k, v); }
+            android.util.Log.i("TrackStudio", "ru ready, forced=" + pvForced);
+        }
+    }
+    /* фонемы → ids как у Piper: ^ _ (ф _)* $ ; tokPh — номер фонемы для каждого id (-1: служебные/паузы) */
+    long[] ruTokens(JSONArray ph, List<Integer> tokPh) throws Exception {
+        List<Long> ids = new ArrayList<>(); ids.add((long) ruIds.get("^")[0]); tokPh.add(-1); ids.add(0L); tokPh.add(-1);
+        for (int i = 0; i < ph.length(); i++) { int[] v = ruIds.get(ph.getString(i)); if (v == null) continue; for (int x : v) { ids.add((long) x); tokPh.add(i); } ids.add(0L); tokPh.add(-1); }
+        ids.add((long) ruIds.get("$")[0]); tokPh.add(-1);
+        long[] o = new long[ids.size()]; for (int i = 0; i < o.length; i++) o[i] = ids.get(i); return o;
+    }
+    float[][] piper(long[] ids, float[] dur, float noise, float noiseW) throws Exception {
+        int n = ids.length; Map<String, OnnxTensor> in = new HashMap<>();
+        try {
+            in.put("input", OnnxTensor.createTensor(env, LongBuffer.wrap(ids), new long[]{1, n}));
+            in.put("input_lengths", OnnxTensor.createTensor(env, LongBuffer.wrap(new long[]{n}), new long[]{1}));
+            in.put("scales", OnnxTensor.createTensor(env, FloatBuffer.wrap(new float[]{noise, 1f, noiseW}), new long[]{3}));
+            if (pvForced) { float[] d = dur; if (d == null) { d = new float[n]; java.util.Arrays.fill(d, -1f); } in.put("durations", OnnxTensor.createTensor(env, FloatBuffer.wrap(d), new long[]{1, 1, n})); }
+            try (OrtSession.Result r = pv.run(in)) {
+                float[] a = toF((OnnxTensor) r.get(0)); float[] dp = pvForced ? toF((OnnxTensor) r.get(1)) : new float[0];
+                return new float[][]{a, dp};
+            }
+        } finally { for (OnnxTensor t : in.values()) t.close(); }
+    }
+    static float[] lin(float[] x, double sr0, double sr1) {
+        int n = (int) Math.floor(x.length * sr1 / sr0); float[] o = new float[n]; double k = sr0 / sr1;
+        for (int i = 0; i < n; i++) { double p = i * k; int a = (int) p; double w = p - a; o[i] = (float) (x[Math.min(a, x.length - 1)] * (1 - w) + x[Math.min(a + 1, x.length - 1)] * w); }
+        return o;
+    }
+    static float[] f0auto(float[] x, int sr, int hop) {   /* высота исходной речи (автокорреляция), 0 — глухое/тишина */
+        int W = 1024, n = x.length / hop + 1; float[] o = new float[n]; double[] s = new double[W];
+        for (int f = 0; f < n; f++) { int a = f * hop - W / 2; double mean = 0, e = 0;
+            for (int i = 0; i < W; i++) { int j = a + i; s[i] = j >= 0 && j < x.length ? x[j] : 0; mean += s[i]; } mean /= W;
+            for (int i = 0; i < W; i++) { s[i] -= mean; e += s[i] * s[i]; }
+            if (e < W * 1e-5) continue;
+            int lo = sr / 1000, hi = sr / 70; double best = 0; int bk = 0;
+            for (int k = lo; k < hi; k++) { double c = 0; for (int i = 0; i + k < W; i++) c += s[i] * s[i + k]; c /= e; if (c > best) { best = c; bk = k; } }
+            if (best > 0.5 && bk > 0) o[f] = (float) sr / bk; }
+        return o;
+    }
+    static long coarse(double f) { if (f <= 0) return 1; double mn = 1127 * Math.log(1 + 50 / 700.0), mx = 1127 * Math.log(1 + 1100 / 700.0), m = 1127 * Math.log(1 + f / 700); m = (m - mn) * 254 / (mx - mn) + 1; return Math.max(1, Math.min(255, Math.round(m))); }
+    /* job "ruNat": естественные длительности Piper. Выход: [N, tokPh..., dur...] */
+    String ruNatSubmit(String json) { String id = "r" + nidA.incrementAndGet(); jobs.put(id, run.submit(() -> {
+        ruLoad(); JSONObject q = new JSONObject(json); List<Integer> tp = new ArrayList<>(); long[] ids = ruTokens(q.getJSONArray("ph"), tp);
+        float[][] r = piper(ids, null, 0.0f, 0.0f); int n = ids.length; float[] o = new float[1 + 2 * n]; o[0] = n;
+        for (int i = 0; i < n; i++) { o[1 + i] = tp.get(i); o[1 + n + i] = i < r[1].length ? r[1][i] : 1; }
+        return o; })); return id; }
+    /* job "ruSing": строка с нашими длительностями и высотой. q: ph, dur (кадры по 256 @22050 на каждый токен), f0 (Гц по 10 мс; 0 — «как в речи × shift»), shift.
+       Выход: float32 44.1 кГц, отсчёт 0 = начало строки */
+    String ruSingSubmit(String json) { String id = "r" + nidA.incrementAndGet(); jobs.put(id, run.submit(() -> {
+        ruLoad(); JSONObject q = new JSONObject(json); List<Integer> tp = new ArrayList<>(); long[] ids = ruTokens(q.getJSONArray("ph"), tp);
+        JSONArray dj = q.optJSONArray("dur"); float[] dur = null; if (dj != null && dj.length() == ids.length) { dur = new float[ids.length]; for (int i = 0; i < dur.length; i++) dur[i] = (float) dj.getDouble(i); }
+        float[] a = piper(ids, dur, (float) q.optDouble("noise", 0.45), (float) q.optDouble("noiseW", 0.5))[0];
+        float[] x16 = lin(a, 22050, 16000);
+        float[] fe; long[] fs;
+        Map<String, OnnxTensor> in = new HashMap<>();
+        try { in.put("audio", OnnxTensor.createTensor(env, FloatBuffer.wrap(x16), new long[]{1, x16.length}));
+            try (OrtSession.Result r = cvs.run(in)) { OnnxTensor t = (OnnxTensor) r.get(0); fe = toF(t); fs = t.getInfo().getShape(); } }
+        finally { for (OnnxTensor t : in.values()) t.close(); in.clear(); }
+        int T50 = (int) fs[1], C = (int) fs[2], T = Math.min(T50 * 2, x16.length / 160);
+        float[] ph = new float[T * C]; for (int t = 0; t < T; t++) System.arraycopy(fe, (t / 2) * C, ph, t * C, C);
+        float[] src = f0auto(x16, 16000, 160); JSONArray fj = q.optJSONArray("f0"); double shift = q.optDouble("shift", 1.5);
+        float[] pf = new float[T]; long[] pc = new long[T];
+        for (int t = 0; t < T; t++) { double s0 = t < src.length ? src[t] : 0, want = fj != null && t < fj.length() ? fj.optDouble(t, 0) : 0;
+            double f = s0 > 0 ? (want > 0 ? want : s0 * shift) : 0; pf[t] = (float) f; pc[t] = coarse(f); }
+        float[] rnd = new float[192 * T]; java.util.Random R = new java.util.Random(T * 31L); for (int i = 0; i < rnd.length; i++) rnd[i] = (float) (R.nextGaussian() * 0.66666);
+        float[] y;
+        try { in.put("phone", OnnxTensor.createTensor(env, FloatBuffer.wrap(ph), new long[]{1, T, C}));
+            in.put("phone_lengths", OnnxTensor.createTensor(env, LongBuffer.wrap(new long[]{T}), new long[]{1}));
+            in.put("pitch", OnnxTensor.createTensor(env, LongBuffer.wrap(pc), new long[]{1, T}));
+            in.put("pitchf", OnnxTensor.createTensor(env, FloatBuffer.wrap(pf), new long[]{1, T}));
+            in.put("ds", OnnxTensor.createTensor(env, LongBuffer.wrap(new long[]{0}), new long[]{1}));
+            in.put("rnd", OnnxTensor.createTensor(env, FloatBuffer.wrap(rnd), new long[]{1, 192, T}));
+            try (OrtSession.Result r = rvs.run(in)) { y = toF((OnnxTensor) r.get(0)); } }
+        finally { for (OnnxTensor t : in.values()) t.close(); }
+        return lin(y, 40000, 44100); })); return id; }
 }
