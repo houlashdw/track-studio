@@ -1719,7 +1719,7 @@ function compose(spec) {
                высота — октавы и квинты (не спорят с тональностью), тише и дальше (фильтр и реверб — в рендере) */
             const pocket = [3, 6, 7, 11, 14, 15].includes(s), cap = window.__oldSfx ? 99 : (lastBar ? 2 : 1);
             const sfxK = gb + ':' + spec.seed + ':' + sec.idx; if (S._sfxBar !== sfxK) { S._sfxBar = sfxK; S._sfxN = 0; }
-            if (rq < pH * (window.__oldSfx ? 1 : pocket ? 1.6 : 0) && S._sfxN < cap) { S._sfxN++; E('glitch', ts, { k: 'smp', i: hp_ ? hp_[Math.floor(Rq() * hp_.length)] : Math.floor(Rq() * SMP.bank.length), d: .06 + Rq() * .3, r: SMP.themed ? [.75, 1, 1, 1.5][Math.floor(Rq() * 4)] : window.__oldSfx ? [.5, .667, .75, 1, 1.25, 1.5, 2][Math.floor(Rq() * 7)] : [.5, .667, 1, 1, 1.5, 2][Math.floor(Rq() * 6)], s: SMP.themed ? Rq() * .3 : Rq(), rev: Rq() < .2 ? 1 : 0, v: vel(SMP.themed ? .95 : .5, e), tame: window.__oldSfx ? 0 : 1 }); }
+            if (rq < pH * (window.__oldSfx ? 1 : pocket ? 1.6 : 0) && S._sfxN < cap) { S._sfxN++; let si = hp_ ? hp_[Math.floor(Rq() * hp_.length)] : Math.floor(Rq() * SMP.bank.length); if (si === S._sfxLast && SMP.bank.length > 1) si = hp_ ? hp_[(hp_.indexOf(si) + 1) % hp_.length] : (si + 1) % SMP.bank.length; S._sfxLast = si; E('glitch', ts, { k: 'smp', i: si, d: .06 + Rq() * .3, r: SMP.themed ? [.75, 1, 1, 1.5][Math.floor(Rq() * 4)] : window.__oldSfx ? [.5, .667, .75, 1, 1.25, 1.5, 2][Math.floor(Rq() * 7)] : [.5, .667, 1, 1, 1.5, 2][Math.floor(Rq() * 6)], s: SMP.themed ? Rq() * .3 : Rq(), rev: Rq() < .2 ? 1 : 0, v: vel(SMP.themed ? .95 : .5, e), tame: window.__oldSfx ? 0 : 1 }); }
             else if (lastBar && s >= 12 && rq < .35) E('glitch', ts, { k: 'smp', i: qi, d: stepDur * .9, r: 1, s: .3, rev: 0, v: vel(.5 + (s - 12) * .08, e) });
           }
         }
@@ -2204,7 +2204,7 @@ function smpHit(e) { CFG._th = !!SMP.themed; try { return smpHit_(e); } finally 
 function smpHit_(e) {
   const B = SMP.bank[e.i % Math.max(1, SMP.bank.length)]; if (!B) return;
   const r = e.r || 1, len = Math.max(64, Math.floor(Math.min(e.d, B.pcm.length / SR / r) * SR)), n = len + Math.floor(.05 * SR); scratch(n);
-  const st0 = Math.floor(e.s * Math.max(0, B.pcm.length - len * r - 2)), hp = new BQ().hp((e.tame ? 300 : 160) + 600 * e.s, .7), lp = new BQ().lp(e.tame ? 6500 : 9000, .7), at = Math.floor(.004 * SR), rl = Math.max(1, Math.floor(Math.min(.03 * SR, len / 3)));
+  const st0 = Math.floor(e.s * Math.max(0, B.pcm.length - len * r - 2)), hp = new BQ().hp((e.tame ? 300 : 160) + 600 * e.s, .7), lp = new BQ().lp(e.tame ? 3500 + 5000 * ((e.i * 0.618) % 1) : 9000, .7), at = Math.floor(.004 * SR), rl = Math.max(1, Math.floor(Math.min(.03 * SR, len / 3)));
   for (let k = 0; k < len; k++) {
     const pos = st0 + (e.rev ? len - 1 - k : k) * r, i0 = Math.floor(pos), fr = pos - i0, x = B.pcm[i0] * (1 - fr) + (B.pcm[i0 + 1] || 0) * fr;
     T[k] = lp.p(hp.p(x)) * Math.min(1, k / at, (len - k) / rl) * e.v * .9;
@@ -2537,23 +2537,23 @@ const VOICE = {
     const t0 = e.t, v = e.v; let ni = nStart(), n;
     if (e.k === 'rsmp') { smpRev(e); return; }
     if (e.k === 'riser' || e.k === 'swell') {
-      const d = Math.max(.5, e.d); n = Math.floor((d + .05) * SR); scratch(n); const q = new BQ(), sw = e.k === 'swell', f0 = sw ? 300 : 220, f1 = sw ? 2500 : 9000, top = (sw ? .3 : .85) * v;
+      const d = Math.max(.5, e.d); n = Math.floor((d + .05) * SR); scratch(n); const q = new BQ(), sw = e.k === 'swell', f0 = (sw ? 300 : 220) * (.7 + RND() * .6), f1 = (sw ? 2500 : 9000) * (.65 + RND() * .55), top = (sw ? .3 : .85) * v, cx = 1.6 + RND() * 1.4, trem = RND() < .35 ? (2 + Math.floor(RND() * 3)) * 2 : 0;   /* каждый подъём свой: диапазон, кривая, иногда «дрожь» в темп */
       let ph = 0; const so = new BQ().lp(2800, .7), fa = midiToFreq(CFG.root + 12);
       for (let k = 0; k < n; k++) {
         const t = k / SR, r = Math.min(1, t / d); if ((k & 15) === 0) q.bp(f0 * (f1 / f0) ** r, 1.4);
-        const w = NZ[ni]; if (++ni >= NL) ni = 0; let s = q.p(w) * (.005 + (top - .005) * (r ** 2.2)) * 2.4;
+        const w = NZ[ni]; if (++ni >= NL) ni = 0; let s = q.p(w) * (.005 + (top - .005) * (r ** cx)) * 2.4 * (trem ? .6 + .4 * Math.sin(TAU * trem * r * r * d) : 1);
         if (!sw) { ph = (ph + fa * 4 ** r / SR) % 1; s += so.p(sawBL(ph, fa * 4 ** r / SR)) * (.01 + .21 * v * r ** 2.2); }
         T[k] = s * (t > d ? Math.max(0, 1 - (t - d) / .03) : 1);
       }
     } else if (e.k === 'impact') {
-      n = Math.floor(1.7 * SR); scratch(n); let ph = 0; const lp = new BQ().lp(900, .7);
-      for (let k = 0; k < n; k++) { const t = k / SR; ph += (30 + 38 * Math.exp(-t / .25)) / SR; const w = NZ[ni]; if (++ni >= NL) ni = 0; T[k] = Math.sin(TAU * ph) * .9 * v * Math.exp(-t / .3) + lp.p(w) * .45 * v * 1.5 * Math.exp(-t / .11); }
+      n = Math.floor(1.7 * SR); scratch(n); let ph = 0; const lp = new BQ().lp(600 + RND() * 900, .7), fb = 24 + RND() * 16, fs = 26 + RND() * 26, dk = .2 + RND() * .25, nz = .25 + RND() * .45, nd = .07 + RND() * .1;   /* удары разные: глубина, «хвост», шум */
+      for (let k = 0; k < n; k++) { const t = k / SR; ph += (fb + fs * Math.exp(-t / .25)) / SR; const w = NZ[ni]; if (++ni >= NL) ni = 0; T[k] = Math.sin(TAU * ph) * .9 * v * Math.exp(-t / dk) + lp.p(w) * nz * v * 1.5 * Math.exp(-t / nd); }
     } else if (e.k === 'crash') {
-      n = Math.floor(1.9 * SR); scratch(n); const hp = new BQ().hp(4500, .6);
-      for (let k = 0; k < n; k++) { const t = k / SR; const w = NZ[ni]; if (++ni >= NL) ni = 0; T[k] = hp.p(w) * .38 * v * 1.8 * Math.min(1, t / .002) * Math.exp(-t / .32); }
+      n = Math.floor(1.9 * SR); scratch(n); const hp = new BQ().hp(3200 + RND() * 3500, .6), cd = .2 + RND() * .35;
+      for (let k = 0; k < n; k++) { const t = k / SR; const w = NZ[ni]; if (++ni >= NL) ni = 0; T[k] = hp.p(w) * .38 * v * 1.8 * Math.min(1, t / .002) * Math.exp(-t / cd); }
     } else {
       const d = Math.max(.8, e.d); n = Math.floor((d + .05) * SR); scratch(n); const q = new BQ();
-      for (let k = 0; k < n; k++) { const t = k / SR, r = Math.min(1, t / d); if ((k & 15) === 0) q.bp(6000 * (250 / 6000) ** r, 1.2); const w = NZ[ni]; if (++ni >= NL) ni = 0; T[k] = q.p(w) * .5 * v * 2.4 * (.002 / .5) ** r; }
+      for (let k = 0; k < n; k++) { const t = k / SR, r = Math.min(1, t / d); if ((k & 15) === 0) q.bp(e.f0d || 6000 * (250 / 6000) ** r, 1.2); const w = NZ[ni]; if (++ni >= NL) ni = 0; T[k] = q.p(w) * .5 * v * 2.4 * (.002 / .5) ** r; }
     }
     commit('fx', t0, n);
   },
@@ -2810,7 +2810,7 @@ async function renderTrack(track, onProgress) {
   }
   let pk = 0; for (let i = 0; i < N; i += 2) { const q = Math.max(Math.abs(A.dL[i]), Math.abs(A.dR[i])); if (q > pk) pk = q; }
   P(.96); await tick();
-  const mst = await masterV2(A.dL, A.dR, N, SR, track.isBacking ? { prep: true, prepOnly: !window.__oldBack, noRef: true, lufs: -11.5, ceil: .9, space: 1 + spec.space, atmo: .05 + .09 * spec.space } : { prep: true, lufs: -11.5 + 1.5 * clamp(spec.energy, 0, 1), loud: -9 + clamp(spec.energy, 0, 1) + ((spec.grit || 0) > 0.5 ? 1 : 0), space: 1 + spec.space * 1.2, atmo: .06 + .11 * spec.space });
+  const mst = await masterV2(A.dL, A.dR, N, SR, track.isBacking ? { prep: true, prepOnly: !window.__oldBack, noRef: true, lufs: -11.5, ceil: .9, space: 1 + spec.space, atmo: .05 + .09 * spec.space } : { prep: true, lufs: -11.5 + 1.5 * clamp(spec.energy, 0, 1), space: 1 + spec.space * 1.2, atmo: .06 + .11 * spec.space });
   const gain = 1, rms = 0; track.dbg = CFG.dbg; track.rv = CFG.rvRatio; track.dl = CFG.dlRatio; track.master = mst;
   const buf = new AudioBuffer({ numberOfChannels: 2, length: N, sampleRate: SR }), oL = buf.getChannelData(0), oR = buf.getChannelData(1);
   for (let i = 0; i < N; i++) { oL[i] = A.dL[i]; oR[i] = A.dR[i]; }
@@ -7802,6 +7802,16 @@ self.onmessage = async (e) => { const m = e.data; try {
   function hfRatio(L, N) { const h = new BQ().hp(6000, 0.7); let a = 0, b = 0; for (let i = 0; i < N; i += 2) { const y = h.p(L[i]); a += y * y; b += L[i] * L[i]; } return a / Math.max(b, 1e-12); }
   function softclip(L, R, N, knee) { const k = knee, w = 1 - k; for (let i = 0; i < N; i++) { let a = L[i], b = R[i]; const aa = Math.abs(a), bb = Math.abs(b); if (aa > k) a = Math.sign(a) * (k + w * Math.tanh((aa - k) / w)); if (bb > k) b = Math.sign(b) * (k + w * Math.tanh((bb - k) / w)); L[i] = a; R[i] = b; } }
 
+  function leveler(L, R, N, sr) {
+    const hs = [hiShelfBQ(1681, 4), hiShelfBQ(1681, 4)], hp = [new BQ().hp(38, 0.5), new BQ().hp(38, 0.5)], H = Math.round(sr * 0.1), nb = Math.ceil(N / H), e = new Float64Array(nb);
+    for (let b = 0; b < nb; b++) { let a = 0; const z = Math.min(N, (b + 1) * H); for (let i = b * H; i < z; i++) { const l = hp[0].p(hs[0].p(L[i])), r = hp[1].p(hs[1].p(R[i])); a += l * l + r * r; } e[b] = a / Math.max(1, z - b * H); }
+    const W = 30, st = new Float32Array(nb); for (let b = 0; b < nb; b++) { let a = 0, n = 0; for (let j = Math.max(0, b - W / 2); j < Math.min(nb, b + W / 2); j++) { a += e[j]; n++; } st[b] = 10 * Math.log10(a / n + 1e-12); }
+    const act = Array.from(st).filter((x) => x > -60).sort((p, q) => p - q); if (act.length < 20) return null; const ref = act[Math.floor(act.length * 0.6)];
+    const g = new Float32Array(nb); let cur = 0; const ka = 1 - Math.exp(-0.1 / 0.8), kr = 1 - Math.exp(-0.1 / 1.5);
+    for (let b = 0; b < nb; b++) { const want = st[b] < -60 ? 0 : cl(-(st[b] - ref) * 0.55, -5, 2.5); cur += (want < cur ? ka : kr) * (want - cur); g[b] = cur; }
+    let mn = 0, mx = 0; for (let i = 0; i < N; i++) { const x = i / H - 0.5, b0 = cl(Math.floor(x), 0, nb - 1), b1 = Math.min(nb - 1, b0 + 1), w = cl(x - b0, 0, 1), gd = g[b0] * (1 - w) + g[b1] * w, k = fromDb(gd); L[i] *= k; R[i] *= k; if (gd < mn) mn = gd; if (gd > mx) mx = gd; }
+    return { cut: +mn.toFixed(1), lift: +mx.toFixed(1) };
+  }
   /* opt: { prep, lufs, space, wide, atmo, ceil } */
   globalThis.kLufs = kLufs;
   globalThis.masterV2 = async function (L, R, N, sr, opt) {
@@ -7824,6 +7834,9 @@ self.onmessage = async (e) => { const m = e.data; try {
         q.b0 = A_ * ((A_ + 1) - (A_ - 1) * c + sa) / a0; q.b1 = 2 * A_ * ((A_ - 1) - (A_ + 1) * c) / a0; q.b2 = A_ * ((A_ + 1) - (A_ - 1) * c - sa) / a0; q.a1 = -2 * ((A_ - 1) + (A_ + 1) * c) / a0; q.a2 = ((A_ + 1) + (A_ - 1) * c - sa) / a0; return q; };
       const ls = [lo(), lo()], hs = [hiShelfBQ(6000, opt.highDb || 0), hiShelfBQ(6000, opt.highDb || 0)]; for (let i = 0; i < N; i++) { L[i] = hs[0].p(ls[0].p(L[i])); R[i] = hs[1].p(ls[1].p(R[i])); } }
     const hf = hfRatio(L, N); info.hf = hf; const dz = typeof S !== 'undefined' && S.spec && S.spec.feat && S.spec.feat.dist ? 0.3 : 1; tone(L, R, N, hf < 0.02 ? 0 : cl((hf - 0.02) * 60, 0, 3.2) * dz); await tick();   /* дисторшн по просьбе не «лечим» затемнением */
+    /* адаптивная громкость: громкие куски (дроп, удары, плотные места) поджимаются, тихие слегка подтягиваются —
+       кратковременная громкость (окно 3 с, K-взвешивание) приближается к средней на ~55%, без скачков (атака 0.8 с, отпуск 1.5 с) */
+    if (!opt.noLevel && !window.__noLeveler) info.level = leveler(L, R, N, sr);
     multiband(L, R, N); await tick();
     softclip(L, R, N, 0.75);
     const ceil = opt.ceil || 0.841; let tgt = opt.lufs;
@@ -8089,7 +8102,7 @@ self.onmessage = async (e) => { const m = e.data; try {
     const out = await oc.startRendering();
     /* отрезать тишину в хвосте */
     { const L0 = out.getChannelData(0), R0 = out.getChannelData(1); let end = out.length - 1; while (end > sr && Math.abs(L0[end]) < 1e-4 && Math.abs(R0[end]) < 1e-4) end--; out._end = end; }
-    { const sp = S.spec || {}; S.master = await masterV2(out.getChannelData(0), out.getChannelData(1), out.length, sr, { prep: false, lufs: -11.5 + 1.5 * clamp(sp.energy == null ? 0.6 : sp.energy, 0, 1) + ((S.fix && S.fix.lufsAdj) || 0), loud: (vocalDirt(sp) > 0.4 ? -7.5 : -9 + clamp(sp.energy == null ? 0.6 : sp.energy, 0, 1)) + ((S.fix && S.fix.lufsAdj) || 0), lowDb: (S.fix && S.fix.lowDb) || 0, highDb: (S.fix && S.fix.highDb) || 0 }); }
+    { const sp = S.spec || {}; S.master = await masterV2(out.getChannelData(0), out.getChannelData(1), out.length, sr, { prep: false, lufs: -11.5 + 1.5 * clamp(sp.energy == null ? 0.6 : sp.energy, 0, 1) + ((S.fix && S.fix.lufsAdj) || 0), lowDb: (S.fix && S.fix.lowDb) || 0, highDb: (S.fix && S.fix.highDb) || 0 }); }
     let res = out;
     if (out._end && out._end < out.length - sr * 0.5) { res = new AudioBuffer({ numberOfChannels: 2, length: out._end + Math.round(sr * 0.3), sampleRate: sr }); for (let c = 0; c < 2; c++) res.getChannelData(c).set(out.getChannelData(c).subarray(0, res.length)); }
     S.spd = rate; $q('#fxState').textContent = S.fxName || (vNeutral() ? 'включена' : 'бит + голос'); return res;
