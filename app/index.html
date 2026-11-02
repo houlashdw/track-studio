@@ -1564,6 +1564,10 @@ function compose(spec) {
 
     // текстура
     if (spec.layers.tex) E('tex', t0sec, { d: sec.bars * barDur, k: st.kit.tex, v: .5 + e * .5 });
+    /* атмосфера: тихий «воздух» (ветер/плёнка) под всем треком, если своей текстуры у стиля нет — фон не пустой, но и не мешает;
+       в тихих секциях громче, в припеве/дропе почти уходит */
+    else if (spec.atmos !== 0 && !window.__noAtmos) { const quiet = ['intro', 'break', 'outro', 'verse', 'flow', 'build'].includes(sec.role), dk = spec.dark == null ? .5 : spec.dark;
+      E('tex', t0sec, { d: sec.bars * barDur, k: dk > .55 || spec.rap ? 'wind' : 'air', v: (quiet ? .32 : .14) * (spec.atmos == null ? 1 : spec.atmos) }); }
     // fx: риз, импакт, даунлифтер
     if (spec.layers.fx) {
       if (sec.role === 'build') E('fx', t0sec, { k: 'riser', d: sec.bars * barDur - stepDur * 2, v: .8 });
@@ -1630,10 +1634,10 @@ function compose(spec) {
         for (const s of stabs) E('pad', tb + s * stepDur + swingOff(s) + hum(.008), { ms: chordMidis(rootS, L7, cd, 3, true), d: stepDur * (st.kit.pad === 'organ' ? 1.4 : 1.6), v: vel(.75, e), k: padInst || (st.kit.pad === 'organ' ? 'organ' : 'stab') });
       }
 
-      const ambAmt = (spec.amb == null ? .6 : spec.amb) * (spec.rap ? .45 : 1);
-      if (ambAmt > .02 && b % Math.max(cl, 2) === 0) {
+      const ambAmt = (spec.amb == null ? .6 : spec.amb) * (spec.rap ? .75 : 1);   /* рэп: фон-дрон тоже звучит (был почти выключен) — атмосфера под читку */
+      if (ambAmt > .02 && !window.__noAmb && b % Math.max(cl, 2) === 0) {
         const wl = Math.min(Math.max(cl, 2), sec.bars - b), am = chordMidis(rootS - 12, L7, cd, 3, false), sparseA = ['intro', 'break', 'outro', 'build', 'verse'].includes(sec.role);
-        if (am.length >= 3) E('tex', tb, { k: 'amb', ms: [am[0], am[1] + 12, am[2] + 12], d: wl * barDur, v: ambAmt * (sparseA ? 1 : .5) * (.7 + .3 * e) });
+        if (am.length >= 3) E('tex', tb, { k: 'amb', ms: [am[0], am[1] + 12, am[2] + 12], d: wl * barDur, v: ambAmt * (sparseA ? 1 : .65) * (.7 + .3 * e) });
       }
       const Rq = mulberry32((spec.seed ^ Math.imul(gb + 91, 2246822519)) >>> 0), netOn = SMP.active && SMP.bank.length && spec.net !== 0, qi = Math.floor(Rq() * Math.max(1, SMP.bank.length));
       for (let s = 0; s < 16; s++) {
@@ -3280,14 +3284,14 @@ function dsUI() {
     if (globalThis.DSX) DSX.rn = s.renri === 'installed';
     if (s.renri === 'busy') { msg.textContent = '🎤 Ставлю голос Renri… ' + Math.round((s.rprogress || 0) * 100) + '%'; btn.hidden = true; bar.hidden = false; bar.firstElementChild.style.width = Math.round((s.rprogress || 0) * 100) + '%'; return false; }
     if (s.state === 'installed' || s.state === 'ready') { const rn = s.renri === 'installed', cur = (() => { try { return localStorage.getItem('ts_dsvoice') || 'renri'; } catch (e) { return 'renri'; } })();
-      const rnUI = rn ? '<label class="chk sm" style="display:flex;margin-top:6px">Голос: <select id="dsVoiceSel" style="margin-left:6px"><option value="renri"' + (cur === 'renri' ? ' selected' : '') + '>Yamine Renri (аниме)</option><option value="canary"' + (cur !== 'renri' ? ' selected' : '') + '>Canary</option></select></label>'
+      const rnUI = rn ? '<label class="chk sm" style="display:flex;margin-top:6px">Голос: <select id="dsVoiceSel" style="margin-left:6px"><option value="renri"' + (cur === 'renri' ? ' selected' : '') + '>Yamine Renri (аниме)</option><option value="canary"' + (cur !== 'renri' ? ' selected' : '') + '>Canary</option></select></label><label class="chk sm" style="display:flex;margin-top:4px"><input type="checkbox" id="dsRapChk"' + (globalThis.dsRapOn && dsRapOn() ? ' checked' : '') + '><span>рэп тоже этим голосом (без Kokoro)</span></label>'
         : '<div style="margin-top:6px"><button type="button" class="ex" id="rnBtn">+ голос Yamine Renri из файла (zip hop512)</button>' + (/^error/.test(s.renri || '') ? ' <span class="sm">не вышло: ' + escH(s.renri.slice(7, 80)) + '</span>' : '') + '</div>';
-      setTimeout(() => { const sel = $('#dsVoiceSel'); if (sel) sel.onchange = () => { try { localStorage.setItem('ts_dsvoice', sel.value); } catch (e) { } }; const rb = $('#rnBtn'); if (rb) rb.onclick = () => { try { TSAndroid.rnPick(); } catch (e) { } setTimeout(poll, 1500); }; }, 0);
+      setTimeout(() => { const sel = $('#dsVoiceSel'); if (sel) sel.onchange = () => { try { localStorage.setItem('ts_dsvoice', sel.value); } catch (e) { } }; const rc = $('#dsRapChk'); if (rc) rc.onchange = () => { try { localStorage.setItem('ts_dsrap', rc.checked ? '1' : '0'); } catch (e) { } }; const rb = $('#rnBtn'); if (rb) rb.onclick = () => { try { TSAndroid.rnPick(); } catch (e) { } setTimeout(poll, 1500); }; }, 0);
       msg.innerHTML = '🎤 Пение — ' + (rn && cur === 'renri' ? 'Renri' : 'Canary') + (s.pitch === 'installed' ? ' · живая подача' : '') + ' ✓' + rnUI + ' <label class="chk sm" style="display:inline-flex;margin-left:8px"><input type="checkbox" id="dsHQ"' + (S.hq ? ' checked' : '') + '><span>макс. качество (в 2–3 раза дольше)</span></label>';
       $('#dsHQ').onchange = (e) => { S.hq = e.target.checked; try { localStorage.setItem('ts_hq', S.hq ? '1' : ''); } catch (er) { } }; btn.hidden = true; bar.hidden = true; if (globalThis.DSX) { DSX.ok = true; } return true; }
     if (s.state === 'downloading') { msg.textContent = (s.pitch === 'downloading' ? 'Качаю живую подачу… ' + Math.round((s.pprogress || 0) * 100) : 'Качаю певческую модель… ' + Math.round(s.progress * 100)) + '% (один раз, ~650 МБ)'; btn.hidden = true; bar.hidden = false; bar.firstElementChild.style.width = Math.round(s.progress * 100) + '%'; return false; }
     if (s.renri === 'installed' && s.pitch === 'downloading') { if (globalThis.DSX) { DSX.ok = true; DSX.rn = true; } msg.textContent = '🎤 Renri ✓ · докачиваю живую подачу… ' + Math.round((s.pprogress || 0) * 100) + '% (~125 МБ, один раз; петь уже можно)'; btn.hidden = true; bar.hidden = false; bar.firstElementChild.style.width = Math.round((s.pprogress || 0) * 100) + '%'; return false; }
-    if (s.renri === 'installed') { if (globalThis.DSX) { DSX.ok = true; DSX.rn = true; } msg.innerHTML = '🎤 Пение — Yamine Renri' + (s.pitch === 'installed' ? ' · живая подача' : '') + ' ✓ <span class="sm">(Canary — второй голос, по желанию; английские строки он поёт чище)</span>'; btn.hidden = false; btn.textContent = 'Скачать Canary'; bar.hidden = true; return true; }
+    if (s.renri === 'installed') { if (globalThis.DSX) { DSX.ok = true; DSX.rn = true; } msg.innerHTML = '🎤 Пение — Yamine Renri' + (s.pitch === 'installed' ? ' · живая подача' : '') + ' ✓ <span class="sm">(Canary — второй голос, по желанию)</span><label class="chk sm" style="display:flex;margin-top:4px"><input type="checkbox" id="dsRapChk"' + (globalThis.dsRapOn && dsRapOn() ? ' checked' : '') + '><span>рэп тоже этим голосом (без Kokoro)</span></label>'; setTimeout(() => { const rc = $('#dsRapChk'); if (rc) rc.onchange = () => { try { localStorage.setItem('ts_dsrap', rc.checked ? '1' : '0'); } catch (e) { } }; }, 0); btn.hidden = false; btn.textContent = 'Скачать Canary'; bar.hidden = true; return true; }
     msg.innerHTML = (/^error/.test(s.state) ? 'Не скачалось (' + escH(s.state.slice(7, 90)) + '). ' : '') + '🎤 Певческий голос: <b>Yamine Renri</b> — из твоего zip (hop512), или <b>Canary</b> — скачать ~520 МБ'
       + '<div style="margin-top:8px"><button type="button" class="pri ex" id="rnBtn2">Renri из файла</button></div>' + (/^error/.test(s.renri || '') ? '<div class="sm">Renri не встал: ' + escH(s.renri.slice(7, 90)) + '</div>' : '');
     setTimeout(() => { const rb = $('#rnBtn2'); if (rb) rb.onclick = () => { try { TSAndroid.rnPick(); } catch (e) { } setTimeout(poll, 1500); }; }, 0);
@@ -3320,7 +3324,7 @@ function rapifySpec(spec) {
     spec.style = id; spec.scale = pick(R, st.scales); Object.assign(spec, st.d); for (const [k, v] of Object.entries(keep)) if (v != null) spec[k] = v; spec.layers = { ...st.layers }; delete spec.hy;
     if (!spec.bpmUser) { const [a, b] = st.bpm; if (spec.bpm < a - 6 || spec.bpm > b + 6) spec.bpm = Math.round(a + (b - a) * R()); }
   }
-  spec.form = 'rap'; spec.rap = true; spec.amb = Math.min(spec.amb == null ? .6 : spec.amb, .25);
+  spec.form = 'rap'; spec.rap = true; spec.amb = Math.min(spec.amb == null ? .6 : spec.amb, .45);
   for (const l of ['kick', 'snare', 'hats', 'bass']) spec.layers[l] = true;
   return spec;
 }
@@ -5462,7 +5466,7 @@ self.onmessage = async (e) => { const m = e.data; try {
         phKill();                                                            /* свежий поток — с чистой памятью */
         if (!okOnce && a === 1) break;
       }
-      if (!PHW.okOnce) { PHW.off = true; console.warn('espeak: поток не завёлся, работаю в основном'); } else throw new Error('фонемайзер не справился с «' + text + '»');
+      if (!PHW.okOnce) { PHW.off = true; console.warn('espeak: поток не завёлся, работаю в основном'); } else console.warn('espeak-поток не справился — пробую в основном потоке');   /* строка не теряется: последний шанс в основном потоке */
     }
     return phOneMain(text, voice);
   }
@@ -6826,7 +6830,7 @@ self.onmessage = async (e) => { const m = e.data; try {
   }
 
   /* рэп тоже голосом Canary (без заиканий Kokoro); выключатель — в настройках певческой модели */
-  function dsRapOn() { if (window.__dsRap != null) return !!window.__dsRap; try { return localStorage.getItem('ts_dsrap') === '1'; } catch (e) { return false; } }   /* замер: рэп Canary 63–74% слов против 95% у Kokoro — по умолчанию выключено */
+  function dsRapOn() { if (window.__dsRap != null) return !!window.__dsRap; let v = null; try { v = localStorage.getItem('ts_dsrap'); } catch (e) { } return v === '1' || (v !== '0' && !!DSX.rn && dsVoice() === 'renri'); }   /* рэп голосом Renri — по умолчанию, когда он стоит (Kokoro не нужен) */   /* замер: рэп Canary 63–74% слов против 95% у Kokoro — по умолчанию выключено */
   globalThis.dsRapOn = dsRapOn;
   globalThis.dsSing = dsSing; globalThis.dsPhones = dsPhones; globalThis.dsF0 = dsF0;
   async function renderNoteLine(it, ctx, lv, emo) {
@@ -6885,6 +6889,7 @@ self.onmessage = async (e) => { const m = e.data; try {
     const natDrift = (u) => dA * (0.5 * Math.sin(2 * Math.PI * 0.6 * u + dPh[0]) + 0.3 * Math.sin(2 * Math.PI * 1.3 * u + dPh[1]) + 0.2 * Math.sin(2 * Math.PI * 2.3 * u + dPh[2]));
     const nat = { off: sy.map(() => (Rn() - 0.5) * (rap ? 0.04 : 0.08)), vr: sy.map(() => gVr * (0.94 + Rn() * 0.12)), vd: sy.map(() => gVib * (0.8 + Rn() * 0.45)),
       end: sy.map((q, k) => k === sy.length - 1 || (NT.vS[k + 1] != null && NT.vS[k + 1] - NT.vE[k] > 0.25)), endD: /\?\s*$/.test(it.tx) ? 0.6 : rap ? -0.8 : -0.45 };
+    const RSP = rap && DSX.ok && dsRapOn() && !window.__noRapSpeech ? (() => { const MD = vMood(), en = hot ? 1.25 : 1; return { decl: (window.__rDecl != null ? window.__rDecl : 2.6) * (MD.id === 'sad' ? 0.8 : 1), acc: (window.__rAcc != null ? window.__rAcc : 1.6) * en * (MD.id === 'aggr' ? 1.25 : MD.id === 'soft' || MD.id === 'sad' ? 0.75 : MD.id === 'joy' ? 1.1 : 1) }; })() : null;
     const f0 = new Array(2 * Fn).fill(0), hk = new Int16Array(2 * Fn).fill(-1); let fr = 0;
     for (let j = 0; j < toks.length; j++) {
       const c = toks[j], k = kOf[j], voiced = k >= 0 && !NV_UNV.has(c) && !NV_BRK.test(c) && !NV_SKIP.test(c);
@@ -6900,6 +6905,11 @@ self.onmessage = async (e) => { const m = e.data; try {
           const vd = Math.min(0.2, vlen * 0.4);
           if (!rap && vlen > 0.28 && into > vd) { const u = into - vd; m += nat.vd[k] * Math.min(1, u / 0.25) * Math.sin(2 * Math.PI * nat.vr[k] * u + 0.5 * Math.sin(2 * Math.PI * 0.8 * u)); }
           if (nat.end[k]) { const rem = NT.vE[k] - t, L0 = rap ? 0.12 : 0.09; if (rem < L0 && rem > -0.05 && vlen > 0.12) { const x = Math.min(1, 1 - rem / L0); m += nat.endD * x * x; } }
+          /* рэп певческой моделью — речевая интонация, а не ноты: фраза сползает вниз (деклинация), ударный слог — пик с соскальзыванием вниз,
+             безударные — короткий спад; энергия секции расширяет диапазон (в припеве/дропе — напористее и выше) */
+          if (rap && RSP) { const L = Math.max(0.3, NT.vE[sy.length - 1] - NT.vS[0]), pos = clamp((t - NT.vS[0]) / L, 0, 1), x = vlen > 0 ? clamp(into / vlen, 0, 1) : 0, st = sy[k].stress;
+            m += RSP.decl * (0.5 - pos);
+            m += st >= 1 ? RSP.acc * (1.25 - 1.6 * x) - (k > 0 && sy[k - 1].stress < 1 ? 0 : 0.3) : st >= 0.5 ? 0.4 * RSP.acc * (0.8 - 1.2 * x) : RSP.acc * (0.15 - 0.5 * x); }
         } else if (!rap && vlen > 0.32 && into > 0.18) m += gVib * Math.min(1, (into - 0.18) / 0.15) * Math.sin(2 * Math.PI * gVr * (into - 0.18));
         f0[h] = 440 * 2 ** ((m - 69) / 12); }
       fr += dur[j];
@@ -6914,14 +6924,24 @@ self.onmessage = async (e) => { const m = e.data; try {
         /* синт-айдол (как вокалоид): ноты ровно по высоте, быстрый «цифровой» переход, вибрато только на долгих нотах — ровное и позднее, голос выше и светлее */
         const VOCX = !rap && nvStyle() === 'vocaloid' && !window.__noVocX;
         const top0 = Math.max(...notes0), up = window.__dsUp != null ? window.__dsUp : rap ? clamp(66 - top0, 0, 3) : VOCX ? clamp(75 - top0, 0, 3) : clamp((vtOn() ? (window.__vtTop || 77) : 77) - top0, 0, vtOn() ? 6 : 4), nDS = up ? notes0.map((m, k) => fitMidi(m + up, ctx.track, ctx.spec, it.t0 + tV[k], sy[k].stress >= 0.6, 1.5, nl[k])) : notes0;
+        /* «тюнинг» как у вокалоид-продюсеров (эмоция без потери ровного синт-характера): подъезд снизу на ударных и после паузы (shakuri),
+           перелёт на скачке вверх, вибрато нарастает на долгих нотах, в конце фразы — спад (грусть/по умолчанию) или короткий взлёт (радость/припев).
+           Сила — по настроению и секции: припев/дроп ярче куплета */
+        const MDv = vMood(), EXP = window.__noTuneX ? 0 : (window.__tuneX != null ? window.__tuneX : 1) * ({ sad: 1.2, aggr: 1.05, soft: 0.85, joy: 1.1 }[MDv.id] || 1) * (hot ? 1.25 : 0.9);
         const vocF0 = (nts) => { const o = new Array(F0M.hk.length).fill(0), GL = 0.032;
           for (let h = 0; h < o.length; h++) { const k = F0M.hk[h]; if (k < 0) continue; const t = a0 + (h + 0.5) * FR / 2, into = t - NT.vS[k], vlen = NT.vE[k] - NT.vS[k]; let m = nts[k];
-            if (k > 0 && into < GL) { const x = clamp((into + 0.008) / GL, 0, 1); m = nts[k - 1] + (m - nts[k - 1]) * (x * x * (3 - 2 * x)); }
-            if (vlen > 0.36 && into > 0.22) m += 0.16 * Math.min(1, (into - 0.22) / 0.1) * Math.sin(2 * Math.PI * 5.8 * (into - 0.22));
+            const afterRest = k === 0 || NT.vS[k] - NT.vE[k - 1] > 0.12, leap = k > 0 && !afterRest ? nts[k] - nts[k - 1] : 0;
+            if (k > 0 && !afterRest && into < GL) { const x = clamp((into + 0.008) / GL, 0, 1); m = nts[k - 1] + (m - nts[k - 1]) * (x * x * (3 - 2 * x)); }
+            if (EXP > 0) {
+              if ((afterRest || sy[k].stress >= 1) && leap <= 0 && vlen > 0.12) { const L = 0.06, x = clamp(into / L, 0, 1); if (x < 1) m -= 0.7 * EXP * (1 - x * x * (3 - 2 * x)); }   /* shakuri */
+              if (leap >= 3) { const u = into - GL; if (u > 0 && u < 0.1) m += 0.28 * EXP * Math.sin(Math.PI * u / 0.1); }   /* перелёт */
+              if (vlen > 0.3 && into > 0.18) { const u = into - 0.18, dep = (0.14 + 0.12 * Math.min(1, u / 0.45)) * EXP; m += dep * Math.min(1, u / 0.08) * Math.sin(2 * Math.PI * (5.6 + 0.4 * Math.sin(1.7 * u)) * u); }
+              if (nat.end[k] && vlen > 0.2) { const rem = NT.vE[k] - t, L0 = 0.14; if (rem < L0 && rem > -0.03) { const x = 1 - Math.max(0, rem) / L0; m += (hot || MDv.id === 'joy' ? 0.6 : -1.0) * EXP * x * x; } }
+            } else if (vlen > 0.36 && into > 0.22) m += 0.16 * Math.min(1, (into - 0.22) / 0.1) * Math.sin(2 * Math.PI * 5.8 * (into - 0.22));
             o[h] = 440 * 2 ** ((m - 69) / 12); } return o; };
         const f0d = VOCX ? vocF0(nDS) : buildF0('', nDS, 0).f0, norm = (x) => { let e = 0, n = 0, pk = 0; for (let i = 0; i < x.length; i++) { const a = Math.abs(x[i]); if (a > pk) pk = a; } for (let i = 0; i < x.length; i++) if (Math.abs(x[i]) > 0.02 * pk) { e += x[i] * x[i]; n++; } const r = n ? Math.sqrt(e / n) : 0; return r > 0 ? Math.min(0.95 / pk, 0.22 / r) * 10 ** ((lv.db || 0) / 20) : 1; };
         const VO = window.__dsVO || { voltage: 0.7, arc: 0.3 }, GD = window.__dsGD != null ? window.__dsGD : vMood().gd;   /* замер: выше регистр (+6) и gender 0.14 — разборчивость 85→42%; держим как у аниме-голоса */   /* «Voltage» — самый яркий подголос Canary (замер: центроид 910 Гц против 577), лёгкий сдвиг формант вверх */
-        const RX = rap ? (window.__dsRapExpr != null ? window.__dsRapExpr : 0.35) : VOCX ? 0 : undefined;   /* рэп: модель высоты слегка — живая интонация речи, а не распев */
+        const RX = rap ? (window.__dsRapExpr != null ? window.__dsRapExpr : 0.35)   /* замер (2 трека × 4 варианта): речевой контур + модель высоты 0.35 — лучшая разборчивость рэпа Renri (0.40 против 0.37 без контура) */ : VOCX ? (window.__vocxExpr != null ? window.__vocxExpr : 0) : undefined;   /* рэп: модель высоты слегка — живая интонация речи, а не распев */
         const yP = dsSing(tok, dur, f0d, VO, { gender: GD, lang, expr: RX, tune: window.__dsTune != null ? window.__dsTune : vMood().tune });
         let dP = null, hP = null;
         if (hot && S.voxStack !== false && !window.__noStack) {
@@ -7585,6 +7605,22 @@ self.onmessage = async (e) => { const m = e.data; try {
     }
     return 'склейка с битом ' + Math.round(d * 100) + '%' + (crush ? ' · биткраш' : '');
   };
+  /* голос следует за битом: где бит громче и плотнее — голос напористее (громче на ~1–2 дБ, ярче, с «перегрузом» верхней середины),
+     где бит стихает (интро, брейк) — мягче и темнее. Огибающая бита сглажена ~полтакта: голос «дышит» с секциями, а не дёргается по ударам */
+  globalThis.vocalRide = function (l, r, sr, music, amt) {
+    if (!music || !(amt > 0)) return ''; const N = l.length, ml = music.getChannelData(0), mr = music.numberOfChannels > 1 ? music.getChannelData(1) : ml, M = Math.min(N, music.length), H = Math.round(sr * 0.05), nb = Math.ceil(N / H);
+    const eb = new Float32Array(nb); for (let b = 0; b < nb; b++) { let e = 0; const a = b * H, z = Math.min(M, a + H); for (let i = a; i < z; i += 2) { const m = (ml[i] + mr[i]) * 0.5; e += m * m; } eb[b] = z > a ? 10 * Math.log10(e / ((z - a) / 2) + 1e-10) : -100; }
+    const sm = new Float32Array(nb); { let v = -100; const at = 1 - Math.exp(-0.05 / 0.25), rl = 1 - Math.exp(-0.05 / 0.7); for (let b = 0; b < nb; b++) { v += (eb[b] > v ? at : rl) * (eb[b] - v); sm[b] = v; } }
+    const live = Array.from(sm).filter((x) => x > -60).sort((p, q) => p - q); if (live.length < 20) return ''; const med = live[live.length >> 1], hi = live[Math.floor(live.length * 0.9)];
+    const xs = new Float32Array(nb); for (let b = 0; b < nb; b++) xs[b] = sm[b] < -60 ? -1 : clamp((sm[b] - med) / Math.max(3, hi - med), -1, 1);
+    const k0 = SR / sr; let used = 0;
+    for (const x of [l, r]) { const hp = new BQ().hp(900 * k0, 0.7), pr = new BQ().hp(2600 * k0, 0.7);
+      for (let i = 0; i < N; i++) { const b = Math.min(nb - 1, i / H), b0 = Math.floor(b), w = b - b0, e = xs[b0] * (1 - w) + xs[Math.min(nb - 1, b0 + 1)] * w, v = x[i];
+        const h = hp.p(v), p2 = pr.p(v), drive = Math.max(0, e) * 0.35 * amt, gdb = 1.6 * e * amt;
+        let y = v + (drive > 0.005 ? (Math.tanh(h * 6) / 6 * 3 - h * 0.5) * drive : 0) + p2 * 0.22 * e * amt;   /* перегруз верхней середины + присутствие (минус — темнее) */
+        x[i] = y * 10 ** (gdb / 20); if (Math.abs(e) > 0.3) used = 1; } }
+    return used ? 'голос дышит с битом' : '';
+  };
   /* по секциям: «телефон» в куплетах, ширина в припевах (копии только в боковом канале — в моно не «плывёт») */
   globalThis.sectionVoxFx = function (l, r, sr, prof) {
     const secs = (S.track && S.track.sections) || [], N = l.length, k0 = SR / sr; if (!secs.length) return '';
@@ -7888,6 +7924,7 @@ self.onmessage = async (e) => { const m = e.data; try {
     if (!window.__voxDry) try {
       const l = out.getChannelData(0), r = out.getChannelData(1); S.voxSec = ''; try { if (globalThis.sectionVoxFx) S.voxSec = sectionVoxFx(l, r, sr, vfxProfile(sp)); } catch (e) { console.warn('секции голоса', e); }
       try { const gd = vocalDirt(sp), tt = window.__noTone ? '' : vocalTone(l, r, sr, gd), gl = vocalGlue(l, r, sr, gd); S.voxSec = [S.voxSec, tt, gl].filter(Boolean).join(', '); } catch (e) { console.warn('склейка', e); }
+      try { const rd = window.__noRide ? '' : vocalRide(l, r, sr, music, window.__rideAmt != null ? window.__rideAmt : 1); if (rd) S.voxSec = (S.voxSec ? S.voxSec + ', ' : '') + rd; } catch (e) { console.warn('ride', e); }
       try { const pm = vfxProfile(sp); if (pm.mic > 0) { cheapMic(l, r, sr, pm.mic); S.voxSec = (S.voxSec ? S.voxSec + ', ' : '') + 'дешёвый микрофон'; } } catch (e) { console.warn('микрофон', e); }
       const fx = await vocalFx(l, r, sr, sp, bpm(), vf);
       for (let i = 0; i < out.length; i++) { l[i] += fx.L[i]; r[i] += fx.R[i]; }
