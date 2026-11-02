@@ -7621,6 +7621,39 @@ self.onmessage = async (e) => { const m = e.data; try {
         x[i] = y * 10 ** (gdb / 20); if (Math.abs(e) > 0.3) used = 1; } }
     return used ? 'голос дышит с битом' : '';
   };
+  /* ЭФФЕКТЫ-МОМЕНТЫ: дисторшн/биткраш/свип включаются там, где они нужны (дроп, концы строк припева, билд), и ОДНОВРЕМЕННО на голосе и бите —
+     так эффект звучит как часть трека, а не как наклейка на голос. Сила — от жанра («грязь» бита) и слов в описании. */
+  globalThis.fxMoments = function (spec) {
+    const t = ((document.querySelector('#prompt') || {}).value || '').toLowerCase(), st = (spec && spec.style) || '', d = vocalDirt(spec), out = [];
+    if (window.__noMoments || /чист|clean|без эффект|no fx/.test(t)) return out;
+    const kwD = /дисторш|distort|перегруз|overdrive|fuzz|грязн|dirty/.test(t), kwC = /биткраш|bitcrush|8.?бит|8.?bit|лоу.?бит|глитч|glitch|чиптюн|chiptune/.test(t);
+    const glitchy = kwC || ['glitch', 'hardtekk', 'gabber', 'breakcore', 'jersey'].includes(st) || d > 0.55, R = mulberry32(((spec.seed || 1) ^ 0x5f3a) >>> 0);
+    const secs = (S.track && S.track.sections) || [], lines = S.flowLines || [];
+    for (const s0 of secs) {
+      if (['drop', 'peak'].includes(s0.role) && (d >= 0.25 || kwD)) { const a = clamp(0.2 + 0.5 * d + (kwD ? 0.25 : 0), 0, 0.7); out.push({ k: 'dist', t0: s0.t0, t1: s0.t1, vox: a, beat: a * 0.45 }); }
+      if (s0.role === 'build' && s0.t1 - s0.t0 > 1.5) out.push({ k: 'sweep', t0: s0.t0 + (s0.t1 - s0.t0) * 0.35, t1: s0.t1, vox: 1, beat: 1 });
+    }
+    if (glitchy || d > 0.35) { let n = 0;
+      for (const ln of lines) { if (ln.end == null) continue; const te = ln.t0 + ln.end, sec = secs.find((x) => te >= x.t0 && te < x.t1), hot = sec && ['peak', 'drop', 'chorus'].includes(sec.role);
+        if (!hot && !(kwC && R() < 0.3)) continue; if (n++ % 2 === 1 && !kwC) continue;
+        const a = clamp((glitchy ? 0.55 : 0.35) + (kwC ? 0.25 : 0), 0, 0.9); out.push({ k: 'crush', t0: te - 0.38, t1: te + 0.06, vox: a, beat: a * 0.6 }); } }
+    return out;
+  };
+  globalThis.applyMoments = function (beat, vox, mom) {
+    if (!mom || !mom.length) return '';
+    const sr = beat.sampleRate, k0 = SR / sr, used = {};
+    const run = (buf, m, amt) => { if (!(amt > 0) || !buf) return; const a = Math.max(0, Math.round(m.t0 * sr)), b = Math.min(buf.length, Math.round(m.t1 * sr)); if (b - a < sr * 0.05) return; const F = Math.round(sr * 0.025);
+      for (let c = 0; c < buf.numberOfChannels; c++) { const x = buf.getChannelData(c);
+        if (m.k === 'dist') { const hp = new BQ().hp(180 * k0, 0.7), lp = new BQ().lp(7500 * k0, 0.7), drv = 2 + 10 * amt, tn = Math.tanh(drv);
+          for (let i = a; i < b; i++) { const w = Math.min(1, (i - a) / F, (b - i) / F) * amt, y = lp.p(Math.tanh(hp.p(x[i]) * drv) / tn) * 0.55; x[i] = x[i] * (1 - w * 0.5) + y * w; } }
+        else if (m.k === 'crush') { const hold = 2 + Math.round(5 * amt), q = 2 ** Math.round(11 - 6 * amt); let held = 0;
+          for (let i = a; i < b; i++) { if ((i - a) % hold === 0) held = Math.round(x[i] * q) / q; const w = Math.min(1, (i - a) / F, (b - i) / (F * 0.5)) * amt; x[i] = x[i] * (1 - w) + held * w; } }
+        else if (m.k === 'sweep') { const q = new BQ(); const L = b - a;
+          for (let i = a; i < b; i++) { if (((i - a) & 63) === 0) { const u = (i - a) / L; q.hp((60 * Math.pow(1500 / 60, u * u)) * k0, 0.9); } const w = Math.min(1, (i - a) / (F * 4)); x[i] = x[i] * (1 - w) + q.p(x[i]) * w; } }
+      } used[m.k] = 1; };
+    for (const m of mom) { run(vox, m, m.vox); run(beat, m, m.beat); }
+    return [used.dist ? 'дисторшн на дропе (голос+бит)' : '', used.crush ? 'биткраш в концах строк припева' : '', used.sweep ? 'свип фильтра на билде' : ''].filter(Boolean).join(', ');
+  };
   /* по секциям: «телефон» в куплетах, ширина в припевах (копии только в боковом канале — в моно не «плывёт») */
   globalThis.sectionVoxFx = function (l, r, sr, prof) {
     const secs = (S.track && S.track.sections) || [], N = l.length, k0 = SR / sr; if (!secs.length) return '';
@@ -8040,6 +8073,8 @@ self.onmessage = async (e) => { const m = e.data; try {
       const vk = JSON.stringify([vf, L, S.spec && S.spec.seed, globalThis.GENE ? ['tapeK', 'revAdj', 'dlyAdj'].map((k) => GENE(k)) : 0]);
       let vb; if (S._vbC && S._vbC.v === vox && S._vbC.b === base && S._vbC.k === vk) vb = S._vbC.out; else { vb = await voxBus(vox, vf, L, base); S._vbC = { v: vox, b: base, k: vk, out: vb }; } if (window.__dbgNotes) window.__vb = vb;
       setStatus('Свожу голос с битом…', 0.92, true); await new Promise((r) => setTimeout(r, 0));
+      try { const mom = fxMoments(S.spec || {}); if (mom.length) { const cp = (x) => { const o = new AudioBuffer({ numberOfChannels: x.numberOfChannels, length: x.length, sampleRate: x.sampleRate }); for (let c = 0; c < x.numberOfChannels; c++) o.getChannelData(c).set(x.getChannelData(c)); return o; };
+        base = cp(base); vb = cp(vb); S.fxMom = applyMoments(base, vb, mom); } else S.fxMom = ''; } catch (e) { console.warn('эффекты-моменты', e); }
       base = await glueBus(mixBuf(base, vb, (f.voxv / 100) * 10 ** ((((S.fix && S.fix.voxDb) || 0) + (globalThis.TEACH ? TEACH.sk('voxDb', 0) : 0)) / 20)));
     }
     const src = f.pitch ? pitchShift(base, f.pitch) : base, rate = f.speed / 100;
@@ -8285,7 +8320,7 @@ self.onmessage = async (e) => { const m = e.data; try {
         fit.ce.sort((a, b) => a - b); const pc = (x) => Math.round((100 * x) / Math.max(1, fit.n)), mod = (tr.rootOffBars || []).some((x) => x);
         add('Гармонист', fit.n < 80 || (fit.inK / fit.n >= 0.9 && fit.cl / fit.n <= 0.04), 'в тональности ' + pc(fit.inK) + '% · на нотах бита ' + pc(fit.snd) + '% · трение ' + pc(fit.cl) + '%' + (mod ? ' · модуляция ✓' : '')); }
       if (voiced) { const gl = (S.voxFx && S.voxFx.glue) || '', tp = S.voxTape || ''; const th = S.voxFx && S.voxFx.throws ? 'эхо-броски ×' + S.voxFx.throws : '', pf = globalThis.vfxProfile ? vfxProfile(sp) : null;
-        add('Окраска', true, ['реверб и дилей бита', pf && pf.sat >= 0.15 ? 'насыщение ' + Math.round(pf.sat * 100) + '%' : '', S.voxSec || '', th, tp].filter(Boolean).join(' · ')); }
+        add('Окраска', true, ['реверб и дилей бита', pf && pf.sat >= 0.15 ? 'насыщение ' + Math.round(pf.sat * 100) + '%' : '', S.voxSec || '', S.fxMom || '', th, tp].filter(Boolean).join(' · ')); }
       for (const r of rep.out) if (r.did) add('Мастеринг', r.ok, r.text.replace(/\s*\(.*?\)/g, '') + ' → ' + r.did);
       if (auto && (fixMix || todo.length) && !quickOn()) {   /* быстрая проба: без второго сведения — поправка уйдёт в следующий трек */
         const f = { ...rep.fix }, vr = { ...((S.fix && S.fix.voxRole) || {}) }; const carve0 = (S.fix && S.fix.carve) || 0; let carve = carve0;
