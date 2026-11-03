@@ -951,6 +951,13 @@ const STYLES = {
     d: { energy: .75, dark: .88, density: .5, space: .35, echo: .3, grit: .45, swing: 0, pump: .05, chaos: .3, glitch: .12, warp: .1 },
     layers: L('kick snare hats perc bass pad arp lead tex fx'), sig: ['kick', 'bass'],
   },
+  plugg: {
+    name: 'Плагг / pluggnb', bpm: [140, 160], kick: 'trap', snare: 'half', hats: 'roll', perc: ['blip', 'click'], bass: '808',
+    chord: 'pad', cl: 2, arp: 'up', arpRate: 2, lead: 'square', form: 'story', scales: ['major', 'dorian', 'pentaMaj', 'lydian'],
+    kit: { kick: 'long', snare: 'clap', bass: '808', lead: 'square', arp: 'bell', pad: 'tri', tex: 'vinyl' },
+    d: { energy: .55, dark: .3, density: .4, space: .6, echo: .5, grit: .1, swing: .04, pump: 0, chaos: .15, glitch: .06, warp: .25 },
+    layers: L('kick snare hats perc bass pad arp lead tex fx'), sig: ['lead', 'bass'],
+  },
   jersey: {
     name: 'Джерси-клаб', bpm: [130, 142], kick: 'jersey', snare: 'jersey', hats: 'off', perc: ['click', 'shaker', 'blip'], bass: '808',
     chord: 'stab', cl: 2, arp: 'skip', arpRate: 2, lead: 'pluck', form: 'club', scales: ['minor', 'dorian', 'pentaMin'],
@@ -1039,6 +1046,7 @@ const STYLE_WORDS = {
   phonk: [/фонк|phonk|дрифт|мемфис|memphis|коубелл|cowbell/, 4],
   drill: [/дрилл|(?<![a-z])drill(?![a-z])/, 4],
   jersey: [/джерси|jersey|club bounce|клаб баунс/, 4],
+  plugg: [/плаг|плагг|plugg|pluggnb|плагнб|(?<![a-z])plug(?![a-z])/, 5],
   dubstep: [/дабстеп|dubstep|ридим|riddim|воббл|wobble|brostep|брострэп|skrillex|скриллекс/, 4],
 };
 const MOOD_RULES = [
@@ -1413,7 +1421,7 @@ function varyHook(R, hook, amount) {
 /* ходы аккордов и ритмы мелодий из 500 MIDI «BLACKOUT» (@ogwaxtri, opium/glo): там гармония стоит на 1–2 аккордах, мелодия — ровными восьмыми и четвертями */
 const PROGS_X = {"min": [[0, 0, 0, 0], [0, 1, 0, 1], [0, 4, 0, 4], [0, 5, 0, 5], [0, 3, 0, 3], [0, 2, 0, 2], [0, 6, 0, 6], [0, 5, 1, 5], [0, 1, 0, 5], [0, 1, 0, 0], [0, 1, 5, 0], [0, 5, 0, 1], [0, 3, 0, 4], [0, 0, 6, 0]], "maj": [[0, 0, 0, 0], [0, 1, 0, 1], [0, 3, 0, 3], [0, 5, 0, 5], [0, 4, 0, 4], [0, 6, 0, 6], [0, 2, 0, 2], [0, 5, 0, 0], [0, 0, 0, 4], [0, 1, 0, 5], [0, 5, 4, 1], [0, 5, 0, 1], [0, 4, 4, 0], [0, 6, 0, 1]]};
 const MCELLS_X = [[0, 2, 4, 6, 8, 10, 12, 14], [0, 4, 8, 12], [0, 8, 12], [0, 4, 6, 8, 10, 12, 14], [0, 8], [0, 4, 6, 8, 10, 12], [0, 2, 4, 6, 8, 10, 12], [0, 4, 6, 8, 12], [0, 2, 4, 8, 10, 12, 14], [0, 2, 4, 6, 8, 12], [0, 4, 8, 10, 12, 14], [0, 4, 8]];
-const PROGS_ST = new Set(['rage', 'melancore', 'hoodtrap', 'trap', 'phonk', 'drill']);
+const PROGS_ST = new Set(['rage', 'melancore', 'hoodtrap', 'trap', 'phonk', 'drill', 'plugg']);
 function genProg(R, kind) {
   const base = PROGS[kind]; if (R() < .45) return pick(R, base);
   const pool = kind === 'sta' ? [0, 1, 2, 3, 4, 5, 6] : kind === 'maj' ? [0, 1, 2, 3, 4, 5] : [0, 2, 3, 4, 5, 6];
@@ -1543,6 +1551,8 @@ function compose(spec) {
       return { A: mx(dBase, f1), B: mx(dAlt, f2) };
     })());
     const bRph = [];
+    /* скольжение 808 (как в дрилле/трэпе): нота стартует с высоты прошлой и съезжает на свою; в дрилле часто и со скачком (квинта/октава) */
+    const SLIDE = window.__noSlide ? 0 : { drill: .42, hoodtrap: .2, trap: .16, phonk: .16, rage: .18, plugg: .14, melancore: .12, jersey: .08 }[spec.style] || 0; let b8prev = null;
     const bassFor = (ph, alt) => { const key = ph * 2 + (alt ? 1 : 0); if (bRph[key]) return bRph[key]; if (bassKind === '808' && spec.layers.kick) { const kp = phD(ph)[alt ? 'B' : 'A'].k, h = [], Rq = mulberry32((spec.seed + sec.idx * 17 + key * 29) >>> 0), on = []; for (let i = 0; i < 16; i++) if (kp[i] > 0) on.push(i); on.forEach((s0, j) => { const nx = j + 1 < on.length ? on[j + 1] : 16; h.push({ s: s0, len: clamp(nx - s0, 2, 8) * (.8 + .2 * Rq()), vel: .85 + .15 * kp[s0], g: Rq() < .22 }); }); if (h.length) return (bRph[key] = h); } return (bRph[key] = bassRhythm(bassKind, mulberry32((spec.seed + sec.idx * 211 + key * 53) >>> 0), spec.density, alt)); };
     const arpPh = [];
     const arpFor = (ph) => arpPh[ph] || (arpPh[ph] = (() => {
@@ -1669,7 +1679,8 @@ function compose(spec) {
             if (h.s !== 0 && bassKind !== 'drone' && bassKind !== 'rumble' && bassKind !== 'offbeat' && R() < .06 + spec.evolve * .1) dg += R() < .5 ? nL : pick(R, [2, 4, -1]);
             let m = scaleMidi(rootS - 12, L7, dg);
             while (m > 52) m -= 12; while (m < 29) m += 12;
-            E('bass', ts + hum(.003), { m, d: Math.max(.06, h.len * stepDur), v: vel(h.vel, e), g: h.g ? 1 : 0, k: secBass });
+            let sl = 0; if (SLIDE && (/^808/.test(secBass) || bassKind === '808') && b8prev != null && h.s !== 0 && R() < SLIDE) { if (m === b8prev && (spec.style === 'drill' || R() < .5)) { const up = spec.style === 'drill' ? pick(R, [12, 7, 5, -5]) : pick(R, [12, 12, 7]); if (m + up >= 29 && m + up <= 55) m += up; } sl = clamp(b8prev - m, -12, 12); }
+            E('bass', ts + hum(.003), { m, d: Math.max(.06, h.len * stepDur), v: vel(h.vel, e), g: h.g && !sl ? 1 : 0, sl, k: secBass }); b8prev = m;
           }
         }
         // арпеджио
@@ -1792,6 +1803,7 @@ const GROOVES = {
   phonk: [G('x..x..x...x.x...', '....x.......x...', 'x.x.x.x.x.x.x.x.', '..o...o...o...o.'), G('x.....x.x.x.....', '........x.......', 'x.x.xxx.x.x.xxx.', null, [[6, 3, .66]]), G('x..x....x..x....', '....x.......x...', 'x.x.x.x.x.x.x.x.'), G('x.x...x...x.x...', '........x.......', 'xxxxxxxxxxxxxxxx')],
   drill: [G('x.....x...x..x..', '........x.......', 'x.x.xxx.x.x.x.x.', null, [[5, 3, .66], [10, 3, .66]]), G('x..x....x.x.....', '........x.......', 'x.x.x.x.x.x.x.x.', null, [[6, 3, .66], [11, 3, .66], [14, 2, .5]]), G('x.....x.x.....x.', '........x.......', 'x.x.x.x.x.xxx.x.', null, [[5, 3, .66]])],
   synthwave: [G('x...x...x...x...', '....x.......x...', 'x.x.x.x.x.x.x.x.', '..o...o...o...o.'), G('x...x...x..xx...', '....x.......x...', 'xoxoxoxoxoxoxoxo'), G('x...x...x...x..x', '....x.......x..g', 'x.x.x.x.x.x.x.x.', '..o...o...o...o.'), G('x...x...x...x...', '....x...g...x...', 'xxxxxxxxxxxxxxxx')],
+  plugg: [G('x.......x.x.....', '........x.......', 'x...x...x...x...', null, [[14, 2, .5]]), G('x.....x...x.....', '........x.......', 'x.x.x...x.x.x...', null, [[6, 2, .5]]), G('x.......x.....x.', '........x.......', 'x...x.x.x...x.x.', null, [[12, 3, .66]])],
   jersey: [G('x..x..x...x.x...', '....x.......x...', '..x...x...x...x.'), G('x..x..x.x..x..x.', '....x...g...x..g', '.x.x.x.x.x.x.x.x'), G('x..x..x..x..x...', '....x.......x.g.', '..x.x.x...x.x.x.')],
   dubstep: [G('x.........x.....', '........x.......', 'x.x.x.x.x.x.x.x.'), G('x....x....x.....', '........x.......', '..x...x...x...x.'), G('x.........x..x..', '........x.....g.', 'x...x...x...x...')],
   house: [G('x...x...x...x...', '....x.......x...', '..o...o...o...o.', '..o...o...o...o.'), G('x...x...x...x...', '....x.......x...', 'x.x.x.x.x.x.x.x.', '..o...o...o...o.'), G('x...x...x...x...', '....x...g...x...', '.xx..xx..xx..xx.', '..o...o...o...o.')],
@@ -1811,7 +1823,7 @@ const LEADCELLS = {
   rage: [[0, 6], [0, 3, 8], [0, 4, 10], [0, 6, 10], [2, 8, 14], [0, 3, 6, 12]], hoodtrap: [[0, 6], [0, 8], [0, 3, 10], [0, 6, 12], [4, 10]],
   melancore: [[0, 6, 10], [0, 4, 8, 12], [0, 3, 6, 10], [0, 8], [0, 6, 8, 14]], phonk: [[0, 3, 6, 8, 10], [0, 2, 4, 6, 8, 10], [0, 3, 7, 10], [0, 6, 9, 12]],
   drill: [[0, 6, 10], [0, 3, 8, 11], [0, 10, 14]], synthwave: [[0, 2, 4, 6, 8, 10, 12, 14], [0, 3, 6, 8, 11, 14], [0, 4, 6, 8, 12, 14], [0, 2, 6, 8, 10, 14]],
-  jersey: [[0, 3, 6, 10], [0, 6, 9, 12], [2, 6, 10, 14]], dubstep: [[0, 6], [0, 8], [0, 3, 10]],
+  plugg: [[0, 3, 6, 10], [0, 4, 8, 11], [0, 6, 8, 12], [2, 6, 10, 14]], jersey: [[0, 3, 6, 10], [0, 6, 9, 12], [2, 6, 10, 14]], dubstep: [[0, 6], [0, 8], [0, 3, 10]],
 };
 /* ---- ритмические режимы: каждая секция (и иногда каждая фраза) может сменить рисунок ударных ---- */
 const RMODES = ['half', 'four', 'broken', 'dnb', 'trap', 'shuffle', 'offbeat', 'stomp', 'sparse'];
@@ -1959,7 +1971,7 @@ const ARCH = [
   { n: 'minimal', BR: [.7, 1.2], WT: [.8, 1.3], WD: [.5, .9], waves: ['sine', 'tri', 'sq'], uni: [1, 1, 2], drv: [0, 1, 1.5], atk: [.002, .05], fe: [0, 2.5], rvs: [.4, .8], rvw: [.4, .8], ch: .1, sat: [.1, 1.2, 1.6], cr: 0, eg: [.4, .6, .5], hm: .3, bb: [0, 1, 1, 0, 0, 0, 0, 0, -1, -2] },
   { n: 'dream', BR: [.4, .9], WT: [.8, 1.3], WD: [1.3, 1.8], waves: ['saw', 'tri', 'mix', 'sine'], uni: [3, 5, 7], drv: [0, 1, 1.5], atk: [.1, .5], fe: [-1, 1.5], rvs: [1.5, 2.2], rvw: [1.2, 1.6], ch: .95, sat: [.1, 1.2, 1.5], cr: .1, eg: [.3, .8, .5], hm: .1, bb: [0, 1, 1, 1, 0, -1, -2, -4, -6, -9] },
 ];
-const AFF = { hardstyle: [0, 5], gabber: [5], melancore: [6, 9, 2], hoodtrap: [2, 1, 8], phonk: [1, 5], drill: [2, 8], jersey: [3, 7], dubstep: [5, 0], techno: [8, 5, 2], house: [6, 0, 3], trance: [0, 4, 9], ambient: [2, 9, 6], lofi: [1, 6, 9], synthwave: [4, 9, 0], cinematic: [2, 9], jumpstyle: [0, 5, 3], hardtekk: [5, 0, 7], rage: [5, 7, 0, 4] };
+const AFF = { hardstyle: [0, 5], gabber: [5], melancore: [6, 9, 2], plugg: [4, 9, 6], hoodtrap: [2, 1, 8], phonk: [1, 5], drill: [2, 8], jersey: [3, 7], dubstep: [5, 0], techno: [8, 5, 2], house: [6, 0, 3], trance: [0, 4, 9], ambient: [2, 9, 6], lofi: [1, 6, 9], synthwave: [4, 9, 0], cinematic: [2, 9], jumpstyle: [0, 5, 3], hardtekk: [5, 0, 7], rage: [5, 7, 0, 4] };
 function genPatch(R, role, AR) {
   const u = (a, b) => a + (b - a) * R(), lg = (a, b) => a * Math.pow(b / a, R()), pk = (a) => a[Math.floor(R() * a.length)];
   const wv = ['saw', 'sq', 'tri', 'sine', 'pulse', 'mix'], bs = role === 'bass';
@@ -1984,7 +1996,7 @@ function genNote(role, f, d, v, p, e) {
   const eD = envAt(d); let pkv = 1e-6;
   for (let k = 0; k < n; k++) {
     const t = k / SR;
-    const mult = (p.gl ? cents(p.gl * 100 * Math.exp(-t / p.glT)) : 1) * (p.vib ? cents(p.vib * Math.sin(TAU * p.vibF * t) * Math.min(1, t / (p.vibD + .01))) : 1);
+    const mult = (e && e.sl ? 2 ** (e.sl / 12 * Math.exp(-t / .07)) : p.gl ? cents(p.gl * 100 * Math.exp(-t / p.glT)) : 1) * (p.vib ? cents(p.vib * Math.sin(TAU * p.vibF * t) * Math.min(1, t / (p.vibD + .01))) : 1);
     let mod = 0; if (p.fmI) { pm = (pm + f * mult * p.fmR / SR) % 1; mod = p.fmI * Math.exp(-t / p.fmD) * Math.sin(TAU * pm) / TAU; }
     let s1 = 0, s2 = 0;
     for (let i = 0; i < uni; i++) {
@@ -2357,7 +2369,7 @@ const VOICE = {
     for (let k = 0; k < n; k++) {
       const t = k / SR; let s = 0;
       if (is8) {
-        const ff = f * (e.g ? 1 + 1 * Math.exp(-t / .04) : 1 + .35 * Math.exp(-t / .012)); ph += ff / SR;
+        const ff = e.sl ? f * 2 ** (e.sl / 12 * Math.exp(-t / .07)) : f * (e.g ? 1 + 1 * Math.exp(-t / .04) : 1 + .35 * Math.exp(-t / .012)); ph += ff / SR;   /* sl — скольжение с прошлой ноты */
         const a = t < .006 ? t / .006 : t < Math.min(.1, dd * .2) ? .9 : .8 * Math.exp(-(t - Math.min(.1, dd * .2)) / (dd / 5));
         s = Math.tanh(Math.sin(TAU * ph) * (k0 === '808d' ? 4.2 : 1.6)) * a * v * (k0 === '808d' ? .58 : .72);
       } else if (k0 === 'sub') {
@@ -2861,13 +2873,13 @@ const SKIT = (() => {
   }
   const ready = (ms) => Promise.race([load(), new Promise((r) => setTimeout(() => r(0), ms || 2000))]);
   /* какой шанс у жанра на живые ударные; «жёсткие» жанры держат свою синт-бочку */
-  const P = { trap: .8, hoodtrap: .8, drill: .8, phonk: .8, rage: .75, melancore: .8, jersey: .8, lofi: .85, jpop: .65, house: .6, techno: .5, synthwave: .5, dnb: .55, glitch: .6, dub: .6, dubstep: .5, trance: .45, cinematic: .4, ambient: .35, industrial: .4, hardstyle: .5, hardtekk: .5, jumpstyle: .5, gabber: .4 };
+  const P = { trap: .8, plugg: .8, hoodtrap: .8, drill: .8, phonk: .8, rage: .75, melancore: .8, jersey: .8, lofi: .85, jpop: .65, house: .6, techno: .5, synthwave: .5, dnb: .55, glitch: .6, dub: .6, dubstep: .5, trance: .45, cinematic: .4, ambient: .35, industrial: .4, hardstyle: .5, hardtekk: .5, jumpstyle: .5, gabber: .4 };
   const HARD = new Set(['hardstyle', 'hardtekk', 'jumpstyle', 'gabber']);
   function pick(spec) {
     if (!st.idx || window.__noSK || (spec.feat && spec.feat.noSK)) return null;
     const R = mulberry32(((spec.seed || 1) ^ 0x5eed5) >>> 0); if (R() > (P[spec.style] != null ? P[spec.style] : .5)) return null;
     /* семья звуков по жанру: хард-бочки DJ XERO — для хардстайла/джампа/хардтека, кит DETROIT — для трэпа, кит 4EVRX — для драм-н-бейса */
-    const fam = HARD.has(spec.style) ? 'hard' : ['trap', 'hoodtrap', 'drill', 'phonk', 'rage', 'melancore', 'jersey'].includes(spec.style) ? 'trap' : ['dnb', 'glitch'].includes(spec.style) ? 'dnb' : null;
+    const fam = HARD.has(spec.style) ? 'hard' : ['trap', 'hoodtrap', 'drill', 'phonk', 'rage', 'melancore', 'jersey', 'plugg'].includes(spec.style) ? 'trap' : ['dnb', 'glitch'].includes(spec.style) ? 'dnb' : null;
     const one = (c, pr) => { const all = (st.idx[c] || []).filter((it) => st.pcm[it.f]); if (!all.length || R() > pr) return null; const mine = fam ? all.filter((it) => it.fam === fam) : [];
       const L = mine.length && R() < .85 ? mine : fam === 'hard' && c === 'kick' ? [] : all.filter((it) => !it.fam || !fam || R() < .3); if (!L.length) return null;
       const it = L[Math.floor(R() * L.length)]; let r = 2 ** ((R() * 2 - 1) * 1.5 / 12);
@@ -3057,6 +3069,7 @@ const STYLE_EXPAND = {
   dnb: { inst: [], mood: ['энергично'], fx: [], snd: ['рычащий риз-бас', 'дроп'] },
   dub: { inst: [], mood: ['тягуче'], fx: ['эхо'], snd: ['глубокий суб-бас'] },
   trap: { inst: ['808'], mood: ['тёмно'], fx: [], snd: ['хэты быстрые роллы'] },
+  plugg: { inst: ['808', 'синт'], mood: ['мечтательно'], fx: ['реверб'], snd: [] },
   lofi: { inst: ['клавиши'], mood: ['тепло', 'спокойно'], fx: ['приглушённо'], snd: ['винил'] },
   jpop: { inst: ['пианино', 'гитара'], mood: ['светло', 'энергично'], fx: ['реверб'], snd: ['яркие аккорды', 'пульсирующий бас'] },
   synthwave: { inst: ['суперсо'], mood: ['тепло', 'мечтательно'], fx: ['реверб'], snd: ['пульсирующий бас', 'неон'] },
@@ -3322,7 +3335,7 @@ function setStatus(text, p, busy) {
 function setBusy(b) { S.busy = b; ['#make', '#rebuild', '#reroll', '#mutate', '#experiment', '#surprise'].forEach((s) => { $(s).disabled = b; }); }
 function reseed(spec) { spec.seed = ((spec.seed0 || spec.seed) + Math.imul(spec.salt + 1, 2654435761)) >>> 0; }
 /* ---- рэп-сетап: форма «куплет-припев», рэп-стиль, ритм и барабаны всегда на месте ---- */
-const RAP_STYLES = ['trap', 'hoodtrap', 'drill', 'phonk', 'lofi', 'jersey', 'melancore', 'rage'];
+const RAP_STYLES = ['trap', 'hoodtrap', 'drill', 'phonk', 'lofi', 'jersey', 'melancore', 'rage', 'plugg'];
 /* рэп-сетап: стиль подбирается под темп и настроение промпта, а темп из промпта не выбрасывается (раньше «лоуфай 85» становился фонком на 134) */
 function rapifySpec(spec) {
   /* стиль, названный в промпте (hardstyle, jumpstyle, техно…), остаётся — рэп поверх него; подбираем рэп-бит только когда стиль угадан по настроению */
@@ -3445,6 +3458,15 @@ async function makeFromPrompt() {
   await buildTrack(spec.title);
 }
 /* каждое «Создать» — новый трек по тому же промпту: свой seed, темп, лад, форма, характер */
+/* случайная смена рисунка — только в рамках жанра: у рэп-жанров бас всегда 808, бочка/хэты — из родственных (трэп↔дрилл), а не «бум-бэп»/«ровная бочка» в дрилле
+   (замер: дрилл с промпта выходил с «катящимся» басом-пилой и бочкой four — жанр не узнавался) */
+const RH_GENRE = { trap: { kick: ['trap', 'drill'], hats: ['roll', 'drill', 'off16'] }, drill: { kick: ['drill'], hats: ['drill', 'roll'] }, phonk: { kick: ['trap', 'drill'], hats: ['roll', 'eighth', 'off16'] },
+  hoodtrap: { kick: ['trap', 'drill'], hats: ['roll', 'drill'] }, rage: { kick: ['trap'], hats: ['roll', 'off16', 'eighth'] }, melancore: { kick: ['trap'], hats: ['roll', 'eighth'] },
+  plugg: { kick: ['trap'], hats: ['roll', 'eighth', 'off16'] }, jersey: { kick: ['jersey'], hats: ['off', 'off16'] } };
+function rhRandom(spec, R) {
+  const G = !window.__oldRh && RH_GENRE[spec.style], O = G || RH_OPTS, k = pick(R, Object.keys(O));
+  spec.rh = { ...(spec.rh || {}), [k]: pick(R, O[k]) };
+}
 function randomizeSpec(spec, prompt) {
   spec.salt = (Math.random() * 1e9) >>> 0; reseed(spec);
   const R = mulberry32((spec.seed ^ 0x5eed) >>> 0), st = STYLES[spec.style] || {};
@@ -3454,7 +3476,7 @@ function randomizeSpec(spec, prompt) {
   if (!spec.bpmUser && st.bpm) spec.bpm = Math.round(st.bpm[0] - 3 + (st.bpm[1] - st.bpm[0] + 6) * R());
   if (!/(мажор|минор|major|minor|лад|scale|дорийск|фригийск|лидийск|гармонич)/i.test(prompt) && st.scales && st.scales.length) spec.scale = pick(R, st.scales.concat(R() < .25 ? ['harmonic', 'phrygian', 'dorian'] : []));
   if (R() < .35) spec.form = pick(R, Object.keys(FORMS));
-  if (R() < .5 && typeof RH_OPTS !== 'undefined') { const k = pick(R, Object.keys(RH_OPTS)); spec.rh = { ...(spec.rh || {}), [k]: pick(R, RH_OPTS[k]) }; }
+  if (R() < .5 && typeof RH_OPTS !== 'undefined') rhRandom(spec, R);
   if (R() < .3) spec.swing = clamp((spec.swing || 0) + (R() - .3) * .3, 0, 1);
 }
 function newVariant(kind) {
@@ -3465,7 +3487,7 @@ function newVariant(kind) {
   if (kind === 'mutate') {
     for (const k of ['energy', 'density', 'chaos', 'glitch', 'space', 'echo', 'grit', 'warp']) s[k] = clamp(s[k] + (R() - .5) * .3, 0, 1);
     s.bpm = clamp(s.bpm + Math.round((R() - .5) * 8), 50, 200); if (s.hy) { s.hy.mix = clamp(s.hy.mix + (R() - .5) * .3, .1, .9); s.hy.donor = pick(R, Object.keys(STYLES)); }
-    if (R() < .5) { const k = pick(R, Object.keys(RH_OPTS)); s.rh = { ...(s.rh || {}), [k]: pick(R, RH_OPTS[k]) }; }
+    if (R() < .5) rhRandom(s, R);
   } else if (kind === 'experiment') {
     s.hy = { donor: pick(R, Object.keys(STYLES)), mix: .5 + R() * .4 }; s.chaos = clamp(.65 + R() * .35, 0, 1); s.glitch = clamp(s.glitch + .25, 0, 1); s.poly = true; s.evolve = .9; s.warp = clamp(s.warp + .2, 0, 1);
     s.scale = pick(R, XENO.concat(['phrygian', 'lydian', 'whole']));
@@ -4807,7 +4829,7 @@ document.addEventListener('DOMContentLoaded', init);
   const STYLE_W = {
     atl: { trap: 3.6, hoodtrap: 3.6, drill: 3, phonk: 2.8, jersey: 2.8, rap: 3.4, rnb: 2.6, lofi: 1.4, story: 1.2, loop: 1.2, house: 0.6 },
     real: { trap: 1.6, hoodtrap: 1.4, drill: 1.4, phonk: 1.6, jersey: 1.2, lofi: 2.4, rap: 1.4, story: 2, loop: 1.4, rnb: 1.6, house: 0.8 },
-    moe: { melancore: 3, synthwave: 1.5, loop: 1.5, trap: 1, lofi: 1, story: 1, jersey: 1.5, club: 1, drift: 1 },
+    moe: { plugg: 2, melancore: 3, synthwave: 1.5, loop: 1.5, trap: 1, lofi: 1, story: 1, jersey: 1.5, club: 1, drift: 1 },
     idol: { synthwave: 3, house: 2.5, club: 2.5, drop: 2, jersey: 2, trance: 1.5, loop: 1, techno: 0.5, trap: 0.5 },
     onee: { story: 3, epic: 2.5, cinematic: 2.5, lofi: 1.6, rap: 2, trap: 1.2, dub: 1.5, drift: 1.5, ambient: 1 },
     kuu: { lofi: 3, ambient: 3, cinematic: 1.5, drift: 2, glitch: 1.5, dub: 1, techno: 1 },
@@ -5174,7 +5196,7 @@ self.onmessage = (e) => { try { const r = analyze(e.data.L, e.data.R, e.data.sr)
   }
   /* САМ ИЩЕТ ЭТАЛОНЫ в свободной музыке с открытыми лицензиями: Openverse (Jamendo, ccMixter, Freesound), Internet Archive, Wikimedia Commons.
      Ищет по стилю текущего трека, качает до 16 МБ, слушает тем же ухом, что и твои файлы. Не больше 6 треков в день. */
-  const NET_Q = { techno: 'techno', house: 'house music', ambient: 'ambient', dnb: 'drum and bass', dub: 'dub', trap: 'trap beat', lofi: 'lofi hip hop', synthwave: 'synthwave', jpop: 'anime opening', industrial: 'industrial', glitch: 'idm glitch',
+  const NET_Q = { techno: 'techno', house: 'house music', ambient: 'ambient', dnb: 'drum and bass', dub: 'dub', trap: 'trap beat', plugg: 'pluggnb beat', lofi: 'lofi hip hop', synthwave: 'synthwave', jpop: 'anime opening', industrial: 'industrial', glitch: 'idm glitch',
     cinematic: 'cinematic', trance: 'trance', hardstyle: 'hardstyle', hardtekk: 'hardtek', jumpstyle: 'jumpstyle', gabber: 'gabber', rage: 'opium rage', melancore: 'melancore', hoodtrap: 'hoodtrap', phonk: 'phonk', drill: 'drill', jersey: 'jersey club', dubstep: 'dubstep' };
   /* учится по жанровым тегам (как ищут на SoundCloud/Audius), а не по «free beat»: тег из промпта → тег стиля; в фоне обходит любимые теги по очереди */
   const NET_TAGS = ['melancore', 'opium rage', 'hardtekk', 'jumpstyle', 'hoodtrap', 'hardstyle', 'digicore', 'breakcore', 'hyperpop', 'jersey club', 'drum and bass'];
@@ -6880,13 +6902,33 @@ self.onmessage = async (e) => { const m = e.data; try {
   function dsRapOn() { if (window.__dsRap != null) return !!window.__dsRap; let v = null; try { v = localStorage.getItem('ts_dsrap'); } catch (e) { } return v === '1' || (v !== '0' && !!DSX.rn && dsVoice() === 'renri'); }   /* рэп голосом Renri — по умолчанию, когда он стоит (Kokoro не нужен) */   /* замер: рэп Canary 63–74% слов против 95% у Kokoro — по умолчанию выключено */
   globalThis.dsRapOn = dsRapOn;
   globalThis.dsSing = dsSing; globalThis.dsPhones = dsPhones; globalThis.dsF0 = dsF0;
+  /* ПОДАЧА ПОД ЖАНР (рэп голосом Renri): как читают в этом жанре — триоли, отрывистость, где фраза встаёт относительно доли, насколько напевно,
+     регистр и какие эдлибы. trip — доля строк в триолях, gate — длина гласной (меньше = отрывистей), lay — сдвиг за долю (с),
+     decl/acc — речевая интонация (множители), mel — доля напевных строк, up — регистр (пт), off — доля строк со стартом со слабой доли,
+     adl — эдлибы: echo (эхо последнего слова), echo2 (два затухающих повтора), low (эхо ниже — как замедленный фонк), chop (заикание последнего слога) */
+  const RAP_GENRE = {
+    trap: { trip: 0.55, gate: 0.74, lay: 0.004, decl: 1, acc: 1.05, mel: 0.15, up: 0, off: 0.15, adl: 'echo', name: 'трэп: триоли, эхо-эдлибы' },
+    drill: { trip: 0.6, gate: 0.56, lay: 0, decl: 0.55, acc: 1.3, mel: 0, up: -2, off: 0.55, adl: 'echo2', name: 'дрилл: отрывисто, со слабой доли, ниже' },
+    rage: { trip: 0.35, gate: 0.86, lay: 0, decl: 0.45, acc: 0.85, mel: 0.55, up: 1, off: 0.1, adl: 'echo', name: 'рейдж: напевно и ярко' },
+    melancore: { trip: 0.3, gate: 0.92, lay: 0.015, decl: 0.8, acc: 0.7, mel: 0.6, up: 0, off: 0.1, adl: 'echo', name: 'меланкор: напевно, мягко' },
+    hoodtrap: { trip: 0.45, gate: 0.62, lay: 0, decl: 0.9, acc: 1.35, mel: 0, up: -1, off: 0.3, adl: 'echo2', name: 'худ-трэп: напористо' },
+    phonk: { trip: 0.5, gate: 0.64, lay: 0.008, decl: 0.8, acc: 1.1, mel: 0, up: -3, off: 0.25, adl: 'low', name: 'фонк: низко, тёмное эхо' },
+    jersey: { trip: 0, gate: 0.6, lay: 0, decl: 0.9, acc: 1.2, mel: 0.1, up: 1, off: 0.2, adl: 'chop', name: 'джерси: пружинисто, заикания' },
+    plugg: { trip: 0.25, gate: 0.9, lay: 0.03, decl: 0.7, acc: 0.8, mel: 0.45, up: 1, off: 0.15, adl: 'echo', name: 'плагг: расслабленно, позади бита' },
+    lofi: { trip: 0, gate: 0.78, lay: 0.022, decl: 1, acc: 0.95, mel: 0, up: 0, off: 0.1, adl: '', name: 'бум-бэп: с оттяжкой' },
+  };
+  globalThis.RAP_GENRE = RAP_GENRE;
+  function rapGenre(spec) { if (window.__noRapGenre || !spec) return null; return RAP_GENRE[spec.style] || null; }
+  globalThis.rapGenre = rapGenre;
   async function renderNoteLine(it, ctx, lv, emo) {
     const rap = ctx.mode === 'rap', sd = ctx.track.stepDur, D = ctx.dna, P = ctx.plan, hot = ['peak', 'drop'].includes(ctx.role) || (!!ctx.cho && !window.__noCho);
     let e = P.lineMap.get(it.tx); if (!e) { const P1 = synthPlan(it.tx, $q('#prompt') ? $q('#prompt').value : '', P.mode); e = P1.lineMap.get(it.tx); if (!e) return null; }
     const lang = e.job.lang, ipas = await kIPA(e.chunks.map((c) => c.text), 'j', lang), tok = Array.from(ipas.join(' ')).filter((c) => KVOCAB[c] != null);
     const sy = ipaSyl(tok); if (!sy.length) return null;
     const TF = globalThis.TEACH ? TEACH.flow() : null, R = mulberry32((hashStr(it.tx) ^ (ctx.spec.seed & 0xffff) ^ 0xf11) >>> 0);
-    const triplet = rap && (['trap', 'drill', 'phonk', 'hoodtrap', 'rage'].includes(ctx.spec.style) || (TF && TF.triplet > 0.5)) && R() < (TF ? lerp(0.3, TF.triplet, TF.k) : 0.3);
+    const GR = rap && DSX.ok && dsRapOn() ? rapGenre(ctx.spec) : null;
+    const triplet = rap && (GR ? GR.trip > 0 : (['trap', 'drill', 'phonk', 'hoodtrap', 'rage'].includes(ctx.spec.style) || (TF && TF.triplet > 0.5))) && R() < (TF ? lerp(GR ? GR.trip : 0.3, TF.triplet, TF.k) : GR ? GR.trip : 0.3);
+    if (GR) emo = { ...emo, gate: GR.gate, lay: GR.lay };
     const rv = R() < 0.5 ? 0 : R() < 0.5 ? 1 : 2, emoL = { ...emo, sing: !rap }, syF = sy.map((q) => ({ u: 0, stress: q.stress }));
     /* протяжная концовка — только где она звучит как в песнях: конец блока припева, «!» или «…»; иначе слово не теряется */
     emoL.holdU = 0;   /* замер на 4 треках: протяжные концовки съедали последнее слово (−3…−10% разборчивости) — выключены */
@@ -6901,9 +6943,13 @@ self.onmessage = async (e) => { const m = e.data; try {
       /* затакт как в песнях: безударное начало («I keep…») — в конце прошлого такта, первый ударный слог — ровно на первую долю */
       if (f === 1 && F.pos[f].p > 0 && F.pos[f].p <= 2 * per && 2 * (16 * sd / F.U) >= 0.15) { const sh = F.pos[f].p, gap = 2;   /* один слог в затакте, не короче ~восьмой */
         F = { ...F, pos: F.pos.map((q, k) => ({ ...q, p: k < f ? -(f - k) * gap : q.p - sh, d: k < f ? gap : q.d })) }; } }
+    /* жанр: строка встаёт со слабой доли (дрилл/худ-трэп) — сдвиг на шестнадцатую/восьмую, если до конца такта хватает места */
+    if (!memo && GR && GR.off && F && F.pos.length && R() < GR.off) { const last = F.pos[F.pos.length - 1], room = it.bars * F.U - (last.p + last.d), sh = F.U === 12 ? 1 : R() < 0.5 ? 1 : 2;
+      if (room >= sh + 1 && F.pos[0].p >= 0) F = { ...F, pos: F.pos.map((q) => ({ ...q, p: q.p + sh })) }; }
     const sw = (ctx.spec.swing || 0) * 0.4 * sd, tV = memo ? memo.tV : F.pos.map((q) => q.p * unitSec + (!triplet && q.p % 2 === 1 ? sw : 0) + (emo.lay || 0)), nl = F.pos.map((q) => q.d * unitSec);
     const lvN = { ...lv, semi: (hot ? 2 : 0) + [0, 1, -1, 2][(ctx.lineK || 0) % 4] }, voc = nvStyle() === 'vocaloid';
-    let notes = voc ? composeNotes(sy, tV, it, ctx, D, ctx.lineK || 0, rap, hot, nl) : rap ? rapNotes(sy, tV, it, ctx, D, lvN, R) : flowMelody(it, sy.length, tV, ctx).map((m) => m + lvN.semi * 0.5);
+    const melR = !!(GR && GR.mel && mulberry32(((ctx.spec.seed || 1) ^ hashStr('mel' + it.tx)) >>> 0)() < GR.mel * (hot ? 1.3 : 1));   /* напевная строка (рейдж/меланкор/плагг) */
+    let notes = voc || melR ? composeNotes(sy, tV, it, ctx, D, ctx.lineK || 0, rap && !melR, hot, nl) : rap ? rapNotes(sy, tV, it, ctx, D, lvN, R) : flowMelody(it, sy.length, tV, ctx).map((m) => m + lvN.semi * 0.5);
     if (!voc) notes = notes.map((m, k) => fitMidi(m, ctx.track, ctx.spec, it.t0 + tV[k], sy[k].stress >= 0.6, 1.5, nl[k]));
     if (memo && memo.notes.length === notes.length) notes = memo.notes.map((m, k) => fitMidi(m, ctx.track, ctx.spec, it.t0 + tV[k], sy[k].stress >= 0.6 || k === sy.length - 1, 2.2, nl[k]));
     else S.noteMemo.m.set(memoK, { F, unitSec, tV, notes: notes.slice() });
@@ -6913,7 +6959,7 @@ self.onmessage = async (e) => { const m = e.data; try {
       let b = m + 3, bs = -1; for (const c of [m + 3, m + 4, m + 5]) { const pc = ((c % 12) + 12) % 12, v = (sc.semis.includes((pc - key + 12) % 12) ? 1 : 0) + w[pc]; if (v > bs) { bs = v; b = c; } } return b; });
     /* потолок модели: выше ~370 Гц она срывается на октаву вниз (замер: 470 Гц — 96% мимо). Поём ниже, поднимаем чистым сдвигом после */
     const top = Math.max(...notes), modelShift = top > 69 ? Math.min(6, top - 69) : 0, notes0 = notes.slice(); if (modelShift) notes = notes.map((m) => m - modelShift);
-    const NT = noteTimes(tok, sy, tV, nl, rap ? clamp(emo.gate || 0.8, 0.6, 0.95) : window.__sgGate || (DSX.ok && !window.__noDS ? Math.min(vMood().gate, 60 / (4 * sd) >= 140 ? 0.92 : 1) : 0.97)), FR = 0.025, a0 = NT.a0;
+    const NT = noteTimes(tok, sy, tV, nl, rap ? clamp(emo.gate || 0.8, GR ? 0.5 : 0.6, 0.95) : window.__sgGate || (DSX.ok && !window.__noDS ? Math.min(vMood().gate, 60 / (4 * sd) >= 140 ? 0.92 : 1) : 0.97)), FR = 0.025, a0 = NT.a0;
     /* кадры: накопленное округление границ, паузы-пады по краям */
     const bnd = (t) => Math.round((t - a0) / FR); let prevB = bnd(NT.onS[0]); const dur = [Math.max(1, prevB)], kOf = [-1]; prevB = Math.max(1, prevB);
     for (let j = 0; j < tok.length; j++) { const sp = NT.span[j]; let b = sp ? bnd(sp[1]) : prevB; if (b < prevB) b = prevB; dur.push(b - prevB); prevB = b; kOf.push(NT.sylOf[j]); }
@@ -6936,7 +6982,7 @@ self.onmessage = async (e) => { const m = e.data; try {
     const natDrift = (u) => dA * (0.5 * Math.sin(2 * Math.PI * 0.6 * u + dPh[0]) + 0.3 * Math.sin(2 * Math.PI * 1.3 * u + dPh[1]) + 0.2 * Math.sin(2 * Math.PI * 2.3 * u + dPh[2]));
     const nat = { off: sy.map(() => (Rn() - 0.5) * (rap ? 0.04 : 0.08)), vr: sy.map(() => gVr * (0.94 + Rn() * 0.12)), vd: sy.map(() => gVib * (0.8 + Rn() * 0.45)),
       end: sy.map((q, k) => k === sy.length - 1 || (NT.vS[k + 1] != null && NT.vS[k + 1] - NT.vE[k] > 0.25)), endD: /\?\s*$/.test(it.tx) ? 0.6 : rap ? -0.8 : -0.45 };
-    const RSP = rap && DSX.ok && dsRapOn() && !window.__noRapSpeech ? (() => { const MD = vMood(), en = hot ? 1.25 : 1; return { decl: (window.__rDecl != null ? window.__rDecl : 2.6) * (MD.id === 'sad' ? 0.8 : 1), acc: (window.__rAcc != null ? window.__rAcc : 1.6) * en * (MD.id === 'aggr' ? 1.25 : MD.id === 'soft' || MD.id === 'sad' ? 0.75 : MD.id === 'joy' ? 1.1 : 1) }; })() : null;
+    const RSP = rap && DSX.ok && dsRapOn() && !window.__noRapSpeech ? (() => { const MD = vMood(), en = hot ? 1.25 : 1; const gD = GR ? GR.decl * (melR ? 0.35 : 1) : 1, gA = GR ? GR.acc * (melR ? 0.4 : 1) : 1; return { decl: (window.__rDecl != null ? window.__rDecl : 2.6) * (MD.id === 'sad' ? 0.8 : 1) * gD, acc: (window.__rAcc != null ? window.__rAcc : 1.6) * en * gA * (MD.id === 'aggr' ? 1.25 : MD.id === 'soft' || MD.id === 'sad' ? 0.75 : MD.id === 'joy' ? 1.1 : 1) }; })() : null;
     const f0 = new Array(2 * Fn).fill(0), hk = new Int16Array(2 * Fn).fill(-1); let fr = 0;
     for (let j = 0; j < toks.length; j++) {
       const c = toks[j], k = kOf[j], voiced = k >= 0 && !NV_UNV.has(c) && !NV_BRK.test(c) && !NV_SKIP.test(c);
@@ -6970,7 +7016,7 @@ self.onmessage = async (e) => { const m = e.data; try {
         /* аниме-регистр: мелодия выше на ~3–4 полутона (в ладу бита — каждая нота заново подгоняется к гамме) */
         /* синт-айдол (как вокалоид): ноты ровно по высоте, быстрый «цифровой» переход, вибрато только на долгих нотах — ровное и позднее, голос выше и светлее */
         const VOCX = !rap && nvStyle() === 'vocaloid' && !window.__noVocX;
-        const top0 = Math.max(...notes0), up = window.__dsUp != null ? window.__dsUp : rap ? clamp(66 - top0, 0, 3) : VOCX ? clamp(75 - top0, 0, 3) : clamp((vtOn() ? (window.__vtTop || 77) : 77) - top0, 0, vtOn() ? 6 : 4), nDS = up ? notes0.map((m, k) => fitMidi(m + up, ctx.track, ctx.spec, it.t0 + tV[k], sy[k].stress >= 0.6, 1.5, nl[k])) : notes0;
+        const top0 = Math.max(...notes0), up = window.__dsUp != null ? window.__dsUp : rap ? clamp(clamp(66 - top0, 0, 3) + (GR ? GR.up : 0), -4, 5) : VOCX ? clamp(75 - top0, 0, 3) : clamp((vtOn() ? (window.__vtTop || 77) : 77) - top0, 0, vtOn() ? 6 : 4), nDS = up ? notes0.map((m, k) => fitMidi(m + up, ctx.track, ctx.spec, it.t0 + tV[k], sy[k].stress >= 0.6, 1.5, nl[k])) : notes0;
         /* «тюнинг» как у вокалоид-продюсеров (эмоция без потери ровного синт-характера): подъезд снизу на ударных и после паузы (shakuri),
            перелёт на скачке вверх, вибрато нарастает на долгих нотах, в конце фразы — спад (грусть/по умолчанию) или короткий взлёт (радость/припев).
            Сила — по настроению и секции: припев/дроп ярче куплета */
@@ -7179,7 +7225,7 @@ self.onmessage = async (e) => { const m = e.data; try {
   async function renderNeural(raw, speech) {
     const sr = raw.sampleRate, N = raw.length, items = lyricPlan(), prompt = $q('#prompt') ? $q('#prompt').value : '';
     const plan = synthPlan($q('#lyrics').value, prompt, speech ? 'rap' : 'sing'), D = plan.D, LK = lookOf(D, speech), V = VOICES.kru; globalThis.VOXDNA = D;
-    dsState(); DSX.used = 0; const dsOn = DSX.ok && (!speech || dsRapOn()) && !window.__noDS; DSX.on = dsOn;   /* пение певческой моделью — Kokoro (163 МБ) не грузим вовсе */
+    S.gAdl = 0; dsState(); DSX.used = 0; const dsOn = DSX.ok && (!speech || dsRapOn()) && !window.__noDS; DSX.on = dsOn; S.gRapOn = dsOn && speech;   /* пение певческой моделью — Kokoro (163 МБ) не грузим вовсе */
     if (dsOn && KV2.w && !window.__dbgNotes) { try { kv2Kill(); KV2.initP = null; } catch (e) { } }   /* память телефона — певческой модели (Kokoro понадобится снова только для рэпа) */
     if (!window.__mockTTS && !dsOn && items.some((it) => lineEng(it.tx) !== 'none')) { await ensureVoice((g, t) => dlUI(g, t)); dlUI(1, 1, true); }
     S.voxLangs = [...new Set(items.map((it) => lineLang(it.tx)))];
@@ -7217,6 +7263,22 @@ self.onmessage = async (e) => { const m = e.data; try {
       prevEnd = it.t1;
       /* эдлибы по настроению: короткое слово в паузе после строки, тише */
       if (!dsOn && S.voxAdlibs !== false && (S.voxAdlibs || D.excl) && !(globalThis.__kv2 && globalThis.__kv2.sing && !window.__noNotes) && L.flow && ctxBase.emo.adl.length && i % 2 === 1) {   /* в нотном режиме без речевых вставок: звучали чужеродно */ try { const w = ctxBase.emo.adl[(i >> 1) % ctxBase.emo.adl.length], T = await say(w + (ctxBase.emo.excl ? '!' : '.'), D, 'shout'), xa = trim(T.pcm, T.sr), te = it.t0 + (L.flow.end || L.flow.tOn[L.flow.tOn.length - 1]) + 0.12, nx = i + 1 < items.length ? items[i + 1].t0 - 0.65 : 1e9; if (te < it.t1 + 0.3 && te + xa.length / T.sr < nx) { addResampled(h1, xa, T.sr, sr, te, 0.55, 0.6); anyH = true; } } catch (e) { } }
+      /* жанровые эдлибы голосом Renri: не новая озвучка, а кусок той же строки — последнее слово эхом в стороне (трэп/рейдж),
+         двумя затухающими повторами (дрилл), ниже и медленнее (фонк), заиканием последнего слога (джерси). Только в паузе до следующей строки */
+      const GRa = dsOn && speech && S.voxAdlibs !== false && !window.__noGAdl ? rapGenre(S.spec) : null;
+      if (GRa && GRa.adl && L.flow && L.flow.tOn && L.flow.tOn.length > 2 && L.flow.end && (i % 2 === 1 || ['peak', 'drop'].includes(roleAt(it.t0 + 0.01)))) { try {
+        const tOn = L.flow.tOn, n = tOn.length, lw = (it.tx.trim().split(/\s+/).pop() || '').toLowerCase(), wv = Math.max(1, (lw.match(/[аеёиоуыэюяaeiouy]/g) || []).length || 1),
+          k0 = Math.max(1, n - Math.min(wv, 3, n - 1)), st = S.track.stepDur, ys = L.y, srL = L.sr,
+          a = Math.max(0, Math.round((tOn[k0] + L.lead - 0.03) * srL)), b = Math.min(ys.length, Math.round((L.flow.end + L.lead + 0.06) * srL));
+        if (b - a > 0.08 * srL) { const seg = ys.slice(a, b); for (let q = 0; q < 240 && q < seg.length; q++) { seg[q] *= q / 240; seg[seg.length - 1 - q] *= q / 240; }
+          const endT = it.t0 + L.flow.end, g0 = Math.ceil((endT + 0.04) / (2 * st)) * 2 * st, nx = i + 1 < items.length ? items[i + 1].t0 - 0.08 : N / sr, dur = seg.length / srL;
+          const put = (t, gain, rate) => { const d = dur / rate; if (t + d <= nx && t + d <= it.t1 + 0.9) { addResampled(h1, seg, srL * rate, sr, t, gain, d); anyH = true; return true; } return false; };
+          if (GRa.adl === 'echo') put(g0, 0.42, 1);
+          else if (GRa.adl === 'echo2') { if (put(g0, 0.4, 1)) put(g0 + Math.max(dur, 4 * st), 0.22, 1); }
+          else if (GRa.adl === 'low') put(g0, 0.45, 0.8);
+          else if (GRa.adl === 'chop') { const c = Math.min(seg.length, Math.round(Math.min(dur, 2 * st) * srL)), sg = seg.slice(0, c); for (let q = 0; q < 120 && q < c; q++) sg[c - 1 - q] *= q / 120;
+            for (let r = 0; r < 3; r++) { const t = g0 + r * st; if (t + c / srL > nx) break; addResampled(h1, sg, srL, sr, t, 0.38 - r * 0.06, c / srL); anyH = true; } }
+          S.gAdl = (S.gAdl || 0) + 1; } } catch (e) { console.warn('адлиб', e); } }
       syl += L.syl;
       await new Promise((r) => setTimeout(r, 0));
     }
@@ -7438,7 +7500,7 @@ self.onmessage = async (e) => { const m = e.data; try {
   /* без ключевых слов: звуковой мир по жанру и настроению трека */
   const STYLE_RX = {
     techno: ['clank', 'glitch', 'drone'], house: ['crystal', 'birds', 'impact'], ambient: ['wind', 'portal', 'crystal', 'waves'], dnb: ['laser', 'glitch', 'drone', 'impact'], dub: ['drips', 'waves', 'drone'],
-    trap: ['bell', 'glitch', 'heart', 'impact'], lofi: ['rain', 'drips', 'birds'], synthwave: ['laser', 'portal', 'crystal'], industrial: ['clank', 'drone', 'glitch', 'impact'], glitch: ['glitch', 'laser', 'chip'],
+    trap: ['bell', 'glitch', 'heart', 'impact'], plugg: ['bell', 'crystal', 'chip'], lofi: ['rain', 'drips', 'birds'], synthwave: ['laser', 'portal', 'crystal'], industrial: ['clank', 'drone', 'glitch', 'impact'], glitch: ['glitch', 'laser', 'chip'],
     cinematic: ['choir', 'impact', 'bell', 'wind'], trance: ['portal', 'crystal', 'wind'], hardstyle: ['impact', 'roar', 'laser', 'choir'], hardtekk: ['impact', 'laser', 'glitch'], jumpstyle: ['impact', 'laser', 'chip'],
     gabber: ['impact', 'roar', 'clank'], rage: ['laser', 'glitch', 'impact', 'roar'], melancore: ['rain', 'crystal', 'whisper'], hoodtrap: ['bell', 'heart', 'glitch'], phonk: ['bell', 'drone', 'whisper', 'impact'],
     drill: ['bell', 'heart', 'glitch'], jersey: ['chip', 'laser', 'impact'], dubstep: ['roar', 'laser', 'glitch', 'impact'],
@@ -7563,7 +7625,7 @@ self.onmessage = async (e) => { const m = e.data; try {
     edm: { rev: -14, size: 1.5, dly: { div: 0.75, lvl: -24 }, sat: 0.04, pres: 2, air: 3, de: 0.55 },
     soft: { rev: -11, size: 2.2, dly: { div: 1, lvl: -22 }, sat: 0.08, pres: 1.2, air: 1, de: 0.5 },
   };
-  const groupOf = (st) => (['trap', 'drill', 'phonk', 'hoodtrap', 'rage', 'jersey', 'rap'].includes(st) ? 'rap' : ['lofi', 'ambient', 'cinematic', 'synthwave', 'melancore', 'dub', 'story', 'drift'].includes(st) ? 'soft' : 'edm');
+  const groupOf = (st) => (['trap', 'drill', 'phonk', 'hoodtrap', 'rage', 'jersey', 'rap', 'plugg'].includes(st) ? 'rap' : ['lofi', 'ambient', 'cinematic', 'synthwave', 'melancore', 'dub', 'story', 'drift'].includes(st) ? 'soft' : 'edm');
   globalThis.vocalFxPreset = function (spec) {
     const g = groupOf(spec && spec.style), p = { ...FXG[g], group: g };
     const vd = globalThis.VOXDNA; if (vd && vd.fx) { const f = vd.fx; Object.assign(p, { rev: f.rev, size: f.size, dly: { div: f.div, lvl: f.dly }, sat: f.sat, pres: vd.pres || p.pres, air: Math.min(4, (vd.air || 3) * 0.8), group: 'anime' }); }
@@ -7605,7 +7667,7 @@ self.onmessage = async (e) => { const m = e.data; try {
   /* жанровые эффекты: возвращает [L,R] хвостов, уже откалиброванных и «пригнутых» под сухой голос */
   /* ЭФФЕКТЫ ГОЛОСА ПОД ЖАНР: насыщение, «телефон» в куплетах, ширина в припевах, эхо-броски концов строк; слова промпта сильнее жанра */
   /* голос по умолчанию чистый: насыщение и «телефон» лёгкие; сильно — только где это суть жанра или просили словами */
-  const VFXP = { phonk: { sat: .3, tel: .3, wide: .4, throw: 2, div: .75 }, rage: { sat: .4, tel: 0, wide: .6, throw: 1, div: .5 }, trap: { sat: .08, tel: 0, wide: .35, throw: 2, div: .75 }, hoodtrap: { sat: .1, tel: 0, wide: .3, throw: 2, div: .75 },
+  const VFXP = { phonk: { sat: .3, tel: .3, wide: .4, throw: 2, div: .75 }, rage: { sat: .4, tel: 0, wide: .6, throw: 1, div: .5 }, trap: { sat: .08, tel: 0, wide: .35, throw: 2, div: .75 }, plugg: { sat: .04, tel: 0, wide: .45, throw: 2, div: .75 }, hoodtrap: { sat: .1, tel: 0, wide: .3, throw: 2, div: .75 },
     drill: { sat: .1, tel: 0, wide: .3, throw: 1, div: .5 }, lofi: { sat: .05, tel: 0, wide: .2, throw: 1, div: 1 }, melancore: { sat: .05, tel: 0, wide: .5, throw: 2, div: .75 }, jersey: { sat: .08, tel: 0, wide: .4, throw: 1, div: .5 },
     dnb: { sat: .05, tel: 0, wide: .5, throw: 1, div: .5 }, synthwave: { sat: .03, tel: 0, wide: .5, throw: 1, div: .75 }, jpop: { sat: .02, tel: 0, wide: .55, throw: 1, div: .5 }, cinematic: { sat: 0, tel: 0, wide: .4, throw: 1, div: 1 }, ambient: { sat: 0, tel: 0, wide: .45, throw: 1, div: 1 },
     dubstep: { sat: .2, tel: 0, wide: .5, throw: 1, div: .5 }, hardstyle: { sat: .25, tel: 0, wide: .5, throw: 1, div: .5 }, industrial: { sat: .35, tel: .2, wide: .3, throw: 1, div: .5 }, gabber: { sat: .3, tel: 0, wide: .4, throw: 1, div: .5 } };
@@ -7621,7 +7683,7 @@ self.onmessage = async (e) => { const m = e.data; try {
      Степень — по жанру, грязи бита (grit, дисторшн) и словам промпта; чистые жанры остаются чистыми */
   globalThis.vocalDirt = function (spec) {
     const st = (spec && spec.style) || '', t = ((document.querySelector('#prompt') || {}).value || '').toLowerCase();
-    const base = { hardtekk: .7, gabber: .75, jumpstyle: .5, hardstyle: .45, glitch: .55, industrial: .6, phonk: .45, rage: .5, dubstep: .45, dnb: .3, hoodtrap: .25, drill: .25, trap: .18, melancore: .2, techno: .25, jersey: .2 }[st] || 0;
+    const base = { hardtekk: .7, gabber: .75, jumpstyle: .5, hardstyle: .45, glitch: .55, industrial: .6, phonk: .45, rage: .5, dubstep: .45, dnb: .3, hoodtrap: .25, drill: .25, trap: .18, plugg: .1, melancore: .2, techno: .25, jersey: .2 }[st] || 0;
     const f = (spec && spec.feat) || {}; let d = Math.max(base, (spec && spec.grit || 0) * 0.7, (f.dist || 0) * 0.9);
     if (/грязн|dirty|спид|speed|убит|distort|дисторш|перегруз|жестк|жёстк|hard|рейв|rave|breakcore|брейккор/.test(t)) d = Math.max(d, 0.6);
     if (/чист|clean|\bdry\b|сух|нежн|soft/.test(t)) d = Math.min(d, 0.12);
@@ -8198,7 +8260,7 @@ self.onmessage = async (e) => { const m = e.data; try {
   const BANDS = [[20, 60, 'саб'], [60, 250, 'низ'], [250, 800, 'низкая середина'], [800, 2500, 'середина'], [2500, 6000, 'присутствие'], [6000, 16000, 'воздух']];
   /* нормы по жанрам: доля энергии ниже 250 Гц, % */
   const LOWN = { heavy: [42, 68], edm: [35, 60], soft: [25, 52] };
-  const GROUP = (st) => (['trap', 'phonk', 'drill', 'dubstep', 'hoodtrap', 'rage', 'dub'].includes(st) ? 'heavy' : ['lofi', 'ambient', 'cinematic', 'synthwave', 'melancore'].includes(st) ? 'soft' : 'edm');
+  const GROUP = (st) => (['trap', 'phonk', 'drill', 'dubstep', 'hoodtrap', 'rage', 'dub'].includes(st) ? 'heavy' : ['lofi', 'ambient', 'cinematic', 'synthwave', 'melancore', 'plugg'].includes(st) ? 'soft' : 'edm');
 
   function analyze() {
     const B = S.buffer, sr = B.sampleRate, L = B.getChannelData(0), R = B.getChannelData(1), N = B.length, n = 4096, hop = Math.round(sr * 0.25);
@@ -8372,7 +8434,7 @@ self.onmessage = async (e) => { const m = e.data; try {
       const sp = S.spec || {}, tr = S.track, rap = $q('#voiceMode') && $q('#voiceMode').value === 'rap', voiced = $q('#voiceMode') && $q('#voiceMode').value !== 'off' && !S.instrOnly && S.voxC;
       add('Битмейкер', true, (STYLES[sp.style] ? STYLES[sp.style].name : sp.style) + ' · ' + sp.bpm + ' bpm' + (tr.pack ? ' · ' + tr.pack.split(' · ').pop() : '') + ' · ударные в тональности');
       if (voiced) { const qa = S.voxQA || [], bad = qa.filter((x) => !x.fixed);
-        add('Вокалист', !qa.length || !bad.length, (S.voxInfo || 'голос') + (qa.length ? ' · перепел ' + (qa.length - bad.length) + '/' + qa.length + ' строк' : globalThis.__kv2 && globalThis.__kv2.sing && !window.__noNotes ? ' · в нотах' : ' · речевой режим')); }
+        add('Вокалист', !qa.length || !bad.length, (S.voxInfo || 'голос') + (qa.length ? ' · перепел ' + (qa.length - bad.length) + '/' + qa.length + ' строк' : globalThis.__kv2 && globalThis.__kv2.sing && !window.__noNotes ? ' · в нотах' : ' · речевой режим') + (S.gRapOn && rapGenre(S.spec) ? ' · подача — ' + rapGenre(S.spec).name + (S.gAdl ? ', эдлибов ' + S.gAdl : '') : '')); }
       const auto = !$q('#critAuto') || $q('#critAuto').checked;
       let m = analyze(), rep = judge(m); S.critic = { m, rep };
       const need = voiced ? mixNeeds(S.mixStats, rap) : {}, fixMix = Object.keys(need).length, todo = rep.out.filter((r) => !r.ok && r.did);
