@@ -46,7 +46,7 @@ jobs:
         working-directory: rvc
         run: |
           (while true; do sleep 300; free -m | sed -n 2p; done) &
-          RVC_WORKERS=1 RVC_PREFETCH=2 LOG_INTERVAL=20 SAVE_EVERY=1 TRAIN_SECONDS=${{ inputs.seconds }} python -u renri_rvc.py train 1000 ${{ inputs.batch }} 2>&1 | grep --line-buffered -vE "Warning|warn\(|return_complex|_VF.stft|torch.load\(|autocast\(|read\(full_path\)|WeightNorm|GradScaler"
+          RVC_WORKERS=2 RVC_PREFETCH=2 LOG_INTERVAL=20 SAVE_EVERY=1 TRAIN_SECONDS=${{ inputs.seconds }} python -u renri_rvc.py train 1000 ${{ inputs.batch }} 2>&1 | grep --line-buffered -vE "Warning|warn\(|return_complex|_VF.stft|torch.load\(|autocast\(|read\(full_path\)|WeightNorm|GradScaler"
       - name: Экспорт, проверка, пак
         working-directory: rvc
         run: |
