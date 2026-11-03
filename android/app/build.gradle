@@ -18,10 +18,12 @@ android {
 
     signingConfigs {
         release {
-            storeFile file('../keystore/release.jks')
-            storePassword 'trackstudio-private'
+            // ключ сменён 2026-11-03: пароль только в секрете GitHub KEYSTORE_PASS (в файлах его нет)
+            storeFile file('../keystore/release2.p12')
+            storeType 'pkcs12'
+            storePassword System.getenv('KEYSTORE_PASS')
             keyAlias 'trackstudio'
-            keyPassword 'trackstudio-private'
+            keyPassword System.getenv('KEYSTORE_PASS')
         }
     }
 

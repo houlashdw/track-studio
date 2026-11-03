@@ -37,12 +37,16 @@ jobs:
           cp app/index.html android/app/src/main/assets/www/index.html
           [ -d app/smp ] && cp -r app/smp android/app/src/main/assets/www/ || true
       - name: Сборка APK
-        run: gradle -p android assembleRelease --no-daemon --stacktrace
+        env: { KEYSTORE_PASS: '${{ secrets.KEYSTORE_PASS }}' }
+        run: |
+          [ -n "$KEYSTORE_PASS" ] || { echo "::error::нет секрета KEYSTORE_PASS (Settings → Secrets and variables → Actions)"; exit 1; }
+          gradle -p android assembleRelease --no-daemon --stacktrace
       - name: Проверка подписи и манифеста
         run: |
           APK=android/app/build/outputs/apk/release/app-release.apk
           BT=$(ls -d $ANDROID_HOME/build-tools/* | sort -V | tail -1)
           $BT/apksigner verify --print-certs $APK | tee build-info.txt
+          grep -qi "7f1835e8b9802e52f295bcd5eb7b0c77147ab9c7ab5a321360876ea369c3bb85" build-info.txt || { echo "::error::APK подписан не новым ключом"; exit 1; }
           $BT/aapt2 dump badging $APK | head -20 | tee -a build-info.txt
           cp $APK TrackStudio.apk
       - uses: actions/upload-artifact@v4
