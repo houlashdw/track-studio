@@ -11,6 +11,7 @@ sys.path.insert(0, os.getcwd())
 EXP = os.environ.get('EXP', 'renri')
 ROOT = os.getcwd()
 LOG = os.path.join(ROOT, 'logs', EXP)
+CK = os.environ.get('CKPT_DIR', LOG)   # куда сохранять прогресс (Google Диск): контрольные точки и готовые веса
 SR = 40000
 CV_NAME = os.environ.get('CONTENTVEC', 'lengyue233/content-vec-best')
 
@@ -25,6 +26,8 @@ def resample(x, sr0, sr1):
 def stage_prep(ds_dir):
     """как preprocess.py RVC: фильтр 48 Гц, куски по 3.7 с с перекрытием 0.3 с, нормализация 0.9·0.75 + 0.25·исходный"""
     d0, d1 = os.path.join(LOG, '0_gt_wavs'), os.path.join(LOG, '1_16k_wavs')
+    if os.path.exists(os.path.join(LOG, 'prep.ok')):
+        print('prep: уже сделано (с Диска)'); return
     os.makedirs(d0, exist_ok=True); os.makedirs(d1, exist_ok=True)
     bh, ah = signal.butter(N=5, Wn=48, btype='high', fs=SR)
     files = sorted(glob.glob(os.path.join(ds_dir, '**', '*.*'), recursive=True))
@@ -46,6 +49,7 @@ def stage_prep(ds_dir):
             sf.write(os.path.join(d0, name + '.wav'), seg, SR, subtype='FLOAT')
             sf.write(os.path.join(d1, name + '.wav'), resample(seg, SR, 16000), 16000, subtype='FLOAT')
             n += 1
+    open(os.path.join(LOG, 'prep.ok'), 'w').write(str(n))
     print('prep: файлов', len(files), 'кусков', n)
 
 
@@ -86,6 +90,7 @@ def stage_f0():
         rm = RMVPE(p, is_half=False, device=dev)
     print('f0:', 'RMVPE' if rm else 'автокорреляция (запасной)')
     for f in sorted(glob.glob(os.path.join(d1, '*.wav'))):
+        if os.path.exists(os.path.join(da, os.path.basename(f) + '.npy')): continue
         x, _ = sf.read(f, dtype='float32')
         f0 = rm.infer_from_audio(x, thred=0.03) if rm else f0_autocorr(x)
         b = os.path.basename(f)
@@ -115,13 +120,36 @@ def stage_feat():
     m = load_cv().to(dev)
     with torch.no_grad():
         for f in sorted(glob.glob(os.path.join(d1, '*.wav'))):
+            if os.path.exists(os.path.join(d3, os.path.basename(f)[:-4] + '.npy')): continue
             x, _ = sf.read(f, dtype='float32')
             y = m(torch.from_numpy(x)[None].to(dev)).last_hidden_state[0].float().cpu().numpy()
             np.save(os.path.join(d3, os.path.basename(f)[:-4] + '.npy'), y, allow_pickle=False)
     print('feat: готово', len(os.listdir(d3)))
 
 
+def final_weights():
+    """готовые веса: из assets/weights, иначе — из последней контрольной точки G (если обучение оборвалось на последней эпохе)"""
+    import torch
+    fin = os.path.join(CK, 'renri_final.pth'), os.path.join('assets', 'weights', EXP + '.pth')
+    for f in fin:
+        if os.path.exists(f): return f
+    g = sorted(glob.glob(os.path.join(LOG, 'G_*.pth')) + glob.glob(os.path.join(CK, 'G_*.pth')), key=os.path.getmtime)
+    if not g: return None
+    from infer.lib.train.utils import HParams
+    from infer.lib.train.process_ckpt import savee
+    ck = torch.load(g[-1], map_location='cpu', weights_only=False)
+    cfg = json.load(open(os.path.join(LOG, 'config.json'))); hps = HParams(**cfg)
+    os.makedirs(os.path.join('assets', 'weights'), exist_ok=True)
+    print(savee(ck['model'], '40k', 1, EXP, ck.get('iteration', 0), 'v2', hps))
+    return fin[1]
+
+
 def stage_train(epochs, batch):
+    if os.path.exists(os.path.join(CK, 'renri_final.pth')):
+        print('train: уже обучено (веса на Диске) — пропускаю'); return
+    os.makedirs(CK, exist_ok=True)
+    for f in glob.glob(os.path.join(CK, '[GD]_*.pth')):   # продолжить с места после отключения
+        if CK != LOG: shutil.copy(f, LOG); print('продолжаю с', os.path.basename(f))
     gt, fe, fa, fb = [os.path.join(LOG, x) for x in ['0_gt_wavs', '3_feature768', '2a_f0', '2b-f0nsf']]
     names = set(x[:-4] for x in os.listdir(gt)) & set(x[:-4] for x in os.listdir(fe)) & set(x[:-8] for x in os.listdir(fa)) & set(x[:-8] for x in os.listdir(fb))
     lines = ['%s/%s.wav|%s/%s.npy|%s/%s.wav.npy|%s/%s.wav.npy|0' % (gt, n, fe, n, fa, n, fb, n) for n in sorted(names)]
@@ -139,11 +167,27 @@ def stage_train(epochs, batch):
     pre = (['-pg', pg, '-pd', pd] if os.path.exists(pg) and os.path.exists(pd) else [])
     print('train: кусков', len(names), 'предобученная база' if pre else 'БЕЗ базы (только проверка)')
     cmd = [sys.executable, 'infer/modules/train/train.py', '-e', EXP, '-sr', '40k', '-f0', '1', '-bs', str(batch), '-g', '0' if torch.cuda.is_available() else '',
-           '-te', str(epochs), '-se', str(max(1, epochs // 4)), *pre, '-l', '1', '-c', '0', '-sw', '0', '-v', 'v2']
+           '-te', str(epochs), '-se', os.environ.get('SAVE_EVERY', '15'), *pre, '-l', '1', '-c', '0', '-sw', '0', '-v', 'v2']
     if not torch.cuda.is_available():
         i = cmd.index('-g'); del cmd[i:i + 2]
     env = dict(os.environ, TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD='1')
-    subprocess.run(cmd, check=True, env=env)
+    import threading, time
+    stop = [False]
+    def sync():   # каждую минуту — свежие контрольные точки на Диск
+        seen = {}
+        while not stop[0]:
+            time.sleep(60)
+            for f in glob.glob(os.path.join(LOG, '[GD]_*.pth')):
+                m = os.path.getmtime(f)
+                if CK != LOG and seen.get(f) != m and time.time() - m > 20:
+                    try: shutil.copy(f, CK + '/'); seen[f] = m; print('💾 сохранено на Диск:', os.path.basename(f), flush=True)
+                    except Exception as e: print('Диск:', e)
+    th = threading.Thread(target=sync, daemon=True); th.start()
+    try: subprocess.run(cmd, check=True, env=env)
+    finally: stop[0] = True
+    w = final_weights()
+    if not w: raise SystemExit('нет весов после обучения')
+    shutil.copy(w, os.path.join(CK, 'renri_final.pth')); print('✅ обучение готово, веса сохранены на Диск')
 
 
 def patch_attn():
@@ -177,7 +221,7 @@ def stage_export():
     os.environ['TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD'] = '1'
     patch_attn()
     from infer.modules.onnx.export import export_onnx
-    w = os.path.join('assets', 'weights', EXP + '.pth')
+    w = final_weights()
     os.makedirs('out', exist_ok=True)
     export_onnx(w, 'out/rvc.onnx'); print('rvc.onnx', os.path.getsize('out/rvc.onnx') // 1e6, 'МБ')
     # ContentVec → ONNX (вход: звук 16 кГц [1,N]; выход: признаки 50 кадров/с [1,T,768]), затем int8 для телефона
