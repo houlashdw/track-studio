@@ -6686,7 +6686,7 @@ self.onmessage = async (e) => { const m = e.data; try {
   }
   /* ноты рэпа: опорная нота аккорда у регистра, ударный слог выше, слабые иногда ниже, конец строки по характеру */
   function rapNotes(sy, tV, it, ctx, D, lv, R) {
-    const ct = chordTones(ctx), sc = SCALES[ctx.spec.scale] || SCALES.minor, reg = 65 + (D.shift || 0) * 0.6 + (lv.semi || 0) * 0.5, out = [];
+    const ct = chordTones(ctx), sc = SCALES[ctx.spec.scale] || SCALES.minor, reg = (window.__rapReg != null ? window.__rapReg : 65) + (D.shift || 0) * 0.6 + (lv.semi || 0) * 0.5, out = [];
     for (let k = 0; k < sy.length; k++) {
       const tones = ct ? ct(it.t0 + tV[k]) : [reg], base = tones.reduce((b, m) => (Math.abs(m - reg) < Math.abs(b - reg) ? m : b), tones[0]); let m = base;
       if (sy[k].stress >= 1) m = snapMidi(base + 2.5, ctx.spec.key, sc.semis); else if (sy[k].stress < 0.35 && R() < 0.4) m = snapMidi(base - 1.5, ctx.spec.key, sc.semis);
@@ -6988,7 +6988,8 @@ self.onmessage = async (e) => { const m = e.data; try {
       const c = toks[j], k = kOf[j], voiced = k >= 0 && !NV_UNV.has(c) && !NV_BRK.test(c) && !NV_SKIP.test(c);
       for (let q = 0; q < dur[j] * 2; q++) { const h = fr * 2 + q; if (!voiced) continue; hk[h] = k;
         const t = a0 + (h + 0.5) * FR / 2, v0 = NT.vS[k], into = t - v0; let m = nts[k] + detC / 100;
-        if (k > 0 && into < gGl - 0.02) { const x = clamp((into + 0.02) / gGl, 0, 1), w = 0.5 - 0.5 * Math.cos(Math.PI * x); m = nts[k - 1] + detC / 100 + (m - nts[k - 1] - detC / 100) * w; }
+        const gGlL = rap && !window.__oldMeow ? 0.04 : gGl;   /* рэп: переход между нотами быстрее — без «подъезда» на каждом слоге */
+        if (k > 0 && into < gGlL - 0.02) { const x = clamp((into + 0.02) / gGlL, 0, 1), w = 0.5 - 0.5 * Math.cos(Math.PI * x); m = nts[k - 1] + detC / 100 + (m - nts[k - 1] - detC / 100) * w; }
         if (!rap && sy[k].stress >= 1 && into >= 0 && into < 0.07) m -= gSc * (1 - into / 0.07);
         const vlen = NT.vE[k] - v0;
         if (NAT) {
@@ -6997,12 +6998,15 @@ self.onmessage = async (e) => { const m = e.data; try {
           if (!rap && k > 0 && nts[k] - nts[k - 1] >= 2) { const x = into - (gGl - 0.02); if (x >= 0 && x < 0.12) m += 0.12 * Math.sin(Math.PI * x / 0.12); }
           const vd = Math.min(0.2, vlen * 0.4);
           if (!rap && vlen > 0.28 && into > vd) { const u = into - vd; m += nat.vd[k] * Math.min(1, u / 0.25) * Math.sin(2 * Math.PI * nat.vr[k] * u + 0.5 * Math.sin(2 * Math.PI * 0.8 * u)); }
-          if (nat.end[k]) { const rem = NT.vE[k] - t, L0 = rap ? 0.12 : 0.09; if (rem < L0 && rem > -0.05 && vlen > 0.12) { const x = Math.min(1, 1 - rem / L0); m += nat.endD * x * x; } }
+          if (nat.end[k]) { const rem = NT.vE[k] - t, L0 = rap ? 0.12 : 0.09; if (rem < L0 && rem > -0.05 && vlen > 0.12) { const x = Math.min(1, 1 - rem / L0); m += nat.endD * (rap && !window.__oldMeow ? 0.5 : 1) * x * x; } }
           /* рэп певческой моделью — речевая интонация, а не ноты: фраза сползает вниз (деклинация), ударный слог — пик с соскальзыванием вниз,
              безударные — короткий спад; энергия секции расширяет диапазон (в припеве/дропе — напористее и выше) */
           if (rap && RSP) { const L = Math.max(0.3, NT.vE[sy.length - 1] - NT.vS[0]), pos = clamp((t - NT.vS[0]) / L, 0, 1), x = vlen > 0 ? clamp(into / vlen, 0, 1) : 0, st = sy[k].stress;
             m += RSP.decl * (0.5 - pos);
-            m += st >= 1 ? RSP.acc * (1.25 - 1.6 * x) - (k > 0 && sy[k - 1].stress < 1 ? 0 : 0.3) : st >= 0.5 ? 0.4 * RSP.acc * (0.8 - 1.2 * x) : RSP.acc * (0.15 - 0.5 * x); }
+            /* «мяуканье»: ударный слог раньше съезжал вниз на ~3 пт внутри одной гласной (замер: 26–37% гласных с размахом >3 пт) — в живом рэпе
+               ударение — ступенька выше, а внутри гласной высота почти ровная. Теперь: ступенька + лёгкий спад ≤ ~0.8 пт */
+            if (window.__oldMeow) m += st >= 1 ? RSP.acc * (1.25 - 1.6 * x) - (k > 0 && sy[k - 1].stress < 1 ? 0 : 0.3) : st >= 0.5 ? 0.4 * RSP.acc * (0.8 - 1.2 * x) : RSP.acc * (0.15 - 0.5 * x);
+            else m += st >= 1 ? RSP.acc * (0.75 - 0.35 * x) - (k > 0 && sy[k - 1].stress < 1 ? 0 : 0.25) : st >= 0.5 ? 0.4 * RSP.acc * (0.6 - 0.3 * x) : RSP.acc * (0.05 - 0.15 * x); }
         } else if (!rap && vlen > 0.32 && into > 0.18) m += gVib * Math.min(1, (into - 0.18) / 0.15) * Math.sin(2 * Math.PI * gVr * (into - 0.18));
         f0[h] = 440 * 2 ** ((m - 69) / 12); }
       fr += dur[j];
@@ -7016,7 +7020,8 @@ self.onmessage = async (e) => { const m = e.data; try {
         /* аниме-регистр: мелодия выше на ~3–4 полутона (в ладу бита — каждая нота заново подгоняется к гамме) */
         /* синт-айдол (как вокалоид): ноты ровно по высоте, быстрый «цифровой» переход, вибрато только на долгих нотах — ровное и позднее, голос выше и светлее */
         const VOCX = !rap && nvStyle() === 'vocaloid' && !window.__noVocX;
-        const top0 = Math.max(...notes0), up = window.__dsUp != null ? window.__dsUp : rap ? clamp(clamp(66 - top0, 0, 3) + (GR ? GR.up : 0), -4, 5) : VOCX ? clamp(75 - top0, 0, 3) : clamp((vtOn() ? (window.__vtTop || 77) : 77) - top0, 0, vtOn() ? 6 : 4), nDS = up ? notes0.map((m, k) => fitMidi(m + up, ctx.track, ctx.spec, it.t0 + tV[k], sy[k].stress >= 0.6, 1.5, nl[k])) : notes0;
+        /* регистр рэпа: верх фразы ~62 (≈290 Гц) — выше голос «мяукал» (замер: плавные скольжения 12–14% кадров → 1–2%), ниже ~270 Гц падает разборчивость */
+        const top0 = Math.max(...notes0), up = window.__dsUp != null ? window.__dsUp : rap ? clamp(clamp((window.__rapTop || (window.__oldMeow ? 66 : 62)) - top0, window.__oldMeow ? 0 : -5, 3) + (GR ? (GR.up < 0 && !window.__oldMeow ? GR.up * 0.5 : GR.up) : 0), -6, 5) : VOCX ? clamp(75 - top0, 0, 3) : clamp((vtOn() ? (window.__vtTop || 77) : 77) - top0, 0, vtOn() ? 6 : 4), nDS = up ? notes0.map((m, k) => fitMidi(m + up, ctx.track, ctx.spec, it.t0 + tV[k], sy[k].stress >= 0.6, 1.5, nl[k])) : notes0;
         /* «тюнинг» как у вокалоид-продюсеров (эмоция без потери ровного синт-характера): подъезд снизу на ударных и после паузы (shakuri),
            перелёт на скачке вверх, вибрато нарастает на долгих нотах, в конце фразы — спад (грусть/по умолчанию) или короткий взлёт (радость/припев).
            Сила — по настроению и секции: припев/дроп ярче куплета */
