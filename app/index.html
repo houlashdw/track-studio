@@ -3283,7 +3283,7 @@ function ruUIhtml(s) {
   if (s.renri !== 'installed') return '';
   if (s.ru === 'installed') return '<div class="sm" style="margin-top:4px">🇷🇺 Русский для Renri ✓ <span class="sm">(русские строки — чистое произношение)</span></div>';
   if (s.ru === 'busy') return '<div class="sm" style="margin-top:4px">🇷🇺 Ставлю русский пак… ' + Math.round((s.ruprogress || 0) * 100) + '%</div>';
-  return '<div style="margin-top:6px"><button type="button" class="ex" id="ruBtn" onclick="try{TSAndroid.ruPick()}catch(e){};setTimeout(dsUI,2500)">+ Русский для Renri (renri_ru_pack.zip из Colab)</button>' + (/^error/.test(s.ru || '') ? ' <span class="sm">не вышло: ' + escH(String(s.ru).slice(7, 90)) + '</span>' : '') + '</div>';
+  return '<div style="margin-top:6px"><button type="button" class="ex" id="ruBtn" onclick="try{TSAndroid.ruPick()}catch(e){};setTimeout(dsUI,2500)">+ Русский для Renri (выбери 4 файла пака)</button>' + (/^error/.test(s.ru || '') ? ' <span class="sm">не вышло: ' + escH(String(s.ru).slice(7, 90)) + '</span>' : '') + '</div>';
 }
 /* певческая модель в приложении: строка с кнопкой «Скачать» и прогрессом */
 function dsUI() {

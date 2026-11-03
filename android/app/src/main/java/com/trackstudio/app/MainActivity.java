@@ -196,7 +196,10 @@ public class MainActivity extends Activity {
 
     @Override
     protected void onActivityResult(int req, int res, Intent data) {
-        if (req == PICK_RU) { if (res == RESULT_OK && data != null && data.getData() != null) ds.installRu(getContentResolver(), data.getData()); return; }
+        if (req == PICK_RU) { if (res == RESULT_OK && data != null) { java.util.List<Uri> us = new java.util.ArrayList<>();
+                if (data.getClipData() != null) for (int k = 0; k < data.getClipData().getItemCount(); k++) us.add(data.getClipData().getItemAt(k).getUri());
+                else if (data.getData() != null) us.add(data.getData());
+                if (!us.isEmpty()) ds.installRu(getContentResolver(), us); } return; }
         if (req == PICK_RN) { if (res == RESULT_OK && data != null && data.getData() != null) ds.installRenri(getContentResolver(), data.getData()); return; }
         if (req != PICK) {
             super.onActivityResult(req, res, data);
@@ -333,7 +336,8 @@ public class MainActivity extends Activity {
         @JavascriptInterface
         public void ruPick() {
             runOnUiThread(() -> { Intent i = new Intent(Intent.ACTION_GET_CONTENT); i.addCategory(Intent.CATEGORY_OPENABLE); i.setType("*/*");
-                try { startActivityForResult(Intent.createChooser(i, "Выбери renri_ru_pack.zip (из Colab)"), PICK_RU); } catch (Exception e) { } });
+                i.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
+                try { startActivityForResult(Intent.createChooser(i, "Выбери файлы русского пака (4 файла или zip)"), PICK_RU); } catch (Exception e) { } });
         }
 
         @JavascriptInterface

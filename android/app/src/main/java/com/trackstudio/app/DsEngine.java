@@ -583,23 +583,42 @@ public class DsEngine {
     volatile String ruState = "none"; volatile double ruProgress = 0;
     volatile OrtSession pv, cvs, rvs; final Map<String, int[]> ruIds = new HashMap<>(); boolean pvForced = false;
     File ruDir() { File d = new File(dir.getParentFile(), "ru"); d.mkdirs(); return d; }
-    void installRu(android.content.ContentResolver cr, android.net.Uri uri) {
+    /* файлы пака: zip целиком ИЛИ отдельные файлы (rvc.onnx, contentvec.onnx, ru.onnx, ru.onnx.json — как их скачал браузер, имена могут быть с «(1)»).
+       Можно выбрать все разом или по одному: «готово», когда на месте все четыре */
+    static String ruTarget(String name) {
+        String n = name.toLowerCase();
+        if (n.endsWith(".json")) return "ru.onnx.json";
+        if (!n.endsWith(".onnx")) return null;
+        if (n.contains("contentvec")) return "contentvec.onnx";
+        if (n.contains("rvc")) return "rvc.onnx";
+        if (n.startsWith("ru")) return "ru.onnx";
+        return null;
+    }
+    void installRu(android.content.ContentResolver cr, List<android.net.Uri> uris) {
         if (ruState.equals("busy")) return; ruState = "busy"; ruProgress = 0;
         new Thread(() -> {
             try {
-                File d = ruDir(); new File(d, "ok").delete(); long total = 270_000_000L;
-                try (android.database.Cursor c = cr.query(uri, null, null, null, null)) { if (c != null && c.moveToFirst()) { int i = c.getColumnIndex(android.provider.OpenableColumns.SIZE); if (i >= 0 && !c.isNull(i)) total = c.getLong(i); } } catch (Exception e) { }
-                final long T = total; final long[] got = {0};
-                InputStream raw = new InputStream() { final InputStream in = cr.openInputStream(uri);
-                    @Override public int read() throws IOException { int b = in.read(); if (b >= 0) got[0]++; return b; }
-                    @Override public int read(byte[] b, int o, int n) throws IOException { int k = in.read(b, o, n); if (k > 0) { got[0] += k; ruProgress = Math.min(0.99, got[0] / (double) T); } return k; }
-                    @Override public void close() throws IOException { in.close(); } };
-                int found = 0;
-                try (ZipInputStream z = new ZipInputStream(raw)) { ZipEntry e;
-                    while ((e = z.getNextEntry()) != null) { String n = e.getName().replace('\\', '/'); if (e.isDirectory()) continue; String b = n.substring(n.lastIndexOf('/') + 1);
-                        if (b.equals("rvc.onnx") || b.equals("contentvec.onnx") || b.equals("ru.onnx") || b.equals("ru.onnx.json") || b.equals("meta.json")) { copyOut(z, new File(d, b), new long[1], 0, null); found++; } } }
-                for (String f : new String[]{"rvc.onnx", "contentvec.onnx", "ru.onnx", "ru.onnx.json"}) if (!new File(d, f).exists()) throw new IOException("в паке нет " + f);
+                File d = ruDir(); new File(d, "ok").delete(); long total = 0; List<String> names = new ArrayList<>();
+                for (android.net.Uri u : uris) { String nm = "file"; long sz = 60_000_000L;
+                    try (android.database.Cursor c = cr.query(u, null, null, null, null)) { if (c != null && c.moveToFirst()) { int i = c.getColumnIndex(android.provider.OpenableColumns.SIZE); if (i >= 0 && !c.isNull(i)) sz = c.getLong(i); int k = c.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME); if (k >= 0 && !c.isNull(k)) nm = c.getString(k); } } catch (Exception e) { }
+                    names.add(nm); total += sz; }
+                final long T = Math.max(1, total); final long[] got = {0};
+                for (int q = 0; q < uris.size(); q++) {
+                    final android.net.Uri u = uris.get(q); String nm = names.get(q);
+                    InputStream raw = new InputStream() { final InputStream in = cr.openInputStream(u);
+                        @Override public int read() throws IOException { int b = in.read(); if (b >= 0) got[0]++; return b; }
+                        @Override public int read(byte[] b, int o, int n) throws IOException { int k = in.read(b, o, n); if (k > 0) { got[0] += k; ruProgress = Math.min(0.99, got[0] / (double) T); } return k; }
+                        @Override public void close() throws IOException { in.close(); } };
+                    if (nm.toLowerCase().endsWith(".zip")) {
+                        try (ZipInputStream z = new ZipInputStream(raw)) { ZipEntry e;
+                            while ((e = z.getNextEntry()) != null) { String n = e.getName().replace('\\', '/'); if (e.isDirectory()) continue; String b = n.substring(n.lastIndexOf('/') + 1); String t = ruTarget(b);
+                                if (t != null) copyOut(z, new File(d, t), new long[1], 0, null); } }
+                    } else { String t = ruTarget(nm); if (t == null) { raw.close(); throw new IOException("непонятный файл: " + nm); } try (InputStream in = raw) { copyOut(in, new File(d, t), new long[1], 0, null); } }
+                }
+                List<String> miss = new ArrayList<>();
+                for (String f : new String[]{"rvc.onnx", "contentvec.onnx", "ru.onnx", "ru.onnx.json"}) if (!new File(d, f).exists()) miss.add(f);
                 synchronized (llock) { ruRelease(); }
+                if (!miss.isEmpty()) { ruState = "error: не хватает " + String.join(", ", miss) + " — выбери и их"; return; }
                 new FileOutputStream(new File(d, "ok")).close(); ruProgress = 1; ruState = "installed";
             } catch (Exception ex) { ruState = "error: " + ex.getMessage(); android.util.Log.w("TrackStudio", "ru", ex); }
         }).start();
