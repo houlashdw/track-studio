@@ -246,7 +246,7 @@ def stage_export():
                       dynamic_axes={'audio': [1], 'feats': [1]}, opset_version=17, do_constant_folding=True)
     from onnxruntime.quantization import quantize_dynamic, QuantType
     quantize_dynamic('out/contentvec_f32.onnx', 'out/contentvec.onnx', weight_type=QuantType.QInt8)
-    os.remove('out/contentvec_f32.onnx')
+    # contentvec_f32.onnx оставляем до конца: demo сравнивает int8 и float32 (в пак не идёт)
     print('contentvec.onnx', os.path.getsize('out/contentvec.onnx') // 1e6, 'МБ')
 
 
@@ -267,18 +267,26 @@ def stage_check(wav16k_path=None):
 def stage_demo(piper_dir, ids_json):
     """русская строка: Piper (женский русский) → признаки → RVC Renri с высотой ×1.5 — слушать в блокноте"""
     import onnxruntime as ort
-    pv = ort.InferenceSession(glob.glob(os.path.join(piper_dir, '*.onnx'))[0]); cv = ort.InferenceSession('out/contentvec.onnx'); rv = ort.InferenceSession('out/rvc.onnx')
-    outs = []
-    for ids in json.load(open(ids_json)):
-        ids = np.array([ids], np.int64)
-        a = pv.run(None, {'input': ids, 'input_lengths': np.array([ids.shape[1]], np.int64), 'scales': np.array([0.667, 1.0, 0.8], np.float32)})[0].reshape(-1)
-        x = resample(a, 22050, 16000)
-        fe = np.repeat(cv.run(None, {'audio': x[None]})[0][0], 2, axis=0)
-        f0 = f0_autocorr(x) * 1.5; T = min(len(fe), len(f0)); fe, f0 = fe[:T], f0[:T]
-        y = rv.run(None, {'phone': fe[None].astype(np.float32), 'phone_lengths': np.array([T], np.int64), 'pitch': coarse(f0.astype(np.float64))[None],
-                          'pitchf': f0[None].astype(np.float32), 'ds': np.array([0], np.int64), 'rnd': np.random.randn(1, 192, T).astype(np.float32) * 0.66666})[0].reshape(-1)
-        outs += [y, np.zeros(SR // 3, np.float32)]
-    sf.write('out/demo_ru.wav', np.concatenate(outs), SR); print('demo: out/demo_ru.wav')
+    pv = ort.InferenceSession(glob.glob(os.path.join(piper_dir, '*.onnx'))[0]); rv = ort.InferenceSession('out/rvc.onnx')
+    for cvf, wav in [('out/contentvec.onnx', 'out/demo_ru.wav'), ('out/contentvec_f32.onnx', 'out/demo_ru_f32.wav')]:
+        if not os.path.exists(cvf): continue
+        cv = ort.InferenceSession(cvf); outs = []; rs = np.random.RandomState(0)
+        for ids in json.load(open(ids_json)):
+            ids = np.array([ids], np.int64)
+            a = pv.run(None, {'input': ids, 'input_lengths': np.array([ids.shape[1]], np.int64), 'scales': np.array([0.667, 1.0, 0.8], np.float32)})[0].reshape(-1)
+            x = resample(a, 22050, 16000)
+            fe = np.repeat(cv.run(None, {'audio': x[None]})[0][0], 2, axis=0)
+            f0 = f0_autocorr(x) * 1.5; T = min(len(fe), len(f0)); fe, f0 = fe[:T], f0[:T]
+            y = rv.run(None, {'phone': fe[None].astype(np.float32), 'phone_lengths': np.array([T], np.int64), 'pitch': coarse(f0.astype(np.float64))[None],
+                              'pitchf': f0[None].astype(np.float32), 'ds': np.array([0], np.int64), 'rnd': rs.randn(1, 192, T).astype(np.float32) * 0.66666})[0].reshape(-1)
+            outs += [y, np.zeros(SR // 3, np.float32)]
+        sf.write(wav, np.concatenate(outs), SR); print('demo:', wav)
+
+
+def ck_epoch():
+    import torch
+    g = sorted(glob.glob(os.path.join(LOG, 'G_*.pth')) + glob.glob(os.path.join(CK, 'G_*.pth')), key=os.path.getmtime)
+    return torch.load(g[-1], map_location='cpu', weights_only=False).get('iteration') if g else None
 
 
 def piper_force_fn():
