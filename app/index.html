@@ -528,6 +528,10 @@ const VOICE_PACK = { rows: 320, ids: ["af_heart", "jf_alpha", "af_sky", "af_jess
       <div class="seg3 mt" id="modeSeg" data-testid="voice-mode-seg">
         <button type="button" data-v="sing">Пение</button><button type="button" data-v="rap" class="on">Рэп</button><button type="button" data-v="off">Без голоса</button>
       </div>
+      <p class="hint" style="margin:10px 2px 0">Перегруз (дисторшн)</p>
+      <div class="seg3 mt8" id="dirtSeg" data-testid="dirt-seg">
+        <button type="button" data-v="auto" class="on">Авто</button><button type="button" data-v="clean">Чисто</button><button type="button" data-v="dirty">С перегрузом</button>
+      </div>
       <div id="dsRow" class="aixbox" hidden data-testid="ds-row"><span class="aixmsg" id="dsMsg"></span><button type="button" class="pri ex" id="dsBtn" data-testid="ds-install">Скачать</button><div class="bar aixbar" id="dsBar" hidden><div></div></div></div>
       <select id="voiceMode" hidden=""><option value="sing">Пение</option><option value="rap" selected="">Рэп</option><option value="off">Без голоса</option></select>
       <div id="lyrWrap" class="mt8">
@@ -1235,7 +1239,8 @@ function analyze(prompt, salt = 0) {
   else { if (Rn() < .45) spec.form = pick(Rn, st.d.energy > .6 ? ['club', 'drop', 'story', 'epic', 'loop'] : ['story', 'drift', 'epic', 'loop', 'club']); notes.push({ k: 'Структура', v: FORMS[spec.form].name.split(':')[0] }); }
   // 6б. особенности: эффекты и инструменты, названные словами (раньше «дисторшн», «гитары», «пианино» не меняли звук)
   { const f = {}, inst = {}, strong = /сильн|много|жестк|heavy|макс|max|очень|мощн|адск/;
-    if (/дисторш|дисторт|distort|перегруз|overdriv|фузз|fuzz|кранч|crunch/.test(textN)) f.dist = strong.test(textN) ? 0.85 : 0.6; else if (/грязн|dirty|хрип|(?<![a-z])raw(?![a-z])/.test(textN)) f.dist = 0.35;
+    if (/чист\S* (электро)?гитар|clean guitar|clean|без дисторш|без перегруз|чистый звук|чистое звучание/.test(textN)) f.clean = 1;
+    if (/дисторш|дисторт|distort|перегруз|overdriv|фузз|fuzz|кранч|crunch/.test(textN) && !/без дисторш|без перегруз/.test(textN)) f.dist = strong.test(textN) ? 0.85 : 0.6; else if (/грязн|dirty|хрип|(?<![a-z])raw(?![a-z])/.test(textN)) f.dist = 0.35;
     if (/slowed|слоуд|слоу(?![а-я])|замедлен/.test(textN)) { f.speed = 85; f.rev = 0.35; }
     if (/nightcore|найткор|sped.?up|speed.?up|ускорен/.test(textN)) f.speed = 118;
     if (/реверб|reverb|ревер(?![а-я])|(?<![а-я])эхо|echo|пещер|(?<![a-z])cave|(?<![а-я])зал(?![а-я])|(?<![a-z])hall(?![a-z])/.test(textN)) f.rev = Math.max(f.rev || 0, /много|огромн|huge|сильн|бескон/.test(textN) ? 0.5 : 0.3);
@@ -1244,11 +1249,12 @@ function analyze(prompt, salt = 0) {
     const elec = /электро|electric|рок|rock|дисторш|перегруз|metal|метал/.test(textN);
     if (/гитар|guitar/.test(textN)) { if (/акуст|acoustic/.test(textN)) { inst.lead = 'guitar'; inst.arp = 'guitar'; } else { inst.lead = elec ? 'eguitar' : 'guitar'; inst.arp = elec ? 'eguitar' : 'guitar'; inst.pad = 'eguitar'; } }
     if (/пианино|piano|рояль|фортепиан/.test(textN)) { inst.pad = 'piano'; inst.arp = inst.arp || 'piano'; }
-    if (/клавиш|(?<![a-z])keys(?![a-z])|rhodes|родес|электропиан/.test(textN)) { inst.pad = 'ekeys'; inst.arp = inst.arp || 'ekeys'; }
+    if (/клавиш|(?<![a-z])keys(?![a-z])|keyboard|rhodes|родес|электропиан|цифров\S* пиани|digital piano/.test(textN)) { inst.pad = 'ekeys'; inst.arp = inst.arp || 'ekeys'; }
     if (/скрипк|струнн|strings|violin|оркестр|orchestr/.test(textN)) inst.pad = 'strings';
     if (/орган|organ/.test(textN)) inst.pad = 'organ';
     if (/флейт|flute/.test(textN)) inst.lead = 'flute';
     if (/(?<![а-я])труб[аыу]|brass|духов|саксофон|(?<![a-z])sax/.test(textN)) inst.lead = 'brass';
+    if (/синтезатор|(?<![а-я])синт(?![а-я])|синтов|(?<![a-z])synth(?![a-z])|synthesizer|аналогов\S* синт|moog|муг/.test(textN)) { if (inst.lead) inst.arp = 'moog'; else inst.lead = 'moog'; }   /* синтезатор — отдельная партия: если ведёт гитара, синт берёт арпеджио */
     if (/суперсо|supersaw/.test(textN)) inst.lead = 'supersaw';
     if (/8.?бит|8.?bit|чиптюн|chiptune|пиксел|game.?boy|денди|nes(?![a-z])/.test(textN)) { inst.lead = 'pixel'; inst.arp = 'pixel'; }
     if (/колокол|(?<![a-z])bells?(?![a-z])/.test(textN)) inst.arp = 'bell';
@@ -2100,7 +2106,16 @@ function ksAdd(f, n, o, amp, g, bright, dn, rl) {
   let p = 0, prev = 0, apx = 0, apy = 0;
   for (let k = 0; k < n; k++) { const x0 = buf[p], l = (x0 + prev) * .5 * g; prev = x0; const ap = a * l + apx - a * apy; apx = l; apy = ap; buf[p] = ap; if (++p >= Ln) p = 0; T[o + k] += x0 * amp * relG(k, dn, rl); }
 }
+/* гитара: перегруз — только где он к месту (тяжёлые жанры, рок-опенинг, «дисторшн» в промпте); иначе чистый усилитель — звонкая и узнаваемая */
+function gtrDirty() { const sp = CFG.spec || {}, f = sp.feat || {}; if (window.__oldGtr) return true; if (f.clean) return false; if (f.dist >= .5) return true;
+  return ['hardstyle', 'hardtekk', 'jumpstyle', 'gabber', 'industrial', 'rage', 'dubstep'].includes(sp.style) || (sp.style === 'jpop' && (sp.energy || 0) > .72) || (sp.grit || 0) > .7; }
+function gtrClean(o, n, mute) {
+  /* чистый канал: лёгкое насыщение, яркий кабинет, присутствие на 2.5 кГц — слышно щипок и каждую ноту аккорда */
+  const hp = new BQ().hp(90, .7), lp = new BQ().lp(mute ? 4200 : 7200, .7), pk = new BQ().bp(2500, 1.1), lm = new BQ().bp(350, 1);
+  for (let k = 0; k < n; k++) { let x = hp.p(T[o + k]); x = Math.tanh(x * 1.4) / 1.2; x = lp.p(x); x += pk.p(x) * .45 - lm.p(x) * .3; T[o + k] = x * .85; }
+}
 function gtrFx(o, n, drive, mute) {
+  if (!gtrDirty()) return gtrClean(o, n, mute);
   /* усилитель: два каскада клиппинга, середина вперёд, кабинет-фильтр */
   const hp = new BQ().hp(95, .7), pre = new BQ().bp(1100, .8), fc = mute ? 3200 : 4800, lpA = new BQ().lp(fc, .7), lpB = new BQ().lp(fc, .7), pk = new BQ().bp(2300, 1.2), z = Math.tanh(.12);
   for (let k = 0; k < n; k++) {
@@ -2716,7 +2731,7 @@ function limiter(L, R, N, ceil, W, rel) {
   }
 }
 function applyMaster(track, spec) {
-  const N = A.N, hp = new BQ().hp(26, .7), hp2 = new BQ().hp(26, .7), kk = 1 + spec.grit * 4.5 * CFG.X.gm + CFG.X.gadd, nk = 1 / kk, TG = CFG.X.tilt, tc = 1 - Math.exp(-TAU * TG.fc / SR); let lo1 = 0, lo2 = 0;
+  const N = A.N, hp = new BQ().hp(26, .7), hp2 = new BQ().hp(26, .7), kk = window.__oldGrit ? 1 + spec.grit * 4.5 * CFG.X.gm + CFG.X.gadd : 1 + Math.min(spec.grit, .8) * 1.3 * Math.min(CFG.X.gm, 1.2) + (CFG.distAmt >= .5 ? CFG.X.gadd + CFG.distAmt * 2 : 0), nk = 1 / kk, TG = CFG.X.tilt, tc = 1 - Math.exp(-TAU * TG.fc / SR); let lo1 = 0, lo2 = 0;
   const dur = track.duration, bd = track.barDur, f0 = Math.max(0, dur - bd * 1.5);
   let env = 0; const att = 1 - Math.exp(-1 / (SR * .008)), rel = 1 - Math.exp(-1 / (SR * .22)), thr = .3, ex = 1 / 2 - 1;
   for (let i = 0; i < N; i++) {
@@ -3417,6 +3432,7 @@ async function buildTrack(label) {
     SMP.active = !!SMP.themed || !!($('#net') && $('#net').checked); if (typeof applyThemeMood === 'function') applyThemeMood(spec); netCreditsUI();
     spec.rap = false;
     if ($('#voiceMode').value === 'rap' && $('#rapSetup') && $('#rapSetup').checked) { rapifySpec(spec); syncControls(); }
+    applyDirt(spec);
     spec.lyrForm = $('#voiceMode').value !== 'off' && !S.instrOnly ? lyrForm($('#lyrics').value) : null;
     const track = compose(spec);
     setStatus('Рендерю звук: ' + track.events.length + ' нот и ударов…', .05, true);
@@ -3463,6 +3479,13 @@ async function makeFromPrompt() {
 const RH_GENRE = { trap: { kick: ['trap', 'drill'], hats: ['roll', 'drill', 'off16'] }, drill: { kick: ['drill'], hats: ['drill', 'roll'] }, phonk: { kick: ['trap', 'drill'], hats: ['roll', 'eighth', 'off16'] },
   hoodtrap: { kick: ['trap', 'drill'], hats: ['roll', 'drill'] }, rage: { kick: ['trap'], hats: ['roll', 'off16', 'eighth'] }, melancore: { kick: ['trap'], hats: ['roll', 'eighth'] },
   plugg: { kick: ['trap'], hats: ['roll', 'eighth', 'off16'] }, jersey: { kick: ['jersey'], hats: ['off', 'off16'] } };
+/* перегруз кнопками (не ползунком): Авто — по жанру и словам промпта; Чисто — гитара чистая, мастер без «грязи»; С перегрузом — гитара и мастер перегружены */
+function dirtMode() { let v = 'auto'; try { v = localStorage.getItem('ts_dirt') || 'auto'; } catch (e) { } return v; }
+function applyDirt(spec) {
+  const m = dirtMode(); spec.feat = { ...(spec.feat || {}) }; spec.dirt = m;
+  if (m === 'clean') { spec.feat.clean = 1; spec.feat.dist = 0; spec.grit = Math.min(spec.grit == null ? .2 : spec.grit, .2); }
+  else if (m === 'dirty') { spec.feat.clean = 0; spec.feat.dist = Math.max(spec.feat.dist || 0, .7); spec.grit = Math.max(spec.grit || 0, .7); }
+}
 function rhRandom(spec, R) {
   const G = !window.__oldRh && RH_GENRE[spec.style], O = G || RH_OPTS, k = pick(R, Object.keys(O));
   spec.rh = { ...(spec.rh || {}), [k]: pick(R, O[k]) };
@@ -8567,6 +8590,7 @@ function toast(msg) {
   document.addEventListener('DOMContentLoaded', () => {
     qa('#tabs button').forEach((b) => (b.onclick = () => showTab(b.dataset.tab)));
     qa('#modeSeg button').forEach((b) => (b.onclick = () => setMode(b.dataset.v, true)));
+    { const dm = dirtMode(); qa('#dirtSeg button').forEach((b) => { b.classList.toggle('on', b.dataset.v === dm); b.onclick = () => { try { localStorage.setItem('ts_dirt', b.dataset.v); } catch (e) { } qa('#dirtSeg button').forEach((x) => x.classList.toggle('on', x === b)); }; }); }
     setMode(prefs.mode || q('#voiceMode').value, false);
     for (const id of ['tuneAmt']) { const e = q('#' + id); e.addEventListener('change', () => { prefs[id] = e.value; savePrefs(); }); if (prefs[id]) e.value = prefs[id]; }
     { const rd = q('#rapDelivery'); if (prefs.rapDelivery) rd.value = prefs.rapDelivery; rd.addEventListener('change', async () => { prefs.rapDelivery = rd.value; savePrefs(); if (S.raw && !S.busy && q('#voiceMode').value === 'rap') { stop(); await fxChanged(); } }); }
