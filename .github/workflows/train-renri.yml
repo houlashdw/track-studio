@@ -33,9 +33,9 @@ jobs:
           sed -i 's/        logger.warning("NO GPU DETECTED: falling back to CPU - this may take a while")/        print("CPU")/' infer/modules/train/train.py
           mkdir -p assets/pretrained_v2 assets/rmvpe assets/weights
           HF=https://huggingface.co/lj1995/VoiceConversionWebUI/resolve/main
-          wget -q -O assets/pretrained_v2/f0G40k.pth $HF/pretrained_v2/f0G40k.pth
-          wget -q -O assets/pretrained_v2/f0D40k.pth $HF/pretrained_v2/f0D40k.pth
-          wget -q -O assets/rmvpe/rmvpe.pt $HF/rmvpe.pt
+          wget -nv --tries=8 --waitretry=30 --retry-connrefused --retry-on-http-error=429,500,502,503,504 -O assets/pretrained_v2/f0G40k.pth $HF/pretrained_v2/f0G40k.pth
+          wget -nv --tries=8 --waitretry=30 --retry-connrefused --retry-on-http-error=429,500,502,503,504 -O assets/pretrained_v2/f0D40k.pth $HF/pretrained_v2/f0D40k.pth
+          wget -nv --tries=8 --waitretry=30 --retry-connrefused --retry-on-http-error=429,500,502,503,504 -O assets/rmvpe/rmvpe.pt $HF/rmvpe.pt
           cp ../colab/renri_rvc.py ../colab/onnx_half.py ../colab/demo_ids.json .
           mkdir -p /tmp/piper && cd /tmp/piper && wget -q https://github.com/rhasspy/piper/releases/download/v0.0.2/voice-ru-irinia-medium.tar.gz && tar xzf voice-ru-irinia-medium.tar.gz
       - name: Подготовка данных
@@ -87,6 +87,6 @@ jobs:
           git add -A && git commit -q -m "ru-pack ${{ github.run_number }}"
           git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" ru-pack
       - name: Следующий запуск цепочки
-        if: always() && inputs.chain != '0' && !cancelled()
+        if: success() && inputs.chain != '0'
         env: { GH_TOKEN: '${{ github.token }}' }
         run: gh workflow run train-renri.yml -R ${{ github.repository }} --ref ${{ github.ref_name }} -f seconds=${{ inputs.seconds }} -f batch=${{ inputs.batch }} -f chain=$(( ${{ inputs.chain }} - 1 ))
