@@ -131,8 +131,9 @@ def final_weights():
     """готовые веса: из assets/weights, иначе — из последней контрольной точки G (если обучение оборвалось на последней эпохе)"""
     import torch
     fin = os.path.join(CK, 'renri_final.pth'), os.path.join('assets', 'weights', EXP + '.pth')
+    t0 = float(os.environ.get('RUN_T0', '0'))
     for f in fin:
-        if os.path.exists(f): return f
+        if os.path.exists(f) and (f == fin[0] or os.path.getmtime(f) >= t0): return f
     g = sorted(glob.glob(os.path.join(LOG, 'G_*.pth')) + glob.glob(os.path.join(CK, 'G_*.pth')), key=os.path.getmtime)
     if not g: return None
     from infer.lib.train.utils import HParams
@@ -162,6 +163,7 @@ def stage_train(epochs, batch):
     import torch
     if not torch.cuda.is_available():
         cfg['train']['fp16_run'] = False
+    cfg['train']['log_interval'] = int(os.environ.get('LOG_INTERVAL', cfg['train']['log_interval']))
     json.dump(cfg, open(os.path.join(LOG, 'config.json'), 'w'), indent=2)
     pg, pd = os.path.join('assets', 'pretrained_v2', 'f0G40k.pth'), os.path.join('assets', 'pretrained_v2', 'f0D40k.pth')
     pre = (['-pg', pg, '-pd', pd] if os.path.exists(pg) and os.path.exists(pd) else [])
@@ -170,7 +172,7 @@ def stage_train(epochs, batch):
            '-te', str(epochs), '-se', os.environ.get('SAVE_EVERY', '15'), *pre, '-l', '1', '-c', '0', '-sw', '0', '-v', 'v2']
     if not torch.cuda.is_available():
         i = cmd.index('-g'); del cmd[i:i + 2]
-    env = dict(os.environ, TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD='1')
+    env = dict(os.environ, TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD='1'); os.environ['RUN_T0'] = str(time.time() if 'time' in globals() else __import__('time').time())
     import threading, time
     stop = [False]
     def sync():   # каждую минуту — свежие контрольные точки на Диск
@@ -183,10 +185,17 @@ def stage_train(epochs, batch):
                     try: shutil.copy(f, CK + '/'); seen[f] = m; print('💾 сохранено на Диск:', os.path.basename(f), flush=True)
                     except Exception as e: print('Диск:', e)
     th = threading.Thread(target=sync, daemon=True); th.start()
-    try: subprocess.run(cmd, check=True, env=env)
+    lim = float(os.environ.get('TRAIN_SECONDS', '0')) or None   # лимит времени (GitHub: задача ≤6 ч) — по нему берём последнюю контрольную точку
+    import signal as sg
+    p = subprocess.Popen(cmd, env=env, start_new_session=True)
+    try: p.wait(timeout=lim)
+    except subprocess.TimeoutExpired:
+        print('⏱ время обучения вышло — беру последнюю контрольную точку', flush=True)
+        try: os.killpg(p.pid, sg.SIGTERM); time.sleep(10); os.killpg(p.pid, sg.SIGKILL)
+        except Exception: pass
     finally: stop[0] = True
     w = final_weights()
-    if not w: raise SystemExit('нет весов после обучения')
+    if not w: raise SystemExit('нет весов после обучения (обучение упало — смотри ошибку выше)')
     shutil.copy(w, os.path.join(CK, 'renri_final.pth')); print('✅ обучение готово, веса сохранены на Диск')
 
 
@@ -223,7 +232,11 @@ def stage_export():
     from infer.modules.onnx.export import export_onnx
     w = final_weights()
     os.makedirs('out', exist_ok=True)
-    export_onnx(w, 'out/rvc.onnx'); print('rvc.onnx', os.path.getsize('out/rvc.onnx') // 1e6, 'МБ')
+    export_onnx(w, 'out/rvc_f32.onnx')
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    from onnx_half import half_store
+    half_store('out/rvc_f32.onnx', 'out/rvc.onnx'); os.remove('out/rvc_f32.onnx')   # веса в float16 (их и учили в half) — файл ~56 МБ
+    print('rvc.onnx', os.path.getsize('out/rvc.onnx') // 1e6, 'МБ')
     # ContentVec → ONNX (вход: звук 16 кГц [1,N]; выход: признаки 50 кадров/с [1,T,768]), затем int8 для телефона
     m = load_cv()
     class W(torch.nn.Module):
