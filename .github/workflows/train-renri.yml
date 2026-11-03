@@ -18,7 +18,7 @@ jobs:
       - name: Зависимости
         run: |
           free -m; nproc
-          pip install -q torch==2.4.1 --index-url https://download.pytorch.org/whl/cpu
+          pip install -q torch==2.6.0 --index-url https://download.pytorch.org/whl/cpu
           pip install -q "numpy<2" scipy soundfile librosa transformers onnx onnxruntime tensorboard matplotlib
       - name: RVC 2.2 + правки
         run: |
