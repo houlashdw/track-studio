@@ -245,7 +245,7 @@ def stage_export():
     torch.onnx.export(W(m), (torch.randn(1, 32000),), 'out/contentvec_f32.onnx', input_names=['audio'], output_names=['feats'],
                       dynamic_axes={'audio': [1], 'feats': [1]}, opset_version=17, do_constant_folding=True)
     from onnxruntime.quantization import quantize_dynamic, QuantType
-    quantize_dynamic('out/contentvec_f32.onnx', 'out/contentvec.onnx', weight_type=QuantType.QInt8)
+    quantize_dynamic('out/contentvec_f32.onnx', 'out/contentvec.onnx', weight_type=QuantType.QInt8, per_channel=True)   # по каналам: замер на эпохе 15 — обычный int8 портил слова (f32: «город спит, а я не сплю опять», int8: «пород спит, я не чувствую себя»)
     # contentvec_f32.onnx оставляем до конца: demo сравнивает int8 и float32 (в пак не идёт)
     print('contentvec.onnx', os.path.getsize('out/contentvec.onnx') // 1e6, 'МБ')
 
