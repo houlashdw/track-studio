@@ -1,0 +1,107 @@
+name: train-voice
+# обучение СВОЕГО голоса (RVC) на процессоре GitHub: вокал из закрытого кэша vprep, выборка select.json; результат зашифрован → ветка voice-pack
+on:
+  workflow_dispatch:
+    inputs:
+      seconds: { description: 'секунд на обучение', default: '16200' }
+      batch: { description: 'batch', default: '2' }
+      chain: { description: 'сколько ещё запусков подряд (продолжение с контрольной точки)', default: '0' }
+      fresh: { description: '1 = начать с нуля (не брать прошлые контрольные точки)', default: '0' }
+permissions:
+  contents: write
+  actions: write
+jobs:
+  train:
+    runs-on: ubuntu-latest
+    timeout-minutes: 355
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - name: Зависимости
+        run: |
+          free -m; nproc
+          pip install -q torch==2.6.0 --index-url https://download.pytorch.org/whl/cpu
+          pip install -q "numpy<2" scipy soundfile librosa transformers onnx onnxruntime tensorboard matplotlib
+      - name: RVC 2.2 + правки
+        run: |
+          git clone -q --depth 1 --branch 2.2.231006 https://github.com/RVC-Project/Retrieval-based-Voice-Conversion-WebUI.git rvc
+          cd rvc
+          sed -i 's/                x = flow(x, x_mask, g=g, reverse=reverse)/                x, _ = flow(x, x_mask, g=g, reverse=reverse)/' infer/lib/infer_pack/models_onnx.py
+          sed -i 's/np.fromstring(fig.canvas.tostring_rgb(), dtype=np.uint8, sep="")/np.asarray(fig.canvas.buffer_rgba())[:, :, :3].copy().reshape(-1)/' infer/lib/train/utils.py
+          sed -i 's/        num_workers=4,/        num_workers=int(os.environ.get("RVC_WORKERS", "4")),/; s/        prefetch_factor=8,/        prefetch_factor=int(os.environ.get("RVC_PREFETCH", "8")),/' infer/modules/train/train.py
+          sed -i 's/        logger.warning("NO GPU DETECTED: falling back to CPU - this may take a while")/        print("CPU")/' infer/modules/train/train.py
+          mkdir -p assets/pretrained_v2 assets/rmvpe assets/weights
+          HF=https://huggingface.co/lj1995/VoiceConversionWebUI/resolve/main
+          wget -nv --tries=8 --waitretry=30 --retry-connrefused --retry-on-http-error=429,500,502,503,504 -O assets/pretrained_v2/f0G40k.pth $HF/pretrained_v2/f0G40k.pth
+          wget -nv --tries=8 --waitretry=30 --retry-connrefused --retry-on-http-error=429,500,502,503,504 -O assets/pretrained_v2/f0D40k.pth $HF/pretrained_v2/f0D40k.pth
+          wget -nv --tries=8 --waitretry=30 --retry-connrefused --retry-on-http-error=429,500,502,503,504 -O assets/rmvpe/rmvpe.pt $HF/rmvpe.pt
+          cp ../colab/renri_rvc.py ../colab/onnx_half.py ../colab/demo_ids.json .
+          mkdir -p /tmp/piper && cd /tmp/piper && wget -q https://github.com/rhasspy/piper/releases/download/v0.0.2/voice-ru-irinia-medium.tar.gz && tar xzf voice-ru-irinia-medium.tar.gz
+      - uses: actions/checkout@v4
+        with: { ref: vprep-in, path: vin }
+      - uses: actions/cache/restore@v4
+        with: { path: /tmp/vox, key: 'vox-41913943505', fail-on-cache-miss: true }
+      - name: Подготовка данных
+        working-directory: rvc
+        run: |
+          mkdir -p /tmp/ds && python - <<'PY'
+          import json, numpy as np, librosa, soundfile as sf
+          y, sr = librosa.load('/tmp/vox/vocals.mp3', sr=40000, mono=True); sel = json.load(open('../vin/select.json'))
+          m = []
+          for a, b in sel:
+              if m and a - m[-1][1] < 0.05: m[-1][1] = b
+              else: m.append([a, b])
+          for i, (a, b) in enumerate(m): sf.write('/tmp/ds/v_%04d.wav' % i, y[int(a * sr):int(b * sr)], sr)
+          print('clips', len(m), 'min', sum(b - a for a, b in m) / 60)
+          PY
+          python renri_rvc.py prep /tmp/ds
+          python renri_rvc.py f0
+          python renri_rvc.py feat
+      - name: Прошлые контрольные точки
+        if: inputs.fresh != '1'
+        uses: actions/cache/restore@v4
+        with:
+          path: /tmp/ck
+          key: voice-ck-${{ github.run_id }}
+          restore-keys: voice-ck-
+      - name: Обучение
+        working-directory: rvc
+        run: |
+          mkdir -p /tmp/ck && rm -f /tmp/ck/renri_final.pth && ls -la /tmp/ck
+          (while true; do sleep 300; free -m | sed -n 2p; done) &
+          CKPT_DIR=/tmp/ck RVC_WORKERS=2 RVC_PREFETCH=2 LOG_INTERVAL=20 SAVE_EVERY=1 TRAIN_SECONDS=${{ inputs.seconds }} python -u renri_rvc.py train 1000 ${{ inputs.batch }} 2>&1 | grep --line-buffered -vE "Warning|warn\(|return_complex|_VF.stft|torch.load\(|autocast\(|read\(full_path\)|WeightNorm|GradScaler"
+      - name: Сохранить контрольные точки
+        if: always()
+        run: |
+          cp -f rvc/logs/renri/G_*.pth rvc/logs/renri/D_*.pth /tmp/ck/ 2>/dev/null || true
+          rm -f /tmp/ck/renri_final.pth; ls -la /tmp/ck
+      - uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: /tmp/ck
+          key: voice-ck-${{ github.run_id }}
+      - name: Экспорт, проверка, пак
+        working-directory: rvc
+        run: |
+          python renri_rvc.py export
+          python renri_rvc.py check
+          python renri_rvc.py demo /tmp/piper demo_ids.json
+          python -c "import renri_rvc as r,re; print('эпоха', r.ck_epoch())" | tee epoch.txt
+          python -c "import renri_rvc as r,glob; r.piper_force_fn()([f for f in glob.glob('/tmp/piper/*.onnx')][0], 'out/ru.onnx')"
+          cp /tmp/piper/*.onnx.json out/ru.onnx.json
+          ls -la out
+      - name: Ветка voice-pack (зашифровано)
+        working-directory: rvc/out
+        env: { P: '${{ secrets.KEYSTORE_PASS }}' }
+        run: |
+          rm -f contentvec_f32.onnx ru_force.onnx contentvec.onnx ru.onnx ru.onnx.json
+          for f in *.onnx *.wav; do [ -f "$f" ] && openssl enc -aes-256-cbc -pbkdf2 -iter 200000 -salt -in "$f" -out "$f.enc" -pass env:P && rm "$f"; done
+          git init -q -b voice-pack && git config user.name github-actions && git config user.email github-actions@users.noreply.github.com
+          echo "run ${{ github.run_number }} · ${{ inputs.seconds }} с · batch ${{ inputs.batch }} · $(cat ../epoch.txt)" > STATUS.txt
+          git add -A && git commit -q -m "voice-pack ${{ github.run_number }}"
+          git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" voice-pack
+      - name: Следующий запуск цепочки
+        if: success() && inputs.chain != '0'
+        env: { GH_TOKEN: '${{ github.token }}' }
+        run: gh workflow run train-voice.yml -R ${{ github.repository }} --ref ${{ github.ref_name }} -f seconds=${{ inputs.seconds }} -f batch=${{ inputs.batch }} -f chain=$(( ${{ inputs.chain }} - 1 ))
