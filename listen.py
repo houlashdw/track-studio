@@ -25,7 +25,7 @@ def key(n):
     v = re.findall(r'gemini-(\d+(?:\.\d+)?)', n); ver = float(v[0]) if v else 0
     return (ver, 'pro' in n, 'preview' not in n and 'exp' not in n)
 names.sort(key=key, reverse=True); print('models:', names[:8])
-MODELS = [n for n in names if 'pro' in n and 'customtools' not in n][:2] + [n for n in names if 'flash' in n][:4] + [n for n in names if 'argon' in n] or ['gemini-3.8-flash']
+MODELS = [n for n in names if 'flash' in n][:4] or ['gemini-3.8-flash']   # pro/argon — нет бесплатной квоты
 open(os.path.join(dst, '_models.txt'), 'w').write('\n'.join(names))
 PC = '''Ты — опытный звукорежиссёр, слушаешь ушами как человек. Контекст: ''' + ctx + '''
 Два файла: ПЕРВЫЙ — старая версия (A), ВТОРОЙ — новая (B), тот же текст и бит. Сравни ТОЛЬКО честно, что слышишь, по-русски, с таймкодами:
@@ -35,11 +35,11 @@ PC = '''Ты — опытный звукорежиссёр, слушаешь у�
 В конце строка JSON: {"A":{"voice":..,"mix":..,"overall":..},"B":{"voice":..,"mix":..,"overall":..},"better":"A|B|same"}'''
 def gen(contents):
     errs = []
-    for att in range(3):
+    for att in range(8):
         for model in MODELS:
             try: r = cl.models.generate_content(model=model, contents=contents); return model, r.text
             except Exception as e: errs.append(model + ': ' + str(e)[:160])
-        time.sleep(30)
+        time.sleep(45 + 15 * att)
     return 'none', 'ошибки:\n' + '\n'.join(errs)
 def upl(f):
     up = cl.files.upload(file=f)
