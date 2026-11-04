@@ -4578,7 +4578,7 @@ document.addEventListener('DOMContentLoaded', init);
     /* по замеру «ушами»: жанровые вокалы на 8–10 дБ темнее нашего и с «телом» — яркость и воздух убавляем тем сильнее, чем грязнее бит */
     const dd = window.__noTone ? 0 : Math.max(0.3, globalThis.vocalDirt && S.spec ? vocalDirt(S.spec) : 0);
     const y = cleanVox(m, sr, { pre: kk, hp: (P && P.male) ? 80 : 95, sat: vfp.sat, de: vfp.de, mud: -2 * (1 - dd),
-      pres: (vfp.pres + (CH ? clamp((CH.pres - 2) * 0.4, -1.5, 1.5) : 0) + (window.__noBright ? 0 : 2)) * (1 - 0.6 * dd), air: (vfp.air + (CH ? clamp((CH.air - 3) * 0.3, -1.5, 1.5) : 0) + (window.__noBright ? 0 : 1.5)) * (1 - 0.9 * dd) });   /* новый тембр темнее на ~3 дБ выше 5 кГц — возвращаем присутствие и воздух */
+      pres: (vfp.pres + (CH ? clamp((CH.pres - 2) * 0.4, -1.5, 1.5) : 0) + (window.__noBright || (globalThis.DSX && DSX.silUsed && !window.__oldSilFx) ? 0 : 2) - ((globalThis.DSX && DSX.silUsed && !window.__oldSilFx) ? 2 : 0)) * (1 - 0.6 * dd), air: (vfp.air + (CH ? clamp((CH.air - 3) * 0.3, -1.5, 1.5) : 0) + (window.__noBright ? 0 : 1.5)) * (1 - 0.9 * dd) });   /* новый тембр темнее на ~3 дБ выше 5 кГц — возвращаем присутствие и воздух */
     const roles = S.track ? S.track.sections : [];
     const roleGain = (t) => {
       for (const s of roles) if (t >= s.t0 && t < s.t1) {
@@ -6864,7 +6864,7 @@ self.onmessage = async (e) => { const m = e.data; try {
   /* высота модели: вход (норм.) → Гц, замер на «Мама мыла раму» (Ксения, id 2) */
   const SIL_CALS = { 2: [184, 252, 320, 380, 424, 459, 485, 513], 4: [171, 211, 251, 288, 329, 361, 387, 416], 1: [205, 242, 281, 320, 353, 377, 412, 428] };   /* Ксения, Ксения мягкая (xenia), Бая */
   const SIL_CAL = { c: [-1, 0, 1, 2, 3, 4, 5, 6], hz: SIL_CALS[2] };
-  const SIL_RANGE = { 2: [240, 440], 4: [210, 390], 1: [220, 400] };
+  const SIL_RANGE = { 2: [225, 410], 4: [210, 380], 1: [210, 390] };   /* Gemini: «бурундук» вверху — потолок ниже */
   /* ХАРАКТЕР ГОЛОСА (сам, по биту и промпту): кто поёт (звонкая / мягкая / взрослее), регистр, размах интонации, конец фразы, окраска тембра */
   function silChar(spec, hot) {
     const M = vMood(), st = (spec && spec.style) || '', dk = spec && spec.dark != null ? spec.dark : 0.5, en = spec && spec.energy != null ? spec.energy : 0.6;
@@ -6952,8 +6952,14 @@ self.onmessage = async (e) => { const m = e.data; try {
     /* длинная гласная = несколько коротких одинаковых звуков: модель училась на речи, одна гласная дольше ~0.3 с у неё «роботит»
        (замер «ушами»: 0.9 с одним звуком — MOS 1.5, естественность 1.1; тремя по 0.3 — 2.2 / 2.5, слова те же) */
     const silSingX = (pit) => { if (window.__noSilSplit) return getF(A.silSing(JSON.stringify({ ids, spk, durs: fr, pitch: pit })));
-      const i2 = [], d2 = [], p2 = [], SEG = (window.__silSeg || 0.15) / FRs;
-      for (let j = 0; j < N; j++) { const f = fr[j]; if (SIL_V.has(chars[j]) && f > SEG * (window.__silSegK || 1.15) && (!RAPm || f * FRs > 0.32)) { const n = Math.min(5, Math.ceil(f / SEG)); let left = f; for (let q = 0; q < n; q++) { const part = q === n - 1 ? left : Math.round(f / n); left -= part; i2.push(ids[j]); d2.push(part); p2.push(pit[j]); } }
+      const i2 = [], d2 = [], p2 = [], SEG = (window.__silSeg || 0.15) / FRs, GL = Math.round(0.04 / FRs);
+      for (let j = 0; j < N; j++) { const f = fr[j];
+        /* подъезд к ноте (Gemini: «ступеньки и щелчки между нотами»): первые ~40 мс гласной — на полпути от прошлой ноты */
+        const kv = SIL_V.has(chars[j]) ? sylOf[j] : -1, prevP = kv > 0 ? pit[tv[kv - 1]] : null;
+        if (window.__silGlide && kv > 0 && prevP != null && Math.abs(pit[j] - prevP) > 0.15 && f > GL * 2.5) { i2.push(ids[j]); d2.push(GL); p2.push(+((prevP + pit[j]) / 2).toFixed(3));
+          const rest = f - GL; if (rest > SEG * (window.__silSegK || 1.15) && (!RAPm || rest * FRs > 0.32)) { const n = Math.min(5, Math.ceil(rest / SEG)); let left = rest; for (let q = 0; q < n; q++) { const part = q === n - 1 ? left : Math.round(rest / n); left -= part; i2.push(ids[j]); d2.push(part); p2.push(pit[j]); } }
+          else { i2.push(ids[j]); d2.push(rest); p2.push(pit[j]); } continue; }
+        if (SIL_V.has(chars[j]) && f > SEG * (window.__silSegK || 1.15) && (!RAPm || f * FRs > 0.32)) { const n = Math.min(5, Math.ceil(f / SEG)); let left = f; for (let q = 0; q < n; q++) { const part = q === n - 1 ? left : Math.round(f / n); left -= part; i2.push(ids[j]); d2.push(part); p2.push(pit[j]); } }
         else { i2.push(ids[j]); d2.push(f); p2.push(pit[j]); } }
       return getF(A.silSing(JSON.stringify({ ids: i2, spk, durs: d2, pitch: p2 }))); };
     let y = await silSingX(pitchOf());
@@ -6969,6 +6975,7 @@ self.onmessage = async (e) => { const m = e.data; try {
       if (end < y.length) { for (let i = Math.max(0, end - fo); i < end; i++) y[i] *= (end - i) / fo; y = y.slice(0, end); } }
     if (oc !== 1) DSX.silOct = (DSX.silOct || 0) + 1;
     if (window.__silDbg) (DSX.silD = DSX.silD || []).push({ mk, hz: hz.map((h) => Math.round(h)), oc, vlen: tv.map((j) => +(fr[j] * FRs).toFixed(2)), first: +((NT.vS[0] - a0)).toFixed(2) });
+    if (globalThis.VCHAIN && !window.__noSilEq) { const n1 = VCHAIN.peakBQ(3200, -3.5, 1.8), n2 = VCHAIN.peakBQ(7800, -3, 1.2); for (let i = 0; i < y.length; i++) y[i] = n2.p(n1.p(y[i])); }   /* Gemini: режущий резонанс 2.8–3.5 кГц и свист 7–9 кГц */
     if (CHR.eq && !window.__noSilChar && globalThis.VCHAIN) { const q = VCHAIN.peakBQ(CHR.eq.f, CHR.eq.g, CHR.eq.q); for (let i = 0; i < y.length; i++) y[i] = q.p(y[i]); }   /* окраска: мягче/теплее или ярче */
     if (window.__silDbg) (DSX.silC = DSX.silC || []).push(CHR);
     if (lead > 0.005) { const z = Math.round(lead * 44100), o = new Float32Array(z + y.length); o.set(y, z); const fi = Math.min(441, y.length); for (let i = 0; i < fi; i++) o[z + i] *= i / fi; y = o; }
@@ -7416,7 +7423,7 @@ self.onmessage = async (e) => { const m = e.data; try {
       /* припев/дроп: дубль из той же озвучки (задержка + чуть другой тон через ресэмпл) — без второй озвучки */
       if (LK.double && S.voxDoubles !== false && !L.sil && !(globalThis.__kv2 && globalThis.__kv2.sing && !window.__noNotes) && ['peak', 'drop'].includes(roleAt(it.t0 + 0.01))) {   /* дубль из той же записи = флэнджер («под водой»): в нотном режиме не делаем */ addResampled(h1, L.y, L.sr * 1.003, sr, start + 0.017, 0.5, maxSec); anyH = true; dbl = true; }
       if (S.voxInhale && LK.inhale && it.t0 - prevEnd > 0.4) inhaleAt(m, sr, start + L.lead * 0.5 - 0.2, pkOf(L.y) * 0.1 * LK.inhale);
-      if (dsOn && !speech && !window.__noBreath && L.flow && L.flow.tOn && L.flow.tOn.length) { const bpmN = 60 / (4 * S.track.stepDur), bd = bpmN >= 140 ? 0.12 : bpmN <= 95 ? 0.35 : 0.22, v0 = it.t0 + L.flow.tOn[0] - 0.03;   /* вдох перед фразой: в быстрых песнях короткий, в медленных глубже */
+      if (dsOn && (!speech || L.sil) && !window.__noBreath && L.flow && L.flow.tOn && L.flow.tOn.length) { const bpmN = 60 / (4 * S.track.stepDur), bd = bpmN >= 140 ? 0.12 : bpmN <= 95 ? 0.35 : 0.22, v0 = it.t0 + L.flow.tOn[0] - 0.03;   /* вдох перед фразой: в быстрых песнях короткий, в медленных глубже */
         if (v0 - bd - 0.04 > prevVoxEnd) inhaleAt(m, sr, v0 - bd, pkOf(L.y) * (vMood().id === 'sad' || vMood().id === 'soft' ? 0.09 : 0.06), bd); }
       if (L.flow) prevVoxEnd = it.t0 + (L.flow.end || 0);
       prevEnd = it.t1;
@@ -7930,10 +7937,10 @@ self.onmessage = async (e) => { const m = e.data; try {
     for (const s0 of secs) { const a = Math.max(0, Math.round(s0.t0 * sr)), b = Math.min(N, Math.round(s0.t1 * sr)), tel = ['verse', 'flow', 'intro'].includes(s0.role) ? prof.tel : prof.tel > 0.7 ? prof.tel * 0.6 : 0, wid = ['peak', 'drop'].includes(s0.role) ? prof.wide : prof.wide * 0.25;
       for (let i = a; i < b; i++) { const fi = Math.min(1, (i - a) / fadeN, (b - i) / fadeN + 0.0); amtT[i] = tel * Math.max(0.15, fi); amtW[i] = wid; } }
     const h1 = new BQ().hp(450 * k0, 0.8), h2 = new BQ().lp(3200 * k0, 1.1), pk = new BQ().bp(1500 * k0, 0.9), hs = new BQ().hp(300 * k0, 0.7), D1 = Math.round(0.011 * sr), D2 = Math.round(0.017 * sr), buf = new Float32Array(D2 + 2);
-    let used = { t: 0, w: 0 };
+    let used = { t: 0, w: 0 }; const silW = !!(globalThis.DSX && DSX.silUsed && !window.__oldSilFx);   /* Gemini: «двойной голос, фазовый конфликт» в каждом припеве — это «ширина» (копии через 11/17 мс); на Ксении выкл. */
     for (let i = 0; i < N; i++) { const m = (l[i] + r[i]) * 0.5; let L = l[i], R = r[i];
       if (amtT[i] > 0.01) { const t = h2.p(h1.p(m)) * 1.6 + pk.p(m) * 0.6, a = amtT[i]; L = L * (1 - a) + t * a; R = R * (1 - a) + t * a; used.t = 1; } else { h1.p(m); h2.p(m); pk.p(m); }
-      const hm = hs.p(m); buf[i % buf.length] = hm; if (amtW[i] > 0.01) { const sd = (buf[(i - D1 + buf.length * 4) % buf.length] - buf[(i - D2 + buf.length * 4) % buf.length]) * 0.32 * amtW[i]; L += sd; R -= sd; used.w = 1; }
+      const hm = hs.p(m); buf[i % buf.length] = hm; if (amtW[i] > 0.01 && !silW) { const sd = (buf[(i - D1 + buf.length * 4) % buf.length] - buf[(i - D2 + buf.length * 4) % buf.length]) * 0.32 * amtW[i]; L += sd; R -= sd; used.w = 1; }
       l[i] = L; r[i] = R; }
     return [used.t ? '«телефон» в куплетах' : '', used.w ? 'ширина в припевах' : ''].filter(Boolean).join(', ');
   };
@@ -7959,7 +7966,7 @@ self.onmessage = async (e) => { const m = e.data; try {
     } catch (e) { console.warn('vox rev', e); }
     const cal = (L, R, tdb) => { let de = 0, we = 0; for (let i = 0; i < N; i += 2) { de += mono[i] * mono[i]; we += (L[i] * L[i] + R[i] * R[i]) * 0.5; } const k = we > 0 ? Math.sqrt(10 ** (tdb / 10) * de / we) : 0; for (let i = 0; i < N; i++) { L[i] *= k; R[i] *= k; } };
     const silV = !!(globalThis.DSX && DSX.silUsed) && !window.__oldSilFx;   /* Ксения (с придыханием): хвост реверба звучал «вторым грязным голосом» — замер «ушами» NISQA: шумность 2.1 → 2.6 при −5 дБ */
-    cal(wetL, wetR, P.rev + userRev + G('revAdj', 0) - (silV ? 5 : 0)); if (window.__noPlate) { wetL.fill(0); wetR.fill(0); }
+    cal(wetL, wetR, P.rev + userRev + G('revAdj', 0) - (silV ? 2.5 : 0));   /* Gemini: голос «сухой и оторван» — реверб вернул наполовину */ if (window.__noPlate) { wetL.fill(0); wetR.fill(0); }
     if (P.dly && !window.__noDly) {
       /* дилей в темп, пинг-понг, фильтрованный, почти не слышен под голосом */
       const dl = Math.round(beat * P.dly.div * sr), bL = new Float32Array(N), bR = new Float32Array(N), dL = new Float32Array(N), dR = new Float32Array(N), hpD = new BQ().hp(450, 0.7), lpD = new BQ().lp(4200, 0.7);
@@ -8579,7 +8586,7 @@ self.onmessage = async (e) => { const m = e.data; try {
   const ROLE_RU = { verse: 'куплет', flow: 'куплет', peak: 'припев', drop: 'дроп', build: 'подъём', lift: 'подъём', break: 'брейк', intro: 'интро', outro: 'аутро', other: 'прочее' };
   globalThis.mixNeedsFn = (stats) => mixNeeds(stats, !!(document.querySelector('#voiceMode') && document.querySelector('#voiceMode').value === 'rap'));
   function mixNeeds(stats, rap) {
-    const tgt = (window.__voxTgt != null ? window.__voxTgt : (rap ? 6 : 7) - 2.5 * (globalThis.vocalDirt && S.spec ? vocalDirt(S.spec) : 0))   /* замер: при +4.5 дБ студия топила голос, в миксе разбиралось 48–60% слов, при +7…8 — до 69% */ + (globalThis.GENE ? GENE('voxOver') : 0), need = {}; for (const [r, z] of Object.entries(stats || {})) { const d = tgt - z.db; if (Math.abs(d) > 1.2) need[r] = clamp(d, -8, 6); }   /* точно к цели: раньше громкий голос убавлялся лишь до «цель+2…4 дБ» и висел над битом */   /* голос, торчащий над битом, — тоже не «вместе» */
+    const tgt = (window.__voxTgt != null ? window.__voxTgt : (rap ? 6 : 7) - 2.5 * (globalThis.vocalDirt && S.spec ? vocalDirt(S.spec) : 0) - (globalThis.DSX && DSX.silUsed && !window.__oldSilFx ? 2 : 0))   /* Gemini: Ксения на 3–4 дБ громче бита, «вываливается» */   /* замер: при +4.5 дБ студия топила голос, в миксе разбиралось 48–60% слов, при +7…8 — до 69% */ + (globalThis.GENE ? GENE('voxOver') : 0), need = {}; for (const [r, z] of Object.entries(stats || {})) { const d = tgt - z.db; if (Math.abs(d) > 1.2) need[r] = clamp(d, -8, 6); }   /* точно к цели: раньше громкий голос убавлялся лишь до «цель+2…4 дБ» и висел над битом */   /* голос, торчащий над битом, — тоже не «вместе» */
     return need;
   }
   function studioShow(J) {
