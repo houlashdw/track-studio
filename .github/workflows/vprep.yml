@@ -1,0 +1,35 @@
+name: vprep
+# голос для обучения: расшифровка → вокал (Demucs) → кластеры «один голос» (Resemblyzer). Вокал — в закрытый кэш, наружу только отчёт
+on: workflow_dispatch
+permissions:
+  contents: write
+jobs:
+  prep:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v4
+        with: { ref: vprep-in, path: in }
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - name: Зависимости
+        run: |
+          pip install -q torch==2.6.0 torchaudio==2.6.0 --index-url https://download.pytorch.org/whl/cpu
+          pip install -q demucs resemblyzer scikit-learn librosa soundfile "numpy<2"
+      - name: Расшифровка и вокал
+        env: { P: '${{ secrets.KEYSTORE_PASS }}' }
+        run: |
+          openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -in in/src.mp3.enc -out src.mp3 -pass env:P
+          python -m demucs --two-stems=vocals -n htdemucs --mp3 -o sep src.mp3
+          mkdir -p /tmp/vox && cp sep/htdemucs/src/vocals.mp3 /tmp/vox/vocals.mp3 && ls -la /tmp/vox
+      - uses: actions/cache/save@v4
+        with: { path: /tmp/vox, key: 'vox-${{ github.run_id }}' }
+      - name: Кластеры голосов
+        run: |
+          mkdir -p out && python in/prep.py /tmp/vox/vocals.mp3 out && cat out/report.json | head -c 3000
+      - name: Отчёт
+        working-directory: out
+        run: |
+          echo "cache key: vox-${{ github.run_id }}" > CACHE.txt
+          git init -q -b vprep-out && git config user.name gha && git config user.email gha@users.noreply.github.com
+          git add -A && git commit -q -m "vprep ${{ github.run_number }}" && git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" vprep-out
