@@ -7,3 +7,4 @@ android/local.properties
 ci-out/
 *.iml
 .idea/
+__pycache__/
