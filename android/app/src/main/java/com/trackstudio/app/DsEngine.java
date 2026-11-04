@@ -631,7 +631,7 @@ public class DsEngine {
         try { in.put("mel", OnnxTensor.createTensor(env, FloatBuffer.wrap(mel), ms));
             try (OrtSession.Result r = svoc.run(in)) { a = toF((OnnxTensor) r.get(0)); } }
         finally { for (OnnxTensor t : in.values()) t.close(); }
-        return lin(a, 48000, 44100); })); return id; }
+        return resample(a, 48000, 44100); })); return id; }
     /* файлы пака: zip целиком ИЛИ отдельные файлы (rvc.onnx, contentvec.onnx, ru.onnx, ru.onnx.json — как их скачал браузер, имена могут быть с «(1)»).
        Можно выбрать все разом или по одному: «готово», когда на месте все четыре */
     static String ruTarget(String name) {
@@ -717,6 +717,16 @@ public class DsEngine {
             }
         } finally { for (OnnxTensor t : in.values()) t.close(); }
     }
+    /* точная смена частоты (оконный sinc, 64 отвода, Блэкман): линейная интерполяция 48→44.1 кГц давала «грязь» −18 дБ на 5–10 кГц — металлический призвук */
+    static float[] resample(float[] x, double sr0, double sr1) {
+        if (sr0 == sr1) return x.clone();
+        int n = (int) Math.floor(x.length * sr1 / sr0); float[] o = new float[n]; double step = sr0 / sr1, fc = 0.5 * Math.min(1.0, sr1 / sr0) * 0.94; int H = 32;
+        for (int i = 0; i < n; i++) { double p = i * step; int c = (int) Math.floor(p); double acc = 0, ws = 0;
+            for (int k = c - H + 1; k <= c + H; k++) { double t = p - k; if (Math.abs(t) >= H) continue; double w = 0.42 + 0.5 * Math.cos(Math.PI * t / H) + 0.08 * Math.cos(2 * Math.PI * t / H);
+                double sv = t == 0 ? 2 * fc : Math.sin(2 * Math.PI * fc * t) / (Math.PI * t); double h = sv * w; ws += h; if (k >= 0 && k < x.length) acc += x[k] * h; }
+            o[i] = (float) (ws != 0 ? acc / ws : 0); }
+        return o;
+    }
     static float[] lin(float[] x, double sr0, double sr1) {
         int n = (int) Math.floor(x.length * sr1 / sr0); float[] o = new float[n]; double k = sr0 / sr1;
         for (int i = 0; i < n; i++) { double p = i * k; int a = (int) p; double w = p - a; o[i] = (float) (x[Math.min(a, x.length - 1)] * (1 - w) + x[Math.min(a + 1, x.length - 1)] * w); }
@@ -746,7 +756,7 @@ public class DsEngine {
         ruLoad(); JSONObject q = new JSONObject(json); List<Integer> tp = new ArrayList<>(); long[] ids = ruTokens(q.getJSONArray("ph"), tp);
         JSONArray dj = q.optJSONArray("dur"); float[] dur = null; if (dj != null && dj.length() == ids.length) { dur = new float[ids.length]; for (int i = 0; i < dur.length; i++) dur[i] = (float) dj.getDouble(i); }
         float[] a = piper(ids, dur, (float) q.optDouble("noise", 0.45), (float) q.optDouble("noiseW", 0.5))[0];
-        if (q.optBoolean("raw", false) || rvs == null || cvs == null) return lin(a, 22050, 44100);   /* речь как есть — высоту и тембр делает приложение */
+        if (q.optBoolean("raw", false) || rvs == null || cvs == null) return resample(a, 22050, 44100);   /* речь как есть — высоту и тембр делает приложение */
         float[] x16 = lin(a, 22050, 16000);
         float[] fe; long[] fs;
         Map<String, OnnxTensor> in = new HashMap<>();
@@ -769,5 +779,5 @@ public class DsEngine {
             in.put("rnd", OnnxTensor.createTensor(env, FloatBuffer.wrap(rnd), new long[]{1, 192, T}));
             try (OrtSession.Result r = rvs.run(in)) { y = toF((OnnxTensor) r.get(0)); } }
         finally { for (OnnxTensor t : in.values()) t.close(); }
-        return lin(y, 40000, 44100); })); return id; }
+        return resample(y, 40000, 44100); })); return id; }
 }
