@@ -1318,6 +1318,9 @@ function lyrForm(txt) {
     out.push([T[1], T[2], n ? n * 2 + 1 : T[3] * 3, T[4], i]); });   /* вес — сколько тактов просят строки (≈2 на строку + вдох) */
   if (out[0] && out[0][0] !== 'intro') out.unshift(['intro', 'Интро', 3, .35, -1]);
   if (out[out.length - 1][0] !== 'outro') out.push(['outro', 'Аутро', 3, .3, -1]);
+  /* универсальная форма хита (разбор Gemini трека Suno): перед каждым припевом/дропом — короткий разгон (предприпев: нарастание, фильтр, райзер),
+     если в тексте его нет — напряжение перед главным моментом в любом жанре */
+  if (!window.__noPreCho) for (let i = out.length - 1; i > 0; i--) if (['peak', 'drop'].includes(out[i][0]) && !['build', 'lift', 'peak', 'drop'].includes(out[i - 1][0])) out.splice(i, 0, ['build', 'Разгон', 2, .74, -1]);
   return out;
 }
 function planForm(spec, totalBars) {
@@ -3435,6 +3438,8 @@ async function buildTrack(label) {
     if ($('#voiceMode').value === 'rap' && $('#rapSetup') && $('#rapSetup').checked) { rapifySpec(spec); syncControls(); }
     applyDirt(spec);
     spec.lyrForm = $('#voiceMode').value !== 'off' && !S.instrOnly ? lyrForm($('#lyrics').value) : null;
+    /* длина под текст: все блоки (куплеты, припевы, разгоны) должны поместиться — иначе разгон съедал такты куплета */
+    if (spec.lyrForm && !window.__noLenFit) { const bd = 240 / (spec.bpm || 120), need = Math.round(spec.lyrForm.reduce((a, q) => a + q[2], 0) * 1.1) * bd; if (need > spec.length) { spec.lengthAuto = spec.length; spec.length = Math.min(240, Math.ceil(need)); } }
     const track = compose(spec);
     setStatus('Рендерю звук: ' + track.events.length + ' нот и ударов…', .05, true);
     await new Promise((r) => setTimeout(r, 30));
@@ -7095,7 +7100,8 @@ self.onmessage = async (e) => { const m = e.data; try {
     const rv = R() < 0.5 ? 0 : R() < 0.5 ? 1 : 2, emoL = { ...emo, sing: !rap }, syF = sy.map((q) => ({ u: 0, stress: q.stress }));
     /* протяжная концовка — только где она звучит как в песнях: конец блока припева, «!» или «…»; иначе слово не теряется */
     emoL.holdU = 0;   /* замер на 4 треках: протяжные концовки съедали последнее слово (−3…−10% разборчивости) — выключены */
-    emoL.flowVar = mulberry32(((ctx.spec.seed || 1) ^ hashStr('fv' + (ctx.role || ''))) >>> 0)() * 3 | 0;
+    const secV = ((ctx.track && ctx.track.sections && ctx.track.sections[ctx.secIdx || 0]) || {}).variant || 0;   /* второй куплет — другой флоу (форма хита: «тот же размер, но другая читка») */
+    emoL.flowVar = mulberry32(((ctx.spec.seed || 1) ^ hashStr('fv' + (ctx.role || '') + (window.__noVerse2 ? '' : secV))) >>> 0)() * 3 | 0;
     emoL.gT = clamp(1 / sylRate(60 / (sd * 4), rap) / (sd * (triplet ? 4 / 3 : 1)) / clamp(emo.dens || 1, 0.85, 1.15), 1, 4);   /* клеток на слог: подача следует темпу бита */
     /* повтор строки в той же роли (припев) поётся так же, как в первый раз: хук узнаётся, а модель не считает то же самое заново */
     if (!S.noteMemo || S.noteMemo.tr !== ctx.track) S.noteMemo = { tr: ctx.track, m: new Map() };
@@ -7983,7 +7989,8 @@ self.onmessage = async (e) => { const m = e.data; try {
         const starts = lines.map((x) => x.t0 + (x.tOn && x.tOn.length ? x.tOn[0] : 0)).sort((a, b) => a - b);
         for (let li = 0; li < lines.length; li++) { const ln = lines[li]; if (ln.end == null) continue; const te = ln.t0 + ln.end, sec = secs.find((x) => te >= x.t0 && te < x.t1), hot = sec && ['peak', 'drop'].includes(sec.role);
           const nxt = starts.find((x) => x > te + 0.05), gap = nxt == null ? 9 : nxt - te; if (gap < 0.45) continue;   /* эхо только в паузе: не налезает на следующую строку */
-          if (!(prof.throw === 2 || hot || li % 3 === 2)) continue; const a = Math.max(0, Math.round((te - 0.42) * sr)), b = Math.min(N, Math.round((te + 0.12) * sr)); if (b - a < sr * 0.1) continue;
+          const lastL = li === lines.length - 1;   /* последняя строка — эхо растворяется в аутро */
+          if (!(prof.throw === 2 || hot || li % 3 === 2 || lastL)) continue; const a = Math.max(0, Math.round((te - 0.42) * sr)), b = Math.min(N, Math.round((te + 0.12) * sr)); if (b - a < sr * 0.1) continue;
           const hp = new BQ().hp(600 * k0, 0.7), lp = new BQ().lp(3600 * k0, 0.7), seg = new Float32Array(b - a); for (let i = 0; i < seg.length; i++) { const w = Math.min(1, i / 400, (seg.length - i) / 800); seg[i] = lp.p(hp.p(mono[a + i])) * w; }
           const lim = Math.round((te + gap - 0.12) * sr);
           for (let rpt = 1; rpt <= 3; rpt++) { const g = (hot ? 0.42 : 0.3) * 0.55 ** (rpt - 1), o = a + D * rpt, toL = rpt % 2 === 1; if (o + seg.length * 0.5 > lim) break; for (let i = 0; i < seg.length; i++) { const j = o + i; if (j >= N || j >= lim) break; const v = seg[i] * g; if (toL) { wetL[j] += v; wetR[j] += v * 0.35; } else { wetR[j] += v; wetL[j] += v * 0.35; } } }
