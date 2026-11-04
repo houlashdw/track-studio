@@ -27,7 +27,31 @@ def key(n):
 names.sort(key=key, reverse=True); print('models:', names[:8])
 MODELS = [n for n in names if 'pro' in n and 'customtools' not in n][:2] + [n for n in names if 'flash' in n][:4] + [n for n in names if 'argon' in n] or ['gemini-3.8-flash']
 open(os.path.join(dst, '_models.txt'), 'w').write('\n'.join(names))
+PC = '''Ты — опытный звукорежиссёр, слушаешь ушами как человек. Контекст: ''' + ctx + '''
+Два файла: ПЕРВЫЙ — старая версия (A), ВТОРОЙ — новая (B), тот же текст и бит. Сравни ТОЛЬКО честно, что слышишь, по-русски, с таймкодами:
+1) Голос: искажения/роботизация, «двойной голос»/фазовость, ступеньки между нотами/щелчки, режущие 3 кГц и свист, «бурундук», сухость, громкость относительно бита, естественность и эмоция. Для каждого пункта: где лучше — A, B или одинаково.
+2) Что в B стало хуже, если стало.
+3) 3 самых заметных оставшихся проблемы голоса в B с таймкодами и как их исправить в синтезе/обработке.
+В конце строка JSON: {"A":{"voice":..,"mix":..,"overall":..},"B":{"voice":..,"mix":..,"overall":..},"better":"A|B|same"}'''
+def gen(contents):
+    errs = []
+    for att in range(3):
+        for model in MODELS:
+            try: r = cl.models.generate_content(model=model, contents=contents); return model, r.text
+            except Exception as e: errs.append(model + ': ' + str(e)[:160])
+        time.sleep(30)
+    return 'none', 'ошибки:\n' + '\n'.join(errs)
+def upl(f):
+    up = cl.files.upload(file=f)
+    while up.state.name == 'PROCESSING': time.sleep(2); up = cl.files.get(name=up.name)
+    return up
+pairs = sorted(set(f[:-6] for f in glob.glob(os.path.join(src, '*_A.mp3'))))
+for b in pairs:
+    if not os.path.exists(b + '_B.mp3'): continue
+    a, bb = upl(b + '_A.mp3'), upl(b + '_B.mp3'); model, txt = gen([a, bb, PC])
+    open(os.path.join(dst, os.path.basename(b) + '_AB.md'), 'w', encoding='utf-8').write('# ' + os.path.basename(b) + ' A vs B (' + model + ')\n\n' + txt); print(b, 'pair ok')
 for f in sorted(glob.glob(os.path.join(src, '*.mp3'))):
+    if f.endswith('_A.mp3') or f.endswith('_B.mp3'): continue
     up = cl.files.upload(file=f)
     while up.state.name == 'PROCESSING': time.sleep(2); up = cl.files.get(name=up.name)
     errs = []; txt = None
