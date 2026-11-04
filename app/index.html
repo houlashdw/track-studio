@@ -3309,9 +3309,10 @@ async function aixRun() {
 /* русский для Renri: пак из Colab (RVC-тембр + русский голос Piper) */
 function ruUIhtml(s) {
   if (s.renri !== 'installed') return '';
-  if (s.ru === 'installed') return '<div class="sm" style="margin-top:4px">🇷🇺 Русский для Renri ✓ <span class="sm">(русские строки — чистое произношение)</span></div>';
+  if (s.sil === 'installed') return '<div class="sm" style="margin-top:4px">🇷🇺 Русский голос «Ксения» ✓ <span class="sm">(русские строки поёт она, остальные — Renri)</span></div>';
+  if (s.ru === 'installed') return '<div class="sm" style="margin-top:4px">🇷🇺 Русский (Piper) ✓ <button type="button" class="ex" onclick="try{TSAndroid.ruPick()}catch(e){};setTimeout(dsUI,2500)">+ голос «Ксения» (3 файла Silero)</button></div>';
   if (s.ru === 'busy') return '<div class="sm" style="margin-top:4px">🇷🇺 Ставлю русский пак… ' + Math.round((s.ruprogress || 0) * 100) + '%</div>';
-  return '<div style="margin-top:6px"><button type="button" class="ex" id="ruBtn" onclick="try{TSAndroid.ruPick()}catch(e){};setTimeout(dsUI,2500)">+ Русский для Renri (выбери 2 файла: ru.onnx и ru.onnx.json)</button>' + (/^error/.test(s.ru || '') ? ' <span class="sm">не вышло: ' + escH(String(s.ru).slice(7, 90)) + '</span>' : '') + '</div>';
+  return '<div style="margin-top:6px"><button type="button" class="ex" id="ruBtn" onclick="try{TSAndroid.ruPick()}catch(e){};setTimeout(dsUI,2500)">+ Русский для Renri (3 файла Silero: acoustic, vocoder, dur_predictor)</button>' + (/^error/.test(s.ru || '') ? ' <span class="sm">не вышло: ' + escH(String(s.ru).slice(7, 90)) + '</span>' : '') + '</div>';
 }
 /* певческая модель в приложении: строка с кнопкой «Скачать» и прогрессом */
 function dsUI() {
@@ -6780,7 +6781,7 @@ self.onmessage = async (e) => { const m = e.data; try {
      Ноты, слоги и тайминг — наши (как для Kokoro), модель только поёт. Рэп остаётся на Kokoro. */
   const DSX = { ok: false, st: null, last: 0 };
   globalThis.DSX = DSX;
-  function dsState() { const A = window.TSAndroid; if (!A || !A.dsStatus) return null; try { const s = JSON.parse(A.dsStatus()); DSX.st = s; DSX.rn = s.renri === 'installed'; DSX.ru = s.ru === 'installed'; DSX.ok = s.state === 'installed' || s.state === 'ready' || DSX.rn; return s; } catch (e) { return null; } }
+  function dsState() { const A = window.TSAndroid; if (!A || !A.dsStatus) return null; try { const s = JSON.parse(A.dsStatus()); DSX.st = s; DSX.rn = s.renri === 'installed'; DSX.sil = s.sil === 'installed'; DSX.ru = s.ru === 'installed' || DSX.sil; DSX.ok = s.state === 'installed' || s.state === 'ready' || DSX.rn; return s; } catch (e) { return null; } }
   const DS_V1 = { 'ɑ': 'aa', 'æ': 'ae', 'ʌ': 'ah', 'ɐ': 'ah', 'ə': 'ax', 'ᵊ': 'ax', 'ɔ': 'ao', 'ɛ': 'eh', 'e': 'eh', 'ɜ': 'er', 'ɝ': 'er', 'ɚ': 'er', 'ɪ': 'ih', 'ᵻ': 'ih', 'i': 'iy', 'ʊ': 'uh', 'u': 'uw', 'o': 'ow', 'a': 'aa',
     'A': 'ey', 'I': 'ay', 'W': 'aw', 'Y': 'oy', 'O': 'ow', 'Q': 'ow', 'p': 'p', 'b': 'b', 't': 't', 'd': 'd', 'k': 'k', 'g': 'g', 'ɡ': 'g', 'f': 'f', 'v': 'v', 's': 's', 'z': 'z', 'h': 'hh', 'x': 'hh',
     'm': 'm', 'n': 'n', 'l': 'l', 'ɫ': 'l', 'w': 'w', 'θ': 'th', 'ð': 'dh', 'ʃ': 'sh', 'ʒ': 'zh', 'ŋ': 'ng', 'ɹ': 'r', 'r': 'r', 'j': 'y', 'ɾ': 'dx', 'ʔ': 'q', 'ʤ': 'jh', 'ʧ': 'ch', 'ʣ': 'jh', 'ʦ': 'ch' };
@@ -6855,7 +6856,77 @@ self.onmessage = async (e) => { const m = e.data; try {
      Гласная каждого слога начинается ровно на ноте (NT.vS) и тянется до NT.vE; согласные — своей длины перед гласной (если тесно — берут у прошлой гласной). */
   const RUPV = new Set(['a', 'o', 'u', 'e', 'i', 'y', 'ɨ', 'ɪ', 'ʊ', 'ʌ', 'ə', 'ɐ', 'ɛ', 'ɑ', 'æ', 'ɵ', 'ʉ']);
   const ruOn = (lang) => lang === 'ru' && DSX.ru && dsVoice() === 'renri' && !window.__noRu;
+  /* ===== Русский голосом Silero v5 «Ксения» (CC BY-NC-SA, личное использование): модель сама поёт — мы задаём каждому звуку длительность
+     (гласная слога — ровно на ноте) и высоту (нота мелодии). Без PSOLA/RVC: замер — 84% разборчивости против 40% у Renri по-русски.
+     Ударения — из espeak (тот же фонемайзер, что у Piper) */
+  const SIL_SYM = ['_', '~', '|', '!', '+', ',', '-', '.', ':', ';', '?', 'а', 'б', 'в', 'г', 'д', 'е', 'ж', 'з', 'и', 'й', 'к', 'л', 'м', 'н', 'о', 'п', 'р', 'с', 'т', 'у', 'ф', 'х', 'ц', 'ч', 'ш', 'щ', 'ъ', 'ы', 'ь', 'э', 'ю', 'я', 'ё', '–', '…', ' '];
+  const SIL_ID = new Map(SIL_SYM.map((c, i) => [c, i])), SIL_V = new Set('аоуыэиеяёю');
+  /* высота модели: вход (норм.) → Гц, замер на «Мама мыла раму» (Ксения, id 2) */
+  const SIL_CAL = { c: [-1, 0, 1, 2, 3, 4, 5, 6], hz: [184, 252, 320, 380, 424, 459, 485, 513] };
+  const silC = (hz) => { const L = Math.log2(hz), H = SIL_CAL.hz.map(Math.log2), C = SIL_CAL.c; if (L <= H[0]) return C[0] + (L - H[0]) / (H[1] - H[0]); for (let i = 1; i < H.length; i++) if (L <= H[i]) return C[i - 1] + (C[i] - C[i - 1]) * (L - H[i - 1]) / (H[i] - H[i - 1]); return C[C.length - 1] + (L - H[H.length - 1]) / (H[H.length - 1] - H[H.length - 2]); };
+  const silOn = () => !!DSX.sil && !window.__noSil, silStressC = new Map();
+  async function silMark(text) {
+    const low = String(text).toLowerCase().replace(/[—]/g, '-').replace(/[«»"“”„]/g, '').replace(/\d+/g, ' ');
+    const words = low.match(/[а-яё]+/g) || [], vw = words.filter((w) => /[аоуыэиеяёю]/.test(w));
+    /* ударение — по каждому слову отдельно (целой строкой espeak склеивает служебные слова — сбивался счёт слов) */
+    const stress = []; for (const w of vw) { let si = -1; try { const c = silStressC.get(w); if (c != null) si = c; else { const ph = (await NEURO.phOne(w, 'ru')).phonemes.join(''); let n = 0; for (const ch of ph) { if (ch === 'ˈ') { si = n; break; } if (RUPV.has(ch)) n++; } silStressC.set(w, si); } } catch (e) { } stress.push(si); }
+    /* второй проход: ставим «+» перед ударной гласной каждого слова */
+    let res = '|', k = -1; const re = /[а-яё]+|[^а-яё]+/g; let m;
+    while ((m = re.exec(low))) { const t = m[0];
+      if (!/[а-яё]/.test(t[0])) { for (const ch of t) if (SIL_ID.has(ch)) res += ch; else if (/\s/.test(ch) && !res.endsWith(' ')) res += ' '; continue; }
+      const nv = (t.match(/[аоуыэиеяёю]/g) || []).length; if (nv) k++;
+      let si = t.indexOf('ё') >= 0 ? [...t].filter((c) => SIL_V.has(c)).indexOf('ё') : stress && k < stress.length ? stress[k] : -1;
+      if (si < 0 && nv === 1) si = 0;
+      let n = 0; for (const ch of t) { if (SIL_V.has(ch)) { if (n === si) res += '+'; n++; } res += ch; } }
+    res = res.replace(/\s+/g, ' ').trim() + '~';
+    return res;
+  }
+  async function silLine(text, NT, a0, f0h) {
+    const A = window.TSAndroid, base = 'https://appassets.androidplatform.net/ds/out/';
+    const t = String(text).replace(/\+/g, '').replace(/\[[^\]]*\]/g, '').trim(); if (!t) return null;
+    const mk = await silMark(t), chars = [...mk].filter((c) => SIL_ID.has(c)), ids = chars.map((c) => SIL_ID.get(c)), N = ids.length;
+    const getF = async (id) => { const r = await fetch(base + id); if (!r.ok) throw new Error('русский голос: ' + (await r.text()).slice(0, 160)); return new Float32Array(await r.arrayBuffer()); };
+    const spk = window.__silSpk != null ? window.__silSpk : 2;
+    const nat = Array.from(await getF(A.silNat(JSON.stringify({ ids, spk }))));
+    const FRs = 512 / 48000, K = NT.vS.length, tv = []; for (let j = 0; j < N; j++) if (SIL_V.has(chars[j])) tv.push(j);
+    if (tv.length !== K) { DSX.silMiss = (DSX.silMiss || 0) + 1; return null; }
+    const isC = (j) => /[а-яё+]/.test(chars[j]) && !SIL_V.has(chars[j]);
+    /* раскладка по времени (cur — фактическое время): согласные — естественной длины, в тесноте сжимаются до 55%, у прошлой гласной берём,
+       но гласная не короче 70 мс (замер: гласные по 10–30 мс — слова «съедались») */
+    const out = new Float64Array(N), MINV = 0.07; let cur = 0;
+    for (let k = 0; k < K; k++) {
+      const j0 = k ? tv[k - 1] + 1 : 0, j1 = tv[k], cons = [], pads = [];
+      for (let j = j0; j < j1; j++) (isC(j) ? cons : pads).push(j);
+      const on = NT.vS[k] - a0, off = Math.max(on + MINV, NT.vE[k] - a0);
+      const cn = cons.map((j) => chars[j] === '+' ? Math.min(0.02, nat[j] * FRs) : Math.max(0.03, nat[j] * FRs)), natc = cn.reduce((x, y) => x + y, 0);
+      let room = on - cur;
+      if (k && cons.length && room < natc + 0.01) { const pv = out[tv[k - 1]], take = Math.min(natc + 0.01 - room, Math.max(0, pv - MINV)); out[tv[k - 1]] = pv - take; cur -= take; room += take; }
+      const cl = cons.length ? Math.max(natc * (window.__silCmin != null ? window.__silCmin : 1), Math.min(natc, room)) : 0, sc = natc > 0 ? cl / natc : 0;
+      cons.forEach((j, q) => { out[j] = cn[q] * sc; });
+      const gap = Math.max(0, room - cl); if (pads.length) for (const j of pads) out[j] = gap / pads.length; else if (cons.length) out[cons[0]] += gap;
+      cur += cl + gap; out[j1] = Math.max(MINV, off - cur); cur += out[j1];
+    }
+    for (let j = tv[K - 1] + 1; j < N; j++) out[j] = Math.max(nat[j], 1) * FRs;
+    const fr = []; let acc = 0, prevF = 0; for (let j = 0; j < N; j++) { acc += out[j]; const f = Math.max(prevF, Math.round(acc / FRs)); fr.push(f - prevF); prevF = f; }
+    /* нота слога: высота контура в середине гласной; регистр модели ~220–480 Гц — строку целиком сдвигаем на октаву, если вылезает */
+    const hz = []; for (let k = 0; k < K; k++) { const m = ((NT.vS[k] + NT.vE[k]) / 2 - a0) / 0.0125; let v = 0; for (let d = 0; d < 40 && !v; d++) v = f0h[Math.round(m) + d] || f0h[Math.round(m) - d] || 0; hz.push(v || (hz.length ? hz[hz.length - 1] : 330)); }
+    const top = Math.max(...hz), bot = Math.min(...hz); let oc = 1; if (top > 480) oc = 0.5; else if (bot < 200 && top * 2 <= 480) oc = 2;
+    const sylOf = new Int32Array(N); { let c = 0; for (let j = 0; j < N; j++) { sylOf[j] = Math.min(c, K - 1); if (SIL_V.has(chars[j])) c++; } }
+    const cK = hz.map((h) => silC(h * oc));
+    const pitchOf = () => Array.from(sylOf, (k) => +cK[k].toFixed(3));
+    let y = await getF(A.silSing(JSON.stringify({ ids, spk, durs: fr, pitch: pitchOf() })));
+    /* точная высота: замер в середине каждой гласной и вторая попытка с поправкой (модель чуть «плывёт» вверху диапазона) */
+    if (!window.__noSilFix) { try { const sr = 44100, AF = analyzeF0(y, sr); let fix = false; let cum = 0; const cs = [0]; for (const f of fr) cs.push(cum += f);
+        for (let k = 0; k < K; k++) { const s0 = cs[tv[k]] * FRs * sr, s1 = cs[tv[k] + 1] * FRs * sr, a = Math.floor(s0 / AF.hop) + 2, b = Math.floor(s1 / AF.hop) - 1, vv = [];
+          for (let i = a; i < b && i < AF.f0.length; i++) if (AF.f0[i] > 0) vv.push(AF.f0[i]); if (vv.length < 3) continue; vv.sort((x, z) => x - z);
+          const err = 12 * Math.log2(hz[k] * oc / vv[vv.length >> 1]); if (Math.abs(err) > 0.35 && Math.abs(err) < 5) { cK[k] += silC(hz[k] * oc * 2 ** (err / 12)) - silC(hz[k] * oc); fix = true; } }
+        if (fix) y = await getF(A.silSing(JSON.stringify({ ids, spk, durs: fr, pitch: pitchOf() }))); } catch (e) { console.warn('sil-fix', e); } }
+    if (oc !== 1) DSX.silOct = (DSX.silOct || 0) + 1;
+    if (window.__silDbg) (DSX.silD = DSX.silD || []).push({ mk, hz: hz.map((h) => Math.round(h)), oc, vlen: tv.map((j) => +(fr[j] * FRs).toFixed(2)), first: +((NT.vS[0] - a0)).toFixed(2) });
+    DSX.silUsed = (DSX.silUsed || 0) + 1; return y;
+  }
   async function ruLine(text, NT, a0, f0h) {
+    if (silOn()) return silLine(text, NT, a0, f0h);
     const A = window.TSAndroid, base = 'https://appassets.androidplatform.net/ds/out/';
     const t = String(text).replace(/\+/g, '').replace(/\[[^\]]*\]/g, '').trim(); if (!t) return null;
     const ph = (await NEURO.phOne(t, 'ru')).phonemes; if (!ph || !ph.length) return null;

@@ -172,7 +172,7 @@ public class DsEngine {
             o.put("progress", progress);
             o.put("loaded", ac != null);
             o.put("pitch", pstate);
-            o.put("renri", rnState); o.put("rprogress", rnProgress); o.put("ru", ruState); o.put("ruprogress", ruProgress);
+            o.put("renri", rnState); o.put("rprogress", rnProgress); o.put("ru", ruState); o.put("ruprogress", ruProgress); o.put("sil", silReady() ? "installed" : "none");
             o.put("pprogress", pprogress);
             return o.toString();
         } catch (Exception e) {
@@ -583,12 +583,64 @@ public class DsEngine {
     volatile String ruState = "none"; volatile double ruProgress = 0;
     volatile OrtSession pv, cvs, rvs; final Map<String, int[]> ruIds = new HashMap<>(); boolean pvForced = false;
     File ruDir() { File d = new File(dir.getParentFile(), "ru"); d.mkdirs(); return d; }
+    /* ===== Silero v5 (русский): поёт сама — длительность и высота каждого звука задаются приложением ===== */
+    volatile OrtSession sac, svoc, sdur;
+    boolean silReady() { File d = ruDir(); return new File(d, "sil_acoustic.onnx").exists() && new File(d, "sil_vocoder.onnx").exists() && new File(d, "sil_dur.onnx").exists(); }
+    void silRelease() { try { if (sac != null) sac.close(); if (svoc != null) svoc.close(); if (sdur != null) sdur.close(); } catch (Exception e) { } sac = svoc = sdur = null; }
+    void silLoad() throws Exception {
+        synchronized (llock) {
+            if (sac != null) return;
+            if (env == null) env = OrtEnvironment.getEnvironment();
+            if (kv != null) { try { kv.close(); } catch (Exception e) { } kv = null; }
+            ruRelease();
+            File d = ruDir(); OrtSession.SessionOptions so = new OrtSession.SessionOptions();
+            so.setIntraOpNumThreads(threads()); so.setOptimizationLevel(OrtSession.SessionOptions.OptLevel.BASIC_OPT); so.setMemoryPatternOptimization(false);
+            sdur = env.createSession(new File(d, "sil_dur.onnx").getAbsolutePath(), so);
+            sac = env.createSession(new File(d, "sil_acoustic.onnx").getAbsolutePath(), so);
+            svoc = env.createSession(new File(d, "sil_vocoder.onnx").getAbsolutePath(), so);
+        }
+    }
+    static long[] jl(JSONArray a) throws Exception { long[] o = new long[a.length()]; for (int i = 0; i < o.length; i++) o[i] = a.getLong(i); return o; }
+    static float[] jf(JSONArray a) throws Exception { float[] o = new float[a.length()]; for (int i = 0; i < o.length; i++) o[i] = (float) a.getDouble(i); return o; }
+    /* job "silNat": естественные длительности звуков (кадры 512 @48 кГц). q: ids, spk */
+    String silNatSubmit(String json) { String id = "s" + nidA.incrementAndGet(); jobs.put(id, run.submit(() -> {
+        silLoad(); JSONObject q = new JSONObject(json); long[] ids = jl(q.getJSONArray("ids")); int n = ids.length; Map<String, OnnxTensor> in = new HashMap<>();
+        try { boolean[][] mask = new boolean[1][n]; long[] z = new long[n];
+            in.put("text", OnnxTensor.createTensor(env, LongBuffer.wrap(ids), new long[]{1, n}));
+            in.put("speaker_ids", OnnxTensor.createTensor(env, LongBuffer.wrap(new long[]{q.optLong("spk", 2)}), new long[]{1}));
+            in.put("mask", OnnxTensor.createTensor(env, mask));
+            in.put("type_ids", OnnxTensor.createTensor(env, LongBuffer.wrap(z), new long[]{1, n}));
+            in.put("focus_mask", OnnxTensor.createTensor(env, LongBuffer.wrap(z.clone()), new long[]{1, n}));
+            try (OrtSession.Result r = sdur.run(in)) { float[] d = toF((OnnxTensor) r.get(0)); for (int i = 0; i < d.length; i++) d[i] = (float) Math.max(0, Math.exp(d[i]) - 1); return d; }
+        } finally { for (OnnxTensor t : in.values()) t.close(); } })); return id; }
+    /* job "silSing": q: ids, spk, durs (кадры), pitch (норм. высота на звук). Выход: float32 44.1 кГц */
+    String silSingSubmit(String json) { String id = "s" + nidA.incrementAndGet(); jobs.put(id, run.submit(() -> {
+        silLoad(); JSONObject q = new JSONObject(json); long[] ids = jl(q.getJSONArray("ids")); int n = ids.length; float[] du = jf(q.getJSONArray("durs")), pi = jf(q.getJSONArray("pitch"));
+        float[] one = new float[n]; java.util.Arrays.fill(one, 1f); long[] z = new long[n]; Map<String, OnnxTensor> in = new HashMap<>(); float[] mel; long[] ms;
+        try { in.put("sequence", OnnxTensor.createTensor(env, LongBuffer.wrap(ids), new long[]{1, n}));
+            in.put("speaker_ids", OnnxTensor.createTensor(env, LongBuffer.wrap(new long[]{q.optLong("spk", 2)}), new long[]{1}));
+            in.put("durs_rate", OnnxTensor.createTensor(env, FloatBuffer.wrap(one), new long[]{1, n}));
+            in.put("gt_durs", OnnxTensor.createTensor(env, FloatBuffer.wrap(du), new long[]{1, n}));
+            in.put("gt_pitch", OnnxTensor.createTensor(env, FloatBuffer.wrap(pi), new long[]{1, 1, n}));
+            in.put("pitch_coefs", OnnxTensor.createTensor(env, FloatBuffer.wrap(one.clone()), new long[]{1, n}));
+            in.put("type_ids", OnnxTensor.createTensor(env, LongBuffer.wrap(z), new long[]{1, n}));
+            in.put("focus_mask", OnnxTensor.createTensor(env, LongBuffer.wrap(z.clone()), new long[]{1, n}));
+            try (OrtSession.Result r = sac.run(in)) { OnnxTensor t = (OnnxTensor) r.get(0); mel = toF(t); ms = t.getInfo().getShape(); }
+        } finally { for (OnnxTensor t : in.values()) t.close(); in.clear(); }
+        float[] a;
+        try { in.put("mel", OnnxTensor.createTensor(env, FloatBuffer.wrap(mel), ms));
+            try (OrtSession.Result r = svoc.run(in)) { a = toF((OnnxTensor) r.get(0)); } }
+        finally { for (OnnxTensor t : in.values()) t.close(); }
+        return lin(a, 48000, 44100); })); return id; }
     /* файлы пака: zip целиком ИЛИ отдельные файлы (rvc.onnx, contentvec.onnx, ru.onnx, ru.onnx.json — как их скачал браузер, имена могут быть с «(1)»).
        Можно выбрать все разом или по одному: «готово», когда на месте все четыре */
     static String ruTarget(String name) {
         String n = name.toLowerCase();
         if (n.endsWith(".json")) return "ru.onnx.json";
         if (!n.endsWith(".onnx")) return null;
+        if (n.contains("acoustic")) return "sil_acoustic.onnx";   /* Silero v5 (русский певческий путь): acoustic_v5_6_ru, vocoder_v5_6_ru, dur_predictor_v5_6_ru */
+        if (n.contains("vocoder")) return "sil_vocoder.onnx";
+        if (n.contains("dur_pred")) return "sil_dur.onnx";
         if (n.contains("contentvec")) return "contentvec.onnx";
         if (n.contains("rvc")) return "rvc.onnx";
         if (n.startsWith("ru")) return "ru.onnx";
@@ -616,7 +668,11 @@ public class DsEngine {
                     } else { String t = ruTarget(nm); if (t == null) { raw.close(); throw new IOException("непонятный файл: " + nm); } try (InputStream in = raw) { copyOut(in, new File(d, t), new long[1], 0, null); } }
                 }
                 List<String> miss = new ArrayList<>();
-                for (String f : new String[]{"ru.onnx", "ru.onnx.json"}) if (!new File(d, f).exists()) miss.add(f);   /* RVC (rvc/contentvec) — необязательно: по умолчанию аниме-обработка в приложении */
+                boolean sil = silReady(); List<String> missS = new ArrayList<>();
+                for (String f : new String[]{"sil_acoustic.onnx", "sil_vocoder.onnx", "sil_dur.onnx"}) if (!new File(d, f).exists()) missS.add(f);
+                if (!sil) for (String f : new String[]{"ru.onnx", "ru.onnx.json"}) if (!new File(d, f).exists()) miss.add(f);   /* хватает Silero (3 файла) ИЛИ Piper (2 файла) */
+                if (!sil && missS.size() < 3) { miss.clear(); for (String f : missS) miss.add(f.replace("sil_acoustic", "acoustic_v5_6_ru").replace("sil_vocoder", "vocoder_v5_6_ru").replace("sil_dur", "dur_predictor_v5_6_ru")); }
+                synchronized (llock) { silRelease(); }
                 synchronized (llock) { ruRelease(); }
                 if (!miss.isEmpty()) { ruState = "error: не хватает " + String.join(", ", miss) + " — выбери и их"; return; }
                 new FileOutputStream(new File(d, "ok")).close(); ruProgress = 1; ruState = "installed";
@@ -629,6 +685,7 @@ public class DsEngine {
             if (pv != null) return;
             if (env == null) env = OrtEnvironment.getEnvironment();
             if (kv != null) { try { kv.close(); } catch (Exception e) { } kv = null; }
+            silRelease();
             File d = ruDir(); OrtSession.SessionOptions so = new OrtSession.SessionOptions();
             so.setIntraOpNumThreads(threads()); so.setOptimizationLevel(OrtSession.SessionOptions.OptLevel.BASIC_OPT); so.setMemoryPatternOptimization(false);
             pv = env.createSession(new File(d, "ru.onnx").getAbsolutePath(), so);

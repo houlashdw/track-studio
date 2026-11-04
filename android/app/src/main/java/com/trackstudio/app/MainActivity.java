@@ -337,7 +337,7 @@ public class MainActivity extends Activity {
         public void ruPick() {
             runOnUiThread(() -> { Intent i = new Intent(Intent.ACTION_GET_CONTENT); i.addCategory(Intent.CATEGORY_OPENABLE); i.setType("*/*");
                 i.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
-                try { startActivityForResult(Intent.createChooser(i, "Выбери файлы русского пака (4 файла или zip)"), PICK_RU); } catch (Exception e) { } });
+                try { startActivityForResult(Intent.createChooser(i, "Выбери файлы русского голоса (3 файла Silero)"), PICK_RU); } catch (Exception e) { } });
         }
 
         @JavascriptInterface
@@ -345,6 +345,12 @@ public class MainActivity extends Activity {
 
         @JavascriptInterface
         public String ruSing(String json) { return ds.ruSingSubmit(json); }
+
+        @JavascriptInterface
+        public String silNat(String json) { return ds.silNatSubmit(json); }
+
+        @JavascriptInterface
+        public String silSing(String json) { return ds.silSingSubmit(json); }
 
         @JavascriptInterface
         public String dsStatus() {
