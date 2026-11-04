@@ -35,10 +35,15 @@ PC = '''Ты — опытный звукорежиссёр, слушаешь у�
 В конце строка JSON: {"A":{"voice":..,"mix":..,"overall":..},"B":{"voice":..,"mix":..,"overall":..},"better":"A|B|same"}'''
 def gen(contents):
     errs = []
-    for att in range(8):
+    dead = set()   # 429 (кончилась дневная квота) — модель больше не дёргаем, чтобы не жечь лимит
+    for att in range(6):
         for model in MODELS:
+            if model in dead: continue
             try: r = cl.models.generate_content(model=model, contents=contents); return model, r.text
-            except Exception as e: errs.append(model + ': ' + str(e)[:160])
+            except Exception as e:
+                errs.append(model + ': ' + str(e)[:160])
+                if '429' in str(e): dead.add(model)
+        if len(dead) == len(MODELS): break
         time.sleep(45 + 15 * att)
     return 'none', 'ошибки:\n' + '\n'.join(errs)
 def upl(f):
