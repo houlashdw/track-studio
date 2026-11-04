@@ -1,0 +1,26 @@
+name: listen
+# «Слушатель»: Gemini (бесплатный ключ из Google AI Studio, секрет GEMINI_API_KEY) слушает треки из ветки listen-in и пишет разбор в ветку listen-out
+on:
+  workflow_dispatch:
+    inputs:
+      note: { description: 'что проверить', default: '' }
+permissions:
+  contents: write
+jobs:
+  listen:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { ref: listen-in, path: in }
+      - name: Gemini слушает
+        env: { GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}', NOTE: '${{ inputs.note }}' }
+        run: |
+          [ -n "$GEMINI_API_KEY" ] || { echo "::error::нет секрета GEMINI_API_KEY"; exit 1; }
+          pip install -q google-genai
+          mkdir -p out
+          python in/listen.py in out
+      - name: Ветка listen-out
+        working-directory: out
+        run: |
+          git init -q -b listen-out && git config user.name gha && git config user.email gha@users.noreply.github.com
+          git add -A && git commit -q -m "listen ${{ github.run_number }}" && git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" listen-out
