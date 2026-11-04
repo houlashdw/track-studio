@@ -6928,13 +6928,20 @@ self.onmessage = async (e) => { const m = e.data; try {
     const sylOf = new Int32Array(N); { let c = 0; for (let j = 0; j < N; j++) { sylOf[j] = Math.min(c, K - 1); if (SIL_V.has(chars[j])) c++; } }
     const cK = hz.map((h) => silC(h * oc));
     const pitchOf = () => Array.from(sylOf, (k) => +Math.min(4.3, Math.max(-0.5, cK[k])).toFixed(3));   /* вне ~200–450 Гц модель хрипит — дальше не пускаем */
-    let y = await getF(A.silSing(JSON.stringify({ ids, spk, durs: fr, pitch: pitchOf() })));
+    /* длинная гласная = несколько коротких одинаковых звуков: модель училась на речи, одна гласная дольше ~0.3 с у неё «роботит»
+       (замер «ушами»: 0.9 с одним звуком — MOS 1.5, естественность 1.1; тремя по 0.3 — 2.2 / 2.5, слова те же) */
+    const silSingX = (pit) => { if (window.__noSilSplit) return getF(A.silSing(JSON.stringify({ ids, spk, durs: fr, pitch: pit })));
+      const i2 = [], d2 = [], p2 = [], SEG = (window.__silSeg || 0.15) / FRs;
+      for (let j = 0; j < N; j++) { const f = fr[j]; if (SIL_V.has(chars[j]) && f > SEG * (window.__silSegK || 1.15)) { const n = Math.min(5, Math.ceil(f / SEG)); let left = f; for (let q = 0; q < n; q++) { const part = q === n - 1 ? left : Math.round(f / n); left -= part; i2.push(ids[j]); d2.push(part); p2.push(pit[j]); } }
+        else { i2.push(ids[j]); d2.push(f); p2.push(pit[j]); } }
+      return getF(A.silSing(JSON.stringify({ ids: i2, spk, durs: d2, pitch: p2 }))); };
+    let y = await silSingX(pitchOf());
     /* точная высота: замер в середине каждой гласной и вторая попытка с поправкой (модель чуть «плывёт» вверху диапазона) */
     if (!window.__noSilFix) { try { const sr = 44100, AF = analyzeF0(y, sr); let fix = false; let cum = 0; const cs = [0]; for (const f of fr) cs.push(cum += f);
         for (let k = 0; k < K; k++) { const s0 = cs[tv[k]] * FRs * sr, s1 = cs[tv[k] + 1] * FRs * sr, a = Math.floor(s0 / AF.hop) + 2, b = Math.floor(s1 / AF.hop) - 1, vv = [];
           for (let i = a; i < b && i < AF.f0.length; i++) if (AF.f0[i] > 0) vv.push(AF.f0[i]); if (vv.length < 3) continue; vv.sort((x, z) => x - z);
           const err = 12 * Math.log2(hz[k] * oc / vv[vv.length >> 1]); if (Math.abs(err) > 0.35 && Math.abs(err) < 3) { cK[k] = Math.min(4.3, cK[k] + silC(hz[k] * oc * 2 ** (err / 12)) - silC(hz[k] * oc)); fix = true; } }
-        if (fix) y = await getF(A.silSing(JSON.stringify({ ids, spk, durs: fr, pitch: pitchOf() }))); } catch (e) { console.warn('sil-fix', e); } }
+        if (fix) y = await silSingX(pitchOf()); } catch (e) { console.warn('sil-fix', e); } }
     /* хвост строки: после последней гласной — только её согласные (≤0.2 с) и затухание; раньше хвост («~», паузы) налезал на начало следующей строки — звучало как второй голос */
     if (!window.__noSilTrim) { let cum = 0; for (let j = 0; j <= tv[K - 1]; j++) cum += fr[j]; let tailF = 0; for (let j = tv[K - 1] + 1; j < N; j++) if (/[а-яё]/.test(chars[j])) tailF += fr[j];
       const end = Math.min(y.length, Math.round((cum + Math.min(tailF, 0.2 / FRs)) * FRs * 44100 + 0.03 * 44100)), fo = Math.round(0.04 * 44100);
