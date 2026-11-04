@@ -14,10 +14,23 @@ P = """Ты — опытный звукорежиссёр и продюсер, �
 5) Сравни с типичным треком Suno v4/v5: что хуже, что лучше — по пунктам.
 6) ТОП-5 конкретных исправлений по важности (что сделать в обработке/синтезе, чтобы звучало как у профи).
 Оценки 1–10: голос, мелодия, бит, сведение, общее. В конце строка JSON: {"voice":..,"melody":..,"beat":..,"mix":..,"overall":..}""" + ("\nОтдельно проверь: " + note if note else '')
+names = []
+try:
+    for m in cl.models.list():
+        n = m.name.split('/')[-1]; acts = getattr(m, 'supported_actions', None) or []
+        if n.startswith('gemini') and ('generateContent' in acts or not acts) and not any(x in n for x in ['tts', 'image', 'embed', 'live', 'audio', 'lite', 'thinking-exp']): names.append(n)
+except Exception as e: print('list', e)
+import re
+def key(n):
+    v = re.findall(r'gemini-(\d+(?:\.\d+)?)', n); ver = float(v[0]) if v else 0
+    return (ver, 'pro' in n, 'preview' not in n and 'exp' not in n)
+names.sort(key=key, reverse=True); print('models:', names[:8])
+MODELS = [n for n in names if 'pro' in n][:2] + [n for n in names if 'flash' in n][:2] or ['gemini-3.8-flash']
+open(os.path.join(dst, '_models.txt'), 'w').write('\n'.join(names))
 for f in sorted(glob.glob(os.path.join(src, '*.mp3'))):
     up = cl.files.upload(file=f)
     while up.state.name == 'PROCESSING': time.sleep(2); up = cl.files.get(name=up.name)
-    for model in ['gemini-2.5-pro', 'gemini-2.5-flash']:
+    for model in MODELS:
         try: r = cl.models.generate_content(model=model, contents=[up, P]); txt = r.text; break
         except Exception as e: txt = 'ошибка ' + model + ': ' + str(e)
     open(os.path.join(dst, os.path.basename(f)[:-4] + '.md'), 'w', encoding='utf-8').write('# ' + os.path.basename(f) + ' (' + model + ')\n\n' + txt)
