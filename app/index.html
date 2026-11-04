@@ -7916,10 +7916,11 @@ self.onmessage = async (e) => { const m = e.data; try {
       const cv = oc.createConvolver(); cv.buffer = plateIR(oc, Math.min(3, P.size * userSize * 1.2 * rvSz), rvPre, 0.7);
       s.connect(hp); hp.connect(lp); lp.connect(cv); cv.connect(oc.destination); s.start();
       const w = await oc.startRendering(), a = w.getChannelData(0), b = w.getChannelData(1);
-      const duk = window.__revDuck != null ? window.__revDuck : 0.78; for (let i = 0; i < N; i++) { const d = 1 - duk * Math.min(1, env[i] * 2.5); wetL[i] = a[i] * d; wetR[i] = b[i] * d; }   /* реверб глубже уходит под голос (было 0.6): слова не тонут, хвосты расцветают в паузах */
+      const duk = window.__revDuck != null ? window.__revDuck : (globalThis.DSX && DSX.silUsed && !window.__oldSilFx ? 0.9 : 0.78); for (let i = 0; i < N; i++) { const d = 1 - duk * Math.min(1, env[i] * 2.5); wetL[i] = a[i] * d; wetR[i] = b[i] * d; }   /* реверб глубже уходит под голос (было 0.6): слова не тонут, хвосты расцветают в паузах */
     } catch (e) { console.warn('vox rev', e); }
     const cal = (L, R, tdb) => { let de = 0, we = 0; for (let i = 0; i < N; i += 2) { de += mono[i] * mono[i]; we += (L[i] * L[i] + R[i] * R[i]) * 0.5; } const k = we > 0 ? Math.sqrt(10 ** (tdb / 10) * de / we) : 0; for (let i = 0; i < N; i++) { L[i] *= k; R[i] *= k; } };
-    cal(wetL, wetR, P.rev + userRev + G('revAdj', 0)); if (window.__noPlate) { wetL.fill(0); wetR.fill(0); }
+    const silV = !!(globalThis.DSX && DSX.silUsed) && !window.__oldSilFx;   /* Ксения (с придыханием): хвост реверба звучал «вторым грязным голосом» — замер «ушами» NISQA: шумность 2.1 → 2.6 при −5 дБ */
+    cal(wetL, wetR, P.rev + userRev + G('revAdj', 0) - (silV ? 5 : 0)); if (window.__noPlate) { wetL.fill(0); wetR.fill(0); }
     if (P.dly && !window.__noDly) {
       /* дилей в темп, пинг-понг, фильтрованный, почти не слышен под голосом */
       const dl = Math.round(beat * P.dly.div * sr), bL = new Float32Array(N), bR = new Float32Array(N), dL = new Float32Array(N), dR = new Float32Array(N), hpD = new BQ().hp(450, 0.7), lpD = new BQ().lp(4200, 0.7);
