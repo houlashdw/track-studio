@@ -616,7 +616,7 @@ public class DsEngine {
                     } else { String t = ruTarget(nm); if (t == null) { raw.close(); throw new IOException("непонятный файл: " + nm); } try (InputStream in = raw) { copyOut(in, new File(d, t), new long[1], 0, null); } }
                 }
                 List<String> miss = new ArrayList<>();
-                for (String f : new String[]{"rvc.onnx", "contentvec.onnx", "ru.onnx", "ru.onnx.json"}) if (!new File(d, f).exists()) miss.add(f);
+                for (String f : new String[]{"ru.onnx", "ru.onnx.json"}) if (!new File(d, f).exists()) miss.add(f);   /* RVC (rvc/contentvec) — необязательно: по умолчанию аниме-обработка в приложении */
                 synchronized (llock) { ruRelease(); }
                 if (!miss.isEmpty()) { ruState = "error: не хватает " + String.join(", ", miss) + " — выбери и их"; return; }
                 new FileOutputStream(new File(d, "ok")).close(); ruProgress = 1; ruState = "installed";
@@ -633,8 +633,7 @@ public class DsEngine {
             so.setIntraOpNumThreads(threads()); so.setOptimizationLevel(OrtSession.SessionOptions.OptLevel.BASIC_OPT); so.setMemoryPatternOptimization(false);
             pv = env.createSession(new File(d, "ru.onnx").getAbsolutePath(), so);
             pvForced = pv.getInputNames().contains("durations");
-            cvs = env.createSession(new File(d, "contentvec.onnx").getAbsolutePath(), so);
-            rvs = env.createSession(new File(d, "rvc.onnx").getAbsolutePath(), so);
+            if (new File(d, "contentvec.onnx").exists() && new File(d, "rvc.onnx").exists()) { cvs = env.createSession(new File(d, "contentvec.onnx").getAbsolutePath(), so); rvs = env.createSession(new File(d, "rvc.onnx").getAbsolutePath(), so); }
             byte[] b = java.nio.file.Files.readAllBytes(new File(d, "ru.onnx.json").toPath());
             JSONObject m = new JSONObject(new String(b, "UTF-8")).getJSONObject("phoneme_id_map"); ruIds.clear();
             for (java.util.Iterator<String> it = m.keys(); it.hasNext(); ) { String k = it.next(); JSONArray a = m.getJSONArray(k); int[] v = new int[a.length()]; for (int i = 0; i < v.length; i++) v[i] = a.getInt(i); ruIds.put(k, v); }
@@ -690,6 +689,7 @@ public class DsEngine {
         ruLoad(); JSONObject q = new JSONObject(json); List<Integer> tp = new ArrayList<>(); long[] ids = ruTokens(q.getJSONArray("ph"), tp);
         JSONArray dj = q.optJSONArray("dur"); float[] dur = null; if (dj != null && dj.length() == ids.length) { dur = new float[ids.length]; for (int i = 0; i < dur.length; i++) dur[i] = (float) dj.getDouble(i); }
         float[] a = piper(ids, dur, (float) q.optDouble("noise", 0.45), (float) q.optDouble("noiseW", 0.5))[0];
+        if (q.optBoolean("raw", false) || rvs == null || cvs == null) return lin(a, 22050, 44100);   /* речь как есть — высоту и тембр делает приложение */
         float[] x16 = lin(a, 22050, 16000);
         float[] fe; long[] fs;
         Map<String, OnnxTensor> in = new HashMap<>();

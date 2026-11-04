@@ -3311,7 +3311,7 @@ function ruUIhtml(s) {
   if (s.renri !== 'installed') return '';
   if (s.ru === 'installed') return '<div class="sm" style="margin-top:4px">🇷🇺 Русский для Renri ✓ <span class="sm">(русские строки — чистое произношение)</span></div>';
   if (s.ru === 'busy') return '<div class="sm" style="margin-top:4px">🇷🇺 Ставлю русский пак… ' + Math.round((s.ruprogress || 0) * 100) + '%</div>';
-  return '<div style="margin-top:6px"><button type="button" class="ex" id="ruBtn" onclick="try{TSAndroid.ruPick()}catch(e){};setTimeout(dsUI,2500)">+ Русский для Renri (выбери 4 файла пака)</button>' + (/^error/.test(s.ru || '') ? ' <span class="sm">не вышло: ' + escH(String(s.ru).slice(7, 90)) + '</span>' : '') + '</div>';
+  return '<div style="margin-top:6px"><button type="button" class="ex" id="ruBtn" onclick="try{TSAndroid.ruPick()}catch(e){};setTimeout(dsUI,2500)">+ Русский для Renri (выбери 2 файла: ru.onnx и ru.onnx.json)</button>' + (/^error/.test(s.ru || '') ? ' <span class="sm">не вышло: ' + escH(String(s.ru).slice(7, 90)) + '</span>' : '') + '</div>';
 }
 /* певческая модель в приложении: строка с кнопкой «Скачать» и прогрессом */
 function dsUI() {
@@ -6884,9 +6884,19 @@ self.onmessage = async (e) => { const m = e.data; try {
     for (let i = 0; i < T; i++) { const h = Math.floor((i / 100) / hs); f0[i] = h < H ? f0h[h] : 0; }
     let last = 0; for (let i = 0; i < T; i++) { if (f0[i] > 0) last = f0[i]; else f0[i] = last; } last = 0; for (let i = T - 1; i >= 0; i--) { if (f0[i] > 0 && last === 0) last = f0[i]; if (f0[i] === 0) f0[i] = last; }
     for (let i = 0; i < T; i++) f0[i] = +f0[i].toFixed(1);
-    const y = await getF(A.ruSing(JSON.stringify({ ph, dur: fr, f0, shift: 1.5, noise: 0.4, noiseW: 0.4 })));
+    let y = await getF(A.ruSing(JSON.stringify({ ph, dur: fr, f0, shift: 1.5, noise: 0.4, noiseW: 0.4, raw: !window.__ruRvc })));
+    if (!window.__ruRvc) y = ruAnime(y, f0);
     DSX.ruUsed = (DSX.ruUsed || 0) + 1; return y;
   }
+  /* «аниме-обработка» русской речи (вместо RVC: замер — RVC Renri после 54 эпох 50% разборчивости против 82% у самой речи):
+     высота — ровно по нотам/контуру строки (PSOLA по периодам), форманты чуть вверх — моложе и светлее, без «бурундука» */
+  function ruAnime(y, f0) {
+    try { const sr = 44100, A = analyzeF0(y, sr), PM = pitchMarks(y, sr, A); if (PM.M.length < 8) return y;
+      const fmt = window.__ruFmt != null ? window.__ruFmt : 2.2, n = f0.length;
+      const tgt = (ts, f) => { const i = Math.min(n - 1, Math.max(0, Math.floor(ts / sr * 100))); return f0[i] > 0 ? f0[i] : f; };
+      const o = psola(y, sr, A, PM, y.length, (t) => t, tgt, 2 ** (fmt / 12)).subarray(0, y.length);
+      let pi = 0, po = 0; for (let i = 0; i < y.length; i += 3) { pi = Math.max(pi, Math.abs(y[i])); po = Math.max(po, Math.abs(o[i])); } if (po > 0) { const k = pi / po; for (let i = 0; i < o.length; i++) o[i] *= k; }
+      return Float32Array.from(o); } catch (e) { console.warn('ru-anime', e); return y; } }
   /* дабл без второго прогона модели: та же дорожка с плавающей задержкой 8–20 мс и лёгким «плаванием» высоты — как второй дубль */
   /* «как у VTuber'ов»: сдвиг формант вверх без изменения высоты нот — голос моложе и милее, без писка.
      STFT, огибающая спектра через кепстр, огибающая растягивается вверх на semis полутонов; гармоники (высота) остаются на месте */
