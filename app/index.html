@@ -6881,7 +6881,8 @@ self.onmessage = async (e) => { const m = e.data; try {
     res = res.replace(/\s+/g, ' ').trim() + '~';
     return res;
   }
-  async function silLine(text, NT0, a0, f0h) {
+  async function silLine(text, NT0, a0, f0h, opt) {
+    const RAPm = !!(opt && opt.rap) && !window.__oldSilRap;
     let NT = NT0;
     const A = window.TSAndroid, base = 'https://appassets.androidplatform.net/ds/out/';
     const t = String(text).replace(/\+/g, '').replace(/\[[^\]]*\]/g, '').trim(); if (!t) return null;
@@ -6913,7 +6914,8 @@ self.onmessage = async (e) => { const m = e.data; try {
       let gap = Math.max(0, room - cl);
       /* начало строки: служебный «|» модель не молчит, а «пропевает» — даём ему естественную длину, а паузу добавляем тишиной перед звуком (иначе строка звучала поверх конца прошлой — «двойной голос») */
       if (k === 0 && pads.length && !window.__oldSilLead) { let natP = 0; for (const j of pads) { out[j] = Math.min(gap / pads.length, Math.max(1, nat[j]) * FRs); natP += out[j]; } lead = Math.max(0, gap - natP); }
-      else if (pads.length) for (const j of pads) out[j] = gap / pads.length; else if (cons.length) out[cons[0]] += gap;
+      else if (pads.length) for (const j of pads) out[j] = gap / pads.length;
+      else if (cons.length) { if (k && !window.__oldSilGap) { out[tv[k - 1]] += gap; } else out[cons[0]] += gap; }   /* «заикание»: лишнее время уходило в согласную (п/т/с тянулись) — теперь тянется прошлая гласная, слово звучит слитно */
       cur += cl + gap; out[j1] = Math.max(MINV, off - cur); cur += out[j1];
     }
     for (let j = tv[K - 1] + 1; j < N; j++) out[j] = Math.max(nat[j], 1) * FRs;
@@ -6926,13 +6928,16 @@ self.onmessage = async (e) => { const m = e.data; try {
     let oc = 1, best = -1; for (const o of [1, 0.5, 2]) { const c = hz.filter((h) => inR(h * o)).length; if (c > best) { best = c; oc = o; } }
     for (let k = 0; k < K; k++) { let h = hz[k] * oc; while (h > HI && h / 2 >= LO * 0.9) h /= 2; while (h < LO && h * 2 <= HI * 1.05) h *= 2; hz[k] = h / oc; }
     const sylOf = new Int32Array(N); { let c = 0; for (let j = 0; j < N; j++) { sylOf[j] = Math.min(c, K - 1); if (SIL_V.has(chars[j])) c++; } }
+    /* рэп: не «стишок» — ударные слоги выше, безударные ниже, фраза начинается напористо и опускается к концу (как у рэперов), в припеве шире */
+    if (RAPm) { const st = tv.map((j) => j > 0 && chars[j - 1] === '+'), amp = opt.hot ? 1.3 : 1;
+      for (let k = 0; k < K; k++) { const pos = K > 1 ? k / (K - 1) : 0, d = (st[k] ? 1.6 : -0.6) * amp + (1.2 - 2.8 * pos) * amp; hz[k] *= 2 ** (d / 12); } }
     const cK = hz.map((h) => silC(h * oc));
     const pitchOf = () => Array.from(sylOf, (k) => +Math.min(4.3, Math.max(-0.5, cK[k])).toFixed(3));   /* вне ~200–450 Гц модель хрипит — дальше не пускаем */
     /* длинная гласная = несколько коротких одинаковых звуков: модель училась на речи, одна гласная дольше ~0.3 с у неё «роботит»
        (замер «ушами»: 0.9 с одним звуком — MOS 1.5, естественность 1.1; тремя по 0.3 — 2.2 / 2.5, слова те же) */
     const silSingX = (pit) => { if (window.__noSilSplit) return getF(A.silSing(JSON.stringify({ ids, spk, durs: fr, pitch: pit })));
       const i2 = [], d2 = [], p2 = [], SEG = (window.__silSeg || 0.15) / FRs;
-      for (let j = 0; j < N; j++) { const f = fr[j]; if (SIL_V.has(chars[j]) && f > SEG * (window.__silSegK || 1.15)) { const n = Math.min(5, Math.ceil(f / SEG)); let left = f; for (let q = 0; q < n; q++) { const part = q === n - 1 ? left : Math.round(f / n); left -= part; i2.push(ids[j]); d2.push(part); p2.push(pit[j]); } }
+      for (let j = 0; j < N; j++) { const f = fr[j]; if (SIL_V.has(chars[j]) && f > SEG * (window.__silSegK || 1.15) && (!RAPm || f * FRs > 0.32)) { const n = Math.min(5, Math.ceil(f / SEG)); let left = f; for (let q = 0; q < n; q++) { const part = q === n - 1 ? left : Math.round(f / n); left -= part; i2.push(ids[j]); d2.push(part); p2.push(pit[j]); } }
         else { i2.push(ids[j]); d2.push(f); p2.push(pit[j]); } }
       return getF(A.silSing(JSON.stringify({ ids: i2, spk, durs: d2, pitch: p2 }))); };
     let y = await silSingX(pitchOf());
@@ -6951,8 +6956,8 @@ self.onmessage = async (e) => { const m = e.data; try {
     if (lead > 0.005) { const z = Math.round(lead * 44100), o = new Float32Array(z + y.length); o.set(y, z); const fi = Math.min(441, y.length); for (let i = 0; i < fi; i++) o[z + i] *= i / fi; y = o; }
     DSX.silUsed = (DSX.silUsed || 0) + 1; y.sil = 1; return y;
   }
-  async function ruLine(text, NT, a0, f0h) {
-    if (silOn()) return silLine(text, NT, a0, f0h);
+  async function ruLine(text, NT, a0, f0h, opt) {
+    if (silOn()) return silLine(text, NT, a0, f0h, opt);
     const A = window.TSAndroid, base = 'https://appassets.androidplatform.net/ds/out/';
     const t = String(text).replace(/\+/g, '').replace(/\[[^\]]*\]/g, '').trim(); if (!t) return null;
     const ph = (await NEURO.phOne(t, 'ru')).phonemes; if (!ph || !ph.length) return null;
@@ -7171,7 +7176,7 @@ self.onmessage = async (e) => { const m = e.data; try {
         const VO = window.__dsVO || { voltage: 0.7, arc: 0.3 }, GD = window.__dsGD != null ? window.__dsGD : vMood().gd;   /* замер: выше регистр (+6) и gender 0.14 — разборчивость 85→42%; держим как у аниме-голоса */   /* «Voltage» — самый яркий подголос Canary (замер: центроид 910 Гц против 577), лёгкий сдвиг формант вверх */
         const RX = rap ? (window.__dsRapExpr != null ? window.__dsRapExpr : 0.35)   /* замер (2 трека × 4 варианта): речевой контур + модель высоты 0.35 — лучшая разборчивость рэпа Renri (0.40 против 0.37 без контура) */ : VOCX ? (window.__vocxExpr != null ? window.__vocxExpr : 0) : undefined;   /* рэп: модель высоты слегка — живая интонация речи, а не распев */
         const dsP = () => dsSing(tok, dur, f0d, VO, { gender: GD, lang, expr: RX, tune: window.__dsTune != null ? window.__dsTune : vMood().tune });
-        const RU = ruOn(lang), yP = RU ? ruLine(it.tx, NT, a0, f0d).then((y) => y || dsP()).catch((er) => { console.warn('русский голос', er); DSX.ruFail = String(er && er.message || er); return dsP(); }) : dsP();
+        const RU = ruOn(lang), yP = RU ? ruLine(it.tx, NT, a0, f0d, { rap, hot }).then((y) => y || dsP()).catch((er) => { console.warn('русский голос', er); DSX.ruFail = String(er && er.message || er); return dsP(); }) : dsP();
         let dP = null, hP = null;
         if (hot && S.voxStack !== false && !window.__noStack && !RU) {
           const Rd = mulberry32((hashStr(it.tx + '|stk') ^ (ctx.spec.seed & 0xffff)) >>> 0), det = (Rd() < 0.5 ? -1 : 1) * (6 + Rd() * 6);
