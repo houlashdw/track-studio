@@ -7919,8 +7919,8 @@ self.onmessage = async (e) => { const m = e.data; try {
       const duk = window.__revDuck != null ? window.__revDuck : 0.78; for (let i = 0; i < N; i++) { const d = 1 - duk * Math.min(1, env[i] * 2.5); wetL[i] = a[i] * d; wetR[i] = b[i] * d; }   /* реверб глубже уходит под голос (было 0.6): слова не тонут, хвосты расцветают в паузах */
     } catch (e) { console.warn('vox rev', e); }
     const cal = (L, R, tdb) => { let de = 0, we = 0; for (let i = 0; i < N; i += 2) { de += mono[i] * mono[i]; we += (L[i] * L[i] + R[i] * R[i]) * 0.5; } const k = we > 0 ? Math.sqrt(10 ** (tdb / 10) * de / we) : 0; for (let i = 0; i < N; i++) { L[i] *= k; R[i] *= k; } };
-    cal(wetL, wetR, P.rev + userRev + G('revAdj', 0));
-    if (P.dly) {
+    cal(wetL, wetR, P.rev + userRev + G('revAdj', 0)); if (window.__noPlate) { wetL.fill(0); wetR.fill(0); }
+    if (P.dly && !window.__noDly) {
       /* дилей в темп, пинг-понг, фильтрованный, почти не слышен под голосом */
       const dl = Math.round(beat * P.dly.div * sr), bL = new Float32Array(N), bR = new Float32Array(N), dL = new Float32Array(N), dR = new Float32Array(N), hpD = new BQ().hp(450, 0.7), lpD = new BQ().lp(4200, 0.7);
       for (let i = 0; i < N; i++) { const x = lpD.p(hpD.p(mono[i])), a = i >= dl ? bL[i - dl] : 0, b = i >= dl ? bR[i - dl] : 0; bL[i] = x + b * 0.32; bR[i] = a; dL[i] = a; dR[i] = b; }
@@ -7929,7 +7929,7 @@ self.onmessage = async (e) => { const m = e.data; try {
     }
     /* эхо-броски: последнее слово строки повторяется в ритме бита (пинг-понг, узкая полоса), в припевах — всегда */
     try { const prof = globalThis.vfxProfile ? vfxProfile(spec) : null, lines = S.flowLines || [], secs = (S.track && S.track.sections) || [], k0 = SR / sr;
-      if (prof && prof.throw && lines.length) { const D = Math.round(beat * prof.div * sr); let nT = 0;
+      if (prof && prof.throw && lines.length && !window.__noThrow) { const D = Math.round(beat * prof.div * sr); let nT = 0;
         const starts = lines.map((x) => x.t0 + (x.tOn && x.tOn.length ? x.tOn[0] : 0)).sort((a, b) => a - b);
         for (let li = 0; li < lines.length; li++) { const ln = lines[li]; if (ln.end == null) continue; const te = ln.t0 + ln.end, sec = secs.find((x) => te >= x.t0 && te < x.t1), hot = sec && ['peak', 'drop'].includes(sec.role);
           const nxt = starts.find((x) => x > te + 0.05), gap = nxt == null ? 9 : nxt - te; if (gap < 0.45) continue;   /* эхо только в паузе: не налезает на следующую строку */
@@ -8200,14 +8200,14 @@ self.onmessage = async (e) => { const m = e.data; try {
     if (vf.vwide !== 50) { const k = vf.vwide / 50, l = out.getChannelData(0), r = out.getChannelData(1); for (let i = 0; i < out.length; i++) { const m = (l[i] + r[i]) * 0.5, sd = (l[i] - r[i]) * 0.5 * k; l[i] = m + sd; r[i] = m - sd; } }
     /* эффекты под жанр: плейт + дилей в темп, откалиброваны и приглушены под голосом */
     if (!window.__voxDry) try {
-      const l = out.getChannelData(0), r = out.getChannelData(1); S.voxSec = ''; try { if (globalThis.sectionVoxFx) S.voxSec = sectionVoxFx(l, r, sr, vfxProfile(sp)); } catch (e) { console.warn('секции голоса', e); }
+      const l = out.getChannelData(0), r = out.getChannelData(1); S.voxSec = ''; try { if (globalThis.sectionVoxFx && !window.__noSecFx) S.voxSec = sectionVoxFx(l, r, sr, vfxProfile(sp)); } catch (e) { console.warn('секции голоса', e); }
       /* «Ксения» (Silero) и так с лёгким придыханием — перегруз склейки/«дыхания с битом» звучал как искажение: оставляем только если просили грязь */
       const cleanV = !!(globalThis.DSX && DSX.silUsed) && !window.__oldSilFx && (typeof dirtMode !== 'function' || dirtMode() !== 'dirty'); globalThis.__rideNoDrive = cleanV;
       try { const gd = vocalDirt(sp), tt = window.__noTone ? '' : vocalTone(l, r, sr, gd), gl = vocalGlue(l, r, sr, cleanV ? Math.min(gd, 0.04) : gd); S.voxSec = [S.voxSec, tt, gl].filter(Boolean).join(', '); } catch (e) { console.warn('склейка', e); }
       try { const rd = window.__noRide ? '' : vocalRide(l, r, sr, music, window.__rideAmt != null ? window.__rideAmt : 1); if (rd) S.voxSec = (S.voxSec ? S.voxSec + ', ' : '') + rd; } catch (e) { console.warn('ride', e); }
       try { const pm = vfxProfile(sp); if (pm.mic > 0) { cheapMic(l, r, sr, pm.mic); S.voxSec = (S.voxSec ? S.voxSec + ', ' : '') + 'дешёвый микрофон'; } } catch (e) { console.warn('микрофон', e); }
       const fx = await vocalFx(l, r, sr, sp, bpm(), vf);
-      for (let i = 0; i < out.length; i++) { l[i] += fx.L[i]; r[i] += fx.R[i]; }
+      if (!window.__noVfx) for (let i = 0; i < out.length; i++) { l[i] += fx.L[i]; r[i] += fx.R[i]; }
       S.voxFx = fx.preset;
     } catch (e) { console.warn('vocalFx', e); }
     return out;
