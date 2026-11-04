@@ -4675,7 +4675,7 @@ document.addEventListener('DOMContentLoaded', init);
     for (let i = 0; i < N; i++) { const m = Math.max(Math.abs(vl[i]), Math.abs(vr[i])); e += (m > e ? at : rl) * (m - e); env[i] = e; }
     const duck = Math.min(1, k);
     const kd = new Float32Array(N).fill(1), dn = Math.floor(0.07 * sr);
-    if (S.track && S.track.kickTimes) {
+    if (S.track && S.track.kickTimes && !(globalThis.DSX && DSX.silUsed && !window.__oldSilFx)) {   /* Ксения: голос не «приседает» на каждую бочку (Gemini: «голос дёргается») */
       for (const kt of S.track.kickTimes) {
         const i0 = Math.round(kt * sr);
         for (let j = 0; j < dn && i0 + j < N; j++) { const g = 1 - 0.14 * (1 - j / dn) ** 1.4; if (g < kd[i0 + j]) kd[i0 + j] = g; }
@@ -6980,6 +6980,19 @@ self.onmessage = async (e) => { const m = e.data; try {
       if (end < y.length) { for (let i = Math.max(0, end - fo); i < end; i++) y[i] *= (end - i) / fo; y = y.slice(0, end); } }
     if (oc !== 1) DSX.silOct = (DSX.silOct || 0) + 1;
     if (window.__silDbg) (DSX.silD = DSX.silD || []).push({ mk, hz: hz.map((h) => Math.round(h)), oc, vlen: tv.map((j) => +(fr[j] * FRs).toFixed(2)), first: +((NT.vS[0] - a0)).toFixed(2) });
+    /* «ДУША»: модель поёт каждую ноту ровной линией — добавляем то, что делает живой певец, малыми сдвигами (≤0.4 пт, без артефактов):
+       подъезд снизу на ударной/после паузы, вибрато на долгих нотах (растёт к концу), лёгкий спад в конце фразы. Рэп — только подъезд и спад */
+    if (window.__silSoul) { try { const sr = 44100, AF = analyzeF0(y, sr), PM = pitchMarks(y, sr, AF);
+      if (PM.M.length > 8) { let cum = 0; const cs = [0]; for (const f of fr) cs.push(cum += f); const ev = [];
+        for (let k = 0; k < K; k++) { const a = cs[tv[k]] * FRs, b = cs[tv[k] + 1] * FRs, st = tv[k] > 0 && chars[tv[k] - 1] === '+', rest = k === 0 || a - cs[tv[k - 1] + 1] * FRs > 0.15; ev.push({ a, b, st, rest, last: k === K - 1 }); }
+        const MDs = CHR.mood, vibD = RAPm ? 0 : (MDs === 'sad' ? 0.42 : MDs === 'aggr' ? 0.22 : 0.33), vibR = MDs === 'sad' ? 5.0 : 5.6, scoop = RAPm ? 0.35 : 0.6, fall = CHR.endB < 0 ? -0.7 : 0.25;
+        const dev = (t) => { for (const e of ev) { if (t < e.a || t > e.b + 0.02) continue; const into = t - e.a, L = e.b - e.a; let d = 0;
+            if ((e.st || e.rest) && into < 0.08) d -= scoop * (1 - into / 0.08) ** 2;
+            if (vibD && L > 0.32 && into > 0.16) { const u = into - 0.16; d += vibD * Math.min(1, u / 0.25) * Math.sin(2 * Math.PI * vibR * u); }
+            if (e.last && L > 0.18 && e.b - t < 0.14) { const x = 1 - (e.b - t) / 0.14; d += fall * x * x; }
+            return d; } return 0; };
+        const o = psola(y, sr, AF, PM, y.length, (q) => q, (ts, f) => f * 2 ** (dev(ts / sr) / 12), 1).subarray(0, y.length);
+        let pi = 0, po = 0; for (let i = 0; i < y.length; i += 3) { pi = Math.max(pi, Math.abs(y[i])); po = Math.max(po, Math.abs(o[i])); } if (po > 0) { const kk = pi / po; y = Float32Array.from(o, (v) => v * kk); } } } catch (e) { console.warn('sil soul', e); } }
     /* Gemini: «бурундук, пластиковая середина» — форманты чуть вниз (тембр взрослее, высота нот та же); верх выше 14.5 кГц — «песок» вокодера */
     if (!window.__noSilFmt) { try { y = vtFormant(y, 44100, window.__silFmt != null ? window.__silFmt : 0); } catch (e) { console.warn('sil fmt', e); } }
     if (!window.__noSilLp) { const l1 = new BQ().lp(14500, 0.7), l2 = new BQ().lp(14500, 0.7); for (let i = 0; i < y.length; i++) y[i] = l2.p(l1.p(y[i])); }
