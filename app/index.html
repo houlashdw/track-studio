@@ -6881,15 +6881,22 @@ self.onmessage = async (e) => { const m = e.data; try {
     res = res.replace(/\s+/g, ' ').trim() + '~';
     return res;
   }
-  async function silLine(text, NT, a0, f0h) {
+  async function silLine(text, NT0, a0, f0h) {
+    let NT = NT0;
     const A = window.TSAndroid, base = 'https://appassets.androidplatform.net/ds/out/';
     const t = String(text).replace(/\+/g, '').replace(/\[[^\]]*\]/g, '').trim(); if (!t) return null;
     const mk = await silMark(t), chars = [...mk].filter((c) => SIL_ID.has(c)), ids = chars.map((c) => SIL_ID.get(c)), N = ids.length;
     const getF = async (id) => { const r = await fetch(base + id); if (!r.ok) throw new Error('русский голос: ' + (await r.text()).slice(0, 160)); return new Float32Array(await r.arrayBuffer()); };
     const spk = window.__silSpk != null ? window.__silSpk : 2;
     const nat = Array.from(await getF(A.silNat(JSON.stringify({ ids, spk }))));
-    const FRs = 512 / 48000, K = NT.vS.length, tv = []; for (let j = 0; j < N; j++) if (SIL_V.has(chars[j])) tv.push(j);
-    if (tv.length !== K) { DSX.silMiss = (DSX.silMiss || 0) + 1; return null; }
+    const FRs = 512 / 48000, tv = []; let K = NT.vS.length; for (let j = 0; j < N; j++) if (SIL_V.has(chars[j])) tv.push(j);
+    if (tv.length !== K) {   /* слоги не совпали (у Silero гласных больше/меньше, чем нот) — не отдаём строку Renri (её русский «грязный»), а подгоняем ноты:
+       лишние гласные делят самую длинную ноту, недостающие — сливаем две самые короткие соседние */
+      DSX.silFit = (DSX.silFit || 0) + 1; if (!tv.length || !K) return null;
+      const vS = NT.vS.slice(), vE = NT.vE.slice();
+      while (vS.length < tv.length) { let b = 0; for (let k = 1; k < vS.length; k++) if (vE[k] - vS[k] > vE[b] - vS[b]) b = k; const m = (vS[b] + vE[b]) / 2; vS.splice(b + 1, 0, m); vE.splice(b, 0, m); }
+      while (vS.length > tv.length) { let b = 0, bl = 1e9; for (let k = 0; k + 1 < vS.length; k++) { const l = vE[k + 1] - vS[k]; if (l < bl) { bl = l; b = k; } } vE.splice(b, 1); vS.splice(b + 1, 1); }
+      NT = { ...NT, vS, vE }; K = vS.length; }
     const isC = (j) => /[а-яё+]/.test(chars[j]) && !SIL_V.has(chars[j]);
     /* раскладка по времени (cur — фактическое время): согласные — естественной длины, в тесноте сжимаются до 55%, у прошлой гласной берём,
        но гласная не короче 70 мс (замер: гласные по 10–30 мс — слова «съедались») */
@@ -6927,7 +6934,7 @@ self.onmessage = async (e) => { const m = e.data; try {
         if (fix) y = await getF(A.silSing(JSON.stringify({ ids, spk, durs: fr, pitch: pitchOf() }))); } catch (e) { console.warn('sil-fix', e); } }
     if (oc !== 1) DSX.silOct = (DSX.silOct || 0) + 1;
     if (window.__silDbg) (DSX.silD = DSX.silD || []).push({ mk, hz: hz.map((h) => Math.round(h)), oc, vlen: tv.map((j) => +(fr[j] * FRs).toFixed(2)), first: +((NT.vS[0] - a0)).toFixed(2) });
-    DSX.silUsed = (DSX.silUsed || 0) + 1; return y;
+    DSX.silUsed = (DSX.silUsed || 0) + 1; y.sil = 1; return y;
   }
   async function ruLine(text, NT, a0, f0h) {
     if (silOn()) return silLine(text, NT, a0, f0h);
@@ -7180,7 +7187,7 @@ self.onmessage = async (e) => { const m = e.data; try {
         if (dP) { try { db = await dP; for (let i = 0; i < db.length; i++) db[i] *= g; db = late(db, 0.012 + Rl() * 0.018); } catch (er) { console.warn('дубль', er); } }
         if (hP) { try { hy = await hP; for (let i = 0; i < hy.length; i++) hy[i] *= g; hy = late(hy, 0.006 + Rl() * 0.012); } catch (er) { console.warn('гармония', er); } }
         TS.total++; TS.done++; DSX.used = (DSX.used || 0) + 1;
-        return { y, sr: 44100, ds: 1, lead: -a0, syl: sy.length, h: hy, d: db, dc: !dP, flow: { triplet, n: sy.length, pos: F.pos.map((q) => q.p), U: F.U, tOn: tV, lv, end: NT.vE[NT.vE.length - 1] } };
+        return { y, sr: 44100, ds: 1, sil: y.sil ? 1 : 0, lead: -a0, syl: sy.length, h: hy, d: db, dc: !dP, flow: { triplet, n: sy.length, pos: F.pos.map((q) => q.p), U: F.U, tOn: tV, lv, end: NT.vE[NT.vE.length - 1] } };
       } catch (er) { console.warn('певческая модель — пою Kokoro', er); DSX.fail = String((er && er.message) || er); }
     }
     const V = e.job.V, f0mix = voc || !rap ? 1 : clamp(0.5 + (D.tune || 0.5) * 0.45 + (hot ? 0.1 : 0), 0.5, 0.95), ipa = tok.join('');
@@ -7368,7 +7375,7 @@ self.onmessage = async (e) => { const m = e.data; try {
       addResampled(m, L.y, L.sr, sr, start, 1, maxSec); if (globalThis.liveAdd) liveAdd(L.y, L.sr, start, maxSec); if (L.h) { addResampled(h1, L.h, L.sr, sr, start + 0.006, 0.3, maxSec); anyH = true; }
       if (L.d) { addResampled(d1, L.d, L.sr, sr, start + 0.013, 0.3, maxSec); anyD = true; if (L.dc) dCopy = true; }   /* дубль чуть позже ведущего — как вторая запись */
       /* припев/дроп: дубль из той же озвучки (задержка + чуть другой тон через ресэмпл) — без второй озвучки */
-      if (LK.double && S.voxDoubles !== false && !(globalThis.__kv2 && globalThis.__kv2.sing && !window.__noNotes) && ['peak', 'drop'].includes(roleAt(it.t0 + 0.01))) {   /* дубль из той же записи = флэнджер («под водой»): в нотном режиме не делаем */ addResampled(h1, L.y, L.sr * 1.003, sr, start + 0.017, 0.5, maxSec); anyH = true; dbl = true; }
+      if (LK.double && S.voxDoubles !== false && !L.sil && !(globalThis.__kv2 && globalThis.__kv2.sing && !window.__noNotes) && ['peak', 'drop'].includes(roleAt(it.t0 + 0.01))) {   /* дубль из той же записи = флэнджер («под водой»): в нотном режиме не делаем */ addResampled(h1, L.y, L.sr * 1.003, sr, start + 0.017, 0.5, maxSec); anyH = true; dbl = true; }
       if (S.voxInhale && LK.inhale && it.t0 - prevEnd > 0.4) inhaleAt(m, sr, start + L.lead * 0.5 - 0.2, pkOf(L.y) * 0.1 * LK.inhale);
       if (dsOn && !speech && !window.__noBreath && L.flow && L.flow.tOn && L.flow.tOn.length) { const bpmN = 60 / (4 * S.track.stepDur), bd = bpmN >= 140 ? 0.12 : bpmN <= 95 ? 0.35 : 0.22, v0 = it.t0 + L.flow.tOn[0] - 0.03;   /* вдох перед фразой: в быстрых песнях короткий, в медленных глубже */
         if (v0 - bd - 0.04 > prevVoxEnd) inhaleAt(m, sr, v0 - bd, pkOf(L.y) * (vMood().id === 'sad' || vMood().id === 'soft' ? 0.09 : 0.06), bd); }
