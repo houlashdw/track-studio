@@ -8120,7 +8120,7 @@ self.onmessage = async (e) => { const m = e.data; try {
       const cur = kLufs(L, R, N); let pk = 0; for (let i = 0; i < N; i += 2) { const a = Math.max(Math.abs(L[i]), Math.abs(R[i])); if (a > pk) pk = a; }
       const need = tgt - cur; if (Math.abs(need) < 0.35 && it) break;
       const gr = db(pk * fromDb(need) / ceil);                       /* сколько придётся давить лимитером */
-      const grMax = opt.loud != null && !window.__softMaster ? 9.5 : 6.5; if (gr > grMax) { tgt = cur + need - (gr - grMax); }                /* не раздавливаем динамику */
+      const grMax = opt.gr != null ? opt.gr : opt.loud != null && !window.__softMaster ? 9.5 : 6.5; if (gr > grMax) { tgt = cur + need - (gr - grMax); }                /* не раздавливаем динамику */
       scale(L, R, N, fromDb(clampNeed(tgt - cur)));
       softclip(L, R, N, 0.8); limiter(L, R, N, ceil, Math.round(SR * 0.004), 0.09); await tick();
     }
@@ -8380,7 +8380,13 @@ self.onmessage = async (e) => { const m = e.data; try {
     const out = await oc.startRendering();
     /* отрезать тишину в хвосте */
     { const L0 = out.getChannelData(0), R0 = out.getChannelData(1); let end = out.length - 1; while (end > sr && Math.abs(L0[end]) < 1e-4 && Math.abs(R0[end]) < 1e-4) end--; out._end = end; }
-    { const sp = S.spec || {}; S.master = await masterV2(out.getChannelData(0), out.getChannelData(1), out.length, sr, { prep: false, lufs: -11.5 + 1.5 * clamp(sp.energy == null ? 0.6 : sp.energy, 0, 1) + ((S.fix && S.fix.lufsAdj) || 0), lowDb: (S.fix && S.fix.lowDb) || 0, highDb: (S.fix && S.fix.highDb) || 0 }); }
+    /* Gemini: «мастер пережат — пампинг на каждой сильной доле, голос дёргается» — на 2.5 дБ тише цели, лимитер давит меньше;
+       «нет общего клея» — короткая общая комната на весь микс (голос и бит в одном пространстве) */
+    const glue = !window.__oldMaster;
+    if (glue) { try { const l = out.getChannelData(0), r = out.getChannelData(1), n = l.length, d1 = Math.round(0.019 * sr), d2 = Math.round(0.027 * sr), d3 = Math.round(0.041 * sr), bl = new Float32Array(n), br = new Float32Array(n), hp = [new BQ().hp(250, 0.7), new BQ().hp(250, 0.7)], lp = [new BQ().lp(6000, 0.7), new BQ().lp(6000, 0.7)];
+        for (let i = 0; i < n; i++) { const a = lp[0].p(hp[0].p(l[i])), b = lp[1].p(hp[1].p(r[i])); bl[i] = a; br[i] = b; }
+        const g = 0.09; for (let i = d3; i < n; i++) { l[i] += g * (0.5 * bl[i - d1] + 0.3 * br[i - d2] + 0.2 * bl[i - d3]); r[i] += g * (0.5 * br[i - d1 - 37] + 0.3 * bl[i - d2 + 23] + 0.2 * br[i - d3]); } } catch (e) { console.warn('glue', e); } }
+    { const sp = S.spec || {}; S.master = await masterV2(out.getChannelData(0), out.getChannelData(1), out.length, sr, { prep: false, gr: glue ? 4 : null, lufs: -11.5 - (glue ? 2.5 : 0) + 1.5 * clamp(sp.energy == null ? 0.6 : sp.energy, 0, 1) + ((S.fix && S.fix.lufsAdj) || 0), lowDb: (S.fix && S.fix.lowDb) || 0, highDb: (S.fix && S.fix.highDb) || 0 }); }
     let res = out;
     if (out._end && out._end < out.length - sr * 0.5) { res = new AudioBuffer({ numberOfChannels: 2, length: out._end + Math.round(sr * 0.3), sampleRate: sr }); for (let c = 0; c < 2; c++) res.getChannelData(c).set(out.getChannelData(c).subarray(0, res.length)); }
     S.spd = rate; $q('#fxState').textContent = S.fxName || (vNeutral() ? 'включена' : 'бит + голос'); return res;
