@@ -7,6 +7,9 @@ on:
       batch: { description: 'batch', default: '2' }
       chain: { description: 'сколько ещё запусков подряд (продолжение с контрольной точки)', default: '0' }
       fresh: { description: '1 = начать с нуля (не брать прошлые контрольные точки)', default: '0' }
+      vox: { description: 'ключ кэша вокала (vprep)', default: 'vox-41913943505' }
+      sel: { description: 'выборка в vprep-in', default: 'select.json' }
+      ck: { description: 'префикс контрольных точек', default: 'voice-ck-' }
 permissions:
   contents: write
   actions: write
@@ -41,13 +44,13 @@ jobs:
       - uses: actions/checkout@v4
         with: { ref: vprep-in, path: vin }
       - uses: actions/cache/restore@v4
-        with: { path: /tmp/vox, key: 'vox-41913943505', fail-on-cache-miss: true }
+        with: { path: /tmp/vox, key: '${{ inputs.vox }}', fail-on-cache-miss: true }
       - name: Подготовка данных
         working-directory: rvc
         run: |
           mkdir -p /tmp/ds && python - <<'PY'
           import json, numpy as np, librosa, soundfile as sf
-          y, sr = librosa.load('/tmp/vox/vocals.mp3', sr=40000, mono=True); sel = json.load(open('../vin/select.json'))
+          y, sr = librosa.load('/tmp/vox/vocals.mp3', sr=40000, mono=True); sel = json.load(open('../vin/${{ inputs.sel }}'))
           m = []
           for a, b in sel:
               if m and a - m[-1][1] < 0.05: m[-1][1] = b
@@ -63,8 +66,8 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: /tmp/ck
-          key: voice-ck-${{ github.run_id }}
-          restore-keys: voice-ck-
+          key: ${{ inputs.ck }}${{ github.run_id }}
+          restore-keys: ${{ inputs.ck }}
       - name: Обучение
         working-directory: rvc
         run: |
@@ -80,7 +83,7 @@ jobs:
         if: always()
         with:
           path: /tmp/ck
-          key: voice-ck-${{ github.run_id }}
+          key: ${{ inputs.ck }}${{ github.run_id }}
       - name: Экспорт, проверка, пак
         working-directory: rvc
         run: |
@@ -104,4 +107,4 @@ jobs:
       - name: Следующий запуск цепочки
         if: success() && inputs.chain != '0'
         env: { GH_TOKEN: '${{ github.token }}' }
-        run: gh workflow run train-voice.yml -R ${{ github.repository }} --ref ${{ github.ref_name }} -f seconds=${{ inputs.seconds }} -f batch=${{ inputs.batch }} -f chain=$(( ${{ inputs.chain }} - 1 ))
+        run: gh workflow run train-voice.yml -R ${{ github.repository }} --ref ${{ github.ref_name }} -f seconds=${{ inputs.seconds }} -f batch=${{ inputs.batch }} -f chain=$(( ${{ inputs.chain }} - 1 )) -f vox=${{ inputs.vox }} -f sel=${{ inputs.sel }} -f ck=${{ inputs.ck }}
