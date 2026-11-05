@@ -169,7 +169,7 @@ def stage_train(epochs, batch):
     pre = (['-pg', pg, '-pd', pd] if os.path.exists(pg) and os.path.exists(pd) else [])
     print('train: кусков', len(names), 'предобученная база' if pre else 'БЕЗ базы (только проверка)')
     cmd = [sys.executable, 'infer/modules/train/train.py', '-e', EXP, '-sr', '40k', '-f0', '1', '-bs', str(batch), '-g', '0' if torch.cuda.is_available() else '',
-           '-te', str(epochs), '-se', os.environ.get('SAVE_EVERY', '15'), *pre, '-l', '1', '-c', '0', '-sw', '0', '-v', 'v2']
+           '-te', str(epochs), '-se', os.environ.get('SAVE_EVERY', '15'), *pre, '-l', '1', '-c', '0', '-sw', os.environ.get('SAVE_WEIGHTS', '0'), '-v', 'v2']
     if not torch.cuda.is_available():
         i = cmd.index('-g'); del cmd[i:i + 2]
     env = dict(os.environ, TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD='1'); os.environ['RUN_T0'] = str(time.time() if 'time' in globals() else __import__('time').time())
