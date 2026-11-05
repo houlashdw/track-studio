@@ -10,7 +10,7 @@ import os, sys, subprocess, glob, json, time, shutil
 
 REPO = 'https://raw.githubusercontent.com/houlashdw/track-studio'
 SRC = os.environ.get('SRC', 'src2.mp3.enc')
-EPOCHS = int(os.environ.get('EPOCHS', '200')); EVERY = int(os.environ.get('EVERY', '10')); BATCH = os.environ.get('BATCH', '8')
+EPOCHS = int(os.environ.get('EPOCHS', '200')); EVERY = int(os.environ.get('EVERY', '5')); BATCH = os.environ.get('BATCH', '8')
 WORK = '/kaggle/working' if os.path.isdir('/kaggle/working') else os.path.abspath('kv_out')
 os.environ['MPLBACKEND'] = 'Agg'   # в Kaggle стоит matplotlib_inline — в нашем окружении его нет, обучение падало на import matplotlib
 T = '/tmp/kv'; VENV = T + '/venv'; PY = VENV + '/bin/python'; RVC = T + '/rvc'
@@ -56,7 +56,18 @@ mkdir -p assets/pretrained_v2 assets/rmvpe assets/weights""")
         sh(f'wget -q -O {T}/src.enc {REPO}/vprep-in/{SRC}')
         subprocess.run(['openssl', 'enc', '-d', '-aes-256-cbc', '-pbkdf2', '-iter', '200000', '-in', T + '/src.enc', '-out', T + '/src.mp3', '-pass', 'env:P'], check=True, env=dict(os.environ, P=P))
         sh(f'cd {T} && {PY} -m demucs --two-stems=vocals -n htdemucs --mp3 --mp3-bitrate 320 -o sep src.mp3')
-        sh(f'{PY} {RVC}/kaggle_voice.py slice {T}/sep/htdemucs/src/vocals.mp3 {T}/ds')
+        voc = f'{T}/sep/htdemucs/src/vocals.mp3'
+        if os.environ.get('DEREVERB', '1') == '1':   # эхо/ревер из вокала Suno — иначе модель учится петь «в зале»
+            try:
+                V2 = T + '/venv2'
+                sh(f'{sys.executable} -m uv venv -q -p 3.11 {V2} && {sys.executable} -m uv pip install -q -p {V2}/bin/python "audio-separator[gpu]"')
+                sh(f'cd {T} && {V2}/bin/audio-separator {voc} --model_filename UVR-DeEcho-DeReverb.pth --output_dir {T}/dry --output_format WAV')
+                c = [f for f in glob.glob(T + '/dry/*.wav') if 'No ' in f or 'no_' in f.lower()]
+                print('без эха:', [os.path.basename(f) for f in glob.glob(T + '/dry/*.wav')], flush=True)
+                if c: voc = c[0]
+            except Exception as e:
+                print('⚠ убрать эхо не вышло, учу как есть:', e, flush=True)
+        sh(f'{PY} {RVC}/kaggle_voice.py slice "{voc}" {T}/ds')
         open(T + '/ds.ok', 'w').write('1')
     env = dict(os.environ, TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD='1', SAVE_WEIGHTS='1', SAVE_EVERY=str(EVERY), LOG_INTERVAL='50',
                TRAIN_SECONDS=os.environ.get('TRAIN_SECONDS', '28800'))
@@ -68,7 +79,8 @@ mkdir -p assets/pretrained_v2 assets/rmvpe assets/weights""")
     print('обучение: %.0f мин' % ((time.time() - t0) / 60), flush=True)
     # 5) выбор лучшей эпохи и выдача
     try:
-        sh(f'cd {RVC} && {PY} kaggle_voice.py eval {T}/piper {WORK}', env=env)
+        sh(f'wget -q -O {T}/test_lines.npz {REPO}/vprep-in/test_lines.npz')
+        sh(f'cd {RVC} && {PY} kaggle_voice.py eval {T}/test_lines.npz {WORK}', env=env)
         best = open(WORK + '/best.txt').read().split()
     except Exception as e:   # проверка упала — не теряем обучение: отдаём веса нескольких эпох (их переведу в ONNX сам)
         print('⚠ проверка эпох упала:', e, flush=True)
@@ -76,8 +88,8 @@ mkdir -p assets/pretrained_v2 assets/rmvpe assets/weights""")
         for f in ws:
             subprocess.run(['openssl', 'enc', '-aes-256-cbc', '-pbkdf2', '-iter', '200000', '-salt', '-in', f, '-out', WORK + '/' + os.path.basename(f) + '.enc', '-pass', 'env:P'], check=True, env=dict(os.environ, P=P))
         print('отдал веса:', [os.path.basename(f) for f in ws]); return
-    for i, f in enumerate(best[:2]):
-        out = WORK + ('/voice_best.onnx.enc' if i == 0 else '/voice_second.onnx.enc')
+    for i, f in enumerate(best[:3]):
+        out = WORK + ['/voice_best.onnx.enc', '/voice_second.onnx.enc', '/voice_third.onnx.enc'][i]
         subprocess.run(['openssl', 'enc', '-aes-256-cbc', '-pbkdf2', '-iter', '200000', '-salt', '-in', f, '-out', out, '-pass', 'env:P'], check=True, env=dict(os.environ, P=P))
     print(open(WORK + '/scores.txt').read())
     print('✅ готово за %.0f мин. Вкладка Output → скачай voice_best.onnx.enc (и demo_*.mp3 послушать)' % ((time.time() - t0) / 60))
@@ -104,8 +116,8 @@ def slice_vocals(src, dst):
     print('нарезка: фраз', k, 'минут %.1f' % (tot / 60), flush=True)
 
 
-def evaluate(piper_dir, work):
-    """каждая сохранённая эпоха → ONNX → строки Piper (женский русский, высота ×1.5) → Whisper → похожесть на исходный текст"""
+def evaluate(lines_npz, work):
+    """каждая сохранённая эпоха → ONNX → строки, спетые Ксенией в приложении → Whisper → похожесть на текст песни"""
     import numpy as np, torch, re, difflib, soundfile as sf, onnxruntime as ort
     sys.path.insert(0, os.getcwd()); import renri_rvc as R
     from onnx_half import half_store
@@ -115,17 +127,15 @@ def evaluate(piper_dir, work):
     dev = 'cuda' if torch.cuda.is_available() else 'cpu'
     asr = pipeline('automatic-speech-recognition', model='openai/whisper-medium', device=0 if dev == 'cuda' else -1, torch_dtype=torch.float16 if dev == 'cuda' else torch.float32)
     tr = lambda x, sr: asr({'raw': R.resample(x, sr, 16000), 'sampling_rate': 16000}, generate_kwargs={'language': 'russian', 'task': 'transcribe'})['text']
-    norm = lambda t: re.sub(r'[^а-я]', '', t.lower().replace('ё', 'е'))
+    norm = lambda t: re.sub(r'(.)\1+', r'\1', re.sub(r'[^а-я]', '', t.lower().replace('ё', 'е')))   # протяжные гласные «гооород» = «город»
     cv = R.load_cv().to(dev)
-    pv = ort.InferenceSession(glob.glob(os.path.join(piper_dir, '*.onnx'))[0])
-    lines = []
-    for ids in json.load(open('demo_ids.json')):
-        ids = np.array([ids], np.int64)
-        a = pv.run(None, {'input': ids, 'input_lengths': np.array([ids.shape[1]], np.int64), 'scales': np.array([0.667, 1.0, 0.8], np.float32)})[0].reshape(-1)
-        x = R.resample(a, 22050, 16000)
+    Z = np.load(lines_npz); texts = list(Z['text']); lines = []
+    for i, t in enumerate(texts):
+        x = Z['a%d' % i].astype(np.float32)
         with torch.no_grad(): fe = cv(torch.from_numpy(x)[None].to(dev)).last_hidden_state[0].float().cpu().numpy()
-        fe = np.repeat(fe, 2, axis=0); f0 = R.f0_autocorr(x) * 1.5; L = min(len(fe), len(f0))
-        lines.append((fe[:L], f0[:L], norm(tr(a, 22050))))
+        fe = np.repeat(fe, 2, axis=0); f0 = R.f0_autocorr(x); L = min(len(fe), len(f0))
+        lines.append((fe[:L], f0[:L], norm(t)))
+    print('строк для проверки:', len(lines), '| Ксения сама: %.3f' % np.mean([difflib.SequenceMatcher(None, norm(tr(Z['a%d' % i].astype(np.float32), 16000)), l[2]).ratio() for i, l in enumerate(lines)]), flush=True)
     ws = sorted(glob.glob('assets/weights/renri_e*_s*.pth'), key=lambda f: int(re.search(r'_e(\d+)_', f).group(1)))
     res = []
     for w in ws:
@@ -133,19 +143,19 @@ def evaluate(piper_dir, work):
         try: export_onnx(w, onx + '.f32'); half_store(onx + '.f32', onx); os.remove(onx + '.f32')
         except Exception as e: print('эпоха', ep, 'экспорт не вышел:', e, flush=True); continue
         rv = ort.InferenceSession(onx, providers=['CPUExecutionProvider']); rs = np.random.RandomState(0); outs = []; sc = []
-        for fe, f0, ref in lines:
+        for j, (fe, f0, ref) in enumerate(lines):
             L = len(fe)
             y = rv.run(None, {'phone': fe[None].astype(np.float32), 'phone_lengths': np.array([L], np.int64), 'pitch': R.coarse(f0.astype(np.float64))[None],
                               'pitchf': f0[None].astype(np.float32), 'ds': np.array([0], np.int64), 'rnd': rs.randn(1, 192, L).astype(np.float32) * 0.66666})[0].reshape(-1)
-            outs += [y, np.zeros(R.SR // 3, np.float32)]
+            if j < 4: outs += [y, np.zeros(R.SR // 3, np.float32)]
             sc.append(difflib.SequenceMatcher(None, norm(tr(y, R.SR)), ref).ratio())
         s = float(np.mean(sc)); res.append((s, ep, onx)); print('эпоха', ep, 'разборчивость %.3f' % s, flush=True)
         sf.write('/tmp/kv/d.wav', np.concatenate(outs), R.SR)
         subprocess.run(['ffmpeg', '-v', 'error', '-y', '-i', '/tmp/kv/d.wav', '-b:a', '128k', f'{work}/demo_e{ep:03d}.mp3'], check=False)
     if not res: raise SystemExit('нет ни одной сохранённой эпохи — обучение не дошло до сохранения')
-    res.sort(key=lambda r: (-round(r[0], 2), r[1]))   # лучшая разборчивость; при равенстве — более ранняя эпоха (меньше переобучения)
-    open(work + '/scores.txt', 'w').write('\n'.join('эпоха %d: %.3f' % (e, s) for s, e, _ in sorted(res, key=lambda r: r[1])) + '\nлучшая: %d\n' % res[0][1])
-    open(work + '/best.txt', 'w').write('\n'.join(o for _, _, o in res[:2]))
+    res.sort(key=lambda r: (-round(r[0], 2), r[1]))   # лучшая разборчивость (до сотых); при равенстве — более ранняя эпоха
+    open(work + '/scores.txt', 'w').write('\n'.join('эпоха %d: %.3f' % (e, s) for s, e, _ in sorted(res, key=lambda r: r[1])) + '\nлучшие: %s\n' % ', '.join(str(e) for _, e, _ in res[:3]))
+    open(work + '/best.txt', 'w').write('\n'.join(o for _, _, o in res[:3]))
 
 
 if __name__ == '__main__':
