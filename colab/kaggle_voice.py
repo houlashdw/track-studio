@@ -12,6 +12,7 @@ REPO = 'https://raw.githubusercontent.com/houlashdw/track-studio'
 SRC = os.environ.get('SRC', 'src2.mp3.enc')
 EPOCHS = int(os.environ.get('EPOCHS', '200')); EVERY = int(os.environ.get('EVERY', '10')); BATCH = os.environ.get('BATCH', '8')
 WORK = '/kaggle/working' if os.path.isdir('/kaggle/working') else os.path.abspath('kv_out')
+os.environ['MPLBACKEND'] = 'Agg'   # в Kaggle стоит matplotlib_inline — в нашем окружении его нет, обучение падало на import matplotlib
 T = '/tmp/kv'; VENV = T + '/venv'; PY = VENV + '/bin/python'; RVC = T + '/rvc'
 
 
@@ -141,6 +142,7 @@ def evaluate(piper_dir, work):
         s = float(np.mean(sc)); res.append((s, ep, onx)); print('эпоха', ep, 'разборчивость %.3f' % s, flush=True)
         sf.write('/tmp/kv/d.wav', np.concatenate(outs), R.SR)
         subprocess.run(['ffmpeg', '-v', 'error', '-y', '-i', '/tmp/kv/d.wav', '-b:a', '128k', f'{work}/demo_e{ep:03d}.mp3'], check=False)
+    if not res: raise SystemExit('нет ни одной сохранённой эпохи — обучение не дошло до сохранения')
     res.sort(key=lambda r: (-round(r[0], 2), r[1]))   # лучшая разборчивость; при равенстве — более ранняя эпоха (меньше переобучения)
     open(work + '/scores.txt', 'w').write('\n'.join('эпоха %d: %.3f' % (e, s) for s, e, _ in sorted(res, key=lambda r: r[1])) + '\nлучшая: %d\n' % res[0][1])
     open(work + '/best.txt', 'w').write('\n'.join(o for _, _, o in res[:2]))
