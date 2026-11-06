@@ -44,7 +44,10 @@ for name, cap, bpm, lyr in json.load(open('/tmp/ace_songs.json')):
 
 if __name__ == '__main__':
     t0 = time.time(); os.makedirs(WORK, exist_ok=True)
-    KIN = (glob.glob('/kaggle/input/*/dataset.json') + glob.glob('/kaggle/input/*/*/dataset.json') + [None])[0]   # закрытый датасет Kaggle — пароль не нужен
+    KIN = None   # закрытый датасет Kaggle — пароль не нужен
+    for dp, dn, fn in os.walk('/kaggle/input'):
+        print('input:', dp, fn[:12], flush=True)
+        if 'dataset.json' in fn and not KIN: KIN = os.path.join(dp, 'dataset.json')
     P = os.environ.get('P')
     if not P and not KIN:
         try:
