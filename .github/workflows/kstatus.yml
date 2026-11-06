@@ -1,0 +1,14 @@
+name: kstatus
+on:
+  workflow_dispatch:
+    inputs:
+      slug: { default: 'ts-lego' }
+jobs:
+  s:
+    runs-on: ubuntu-latest
+    steps:
+      - env: { KAGGLE_USERNAME: '${{ secrets.KAGGLE_USERNAME }}', KK: '${{ secrets.KAGGLE_KEY }}' }
+        run: |
+          pip install -q -U kaggle; export KAGGLE_KEY="$KK"; case "$KK" in KGAT*) export KAGGLE_API_TOKEN="$KK";; esac
+          kaggle kernels status "$KAGGLE_USERNAME/${{ inputs.slug }}"
+          mkdir o; kaggle kernels output "$KAGGLE_USERNAME/${{ inputs.slug }}" -p o >/dev/null 2>&1 || true; ls -la o; tail -c 3000 o/*.log 2>/dev/null | tr -d '\r' | grep -v "it/s\|token/s" | tail -25 || true
