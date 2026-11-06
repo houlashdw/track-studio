@@ -114,6 +114,10 @@ GEN = r'''
 import os, sys, json, time, shutil, glob
 sys.path.insert(0, os.getcwd())
 from acestep.model_downloader import ensure_main_model, ensure_lm_model
+from acestep import gpu_config
+# T4 (до Ampere): ACE-Step сам берёт float16 → переполнение, NaN, тишина. bfloat16 на T4 работает (LM уже в нём) и не переполняется.
+gpu_config.cuda_supports_bfloat16 = lambda *a, **k: os.environ.get('ACE_DT', 'bf16') == 'bf16'
+import acestep.core.generation.handler.memory_utils as _mu; _mu.cuda_supports_bfloat16 = gpu_config.cuda_supports_bfloat16
 from acestep.handler import AceStepHandler
 from acestep.llm_inference import LLMHandler
 from acestep.inference import GenerationParams, GenerationConfig, generate_music
@@ -132,7 +136,7 @@ for name, cap, bpm, lyr in json.load(open('/tmp/ace_songs.json')):
         except Exception as e:
             print('⚠ с LM упало, пробую без него:', e, flush=True); THINK = False
             r = generate_music(dit, lm, GenerationParams(task_type='text2music', thinking=False, caption=cap, lyrics=lyr, bpm=bpm, duration=110, vocal_language='ru'), c, save_dir='/tmp/ace_gen')
-        if r.success:
+        if r.success and r.audios:
             for a in r.audios:
                 dst = f'{OUT}/ace_{name}_{take}.mp3'; shutil.copy(a['path'], dst); print('✅', dst, '%.0f с' % (time.time() - t0), flush=True)
         else:
