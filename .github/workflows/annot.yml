@@ -1,0 +1,34 @@
+name: annot
+# разметка треков для дообучения ACE-Step: Gemini → текст с метками частей, описание, bpm, тональность. Треки и итог — зашифрованы (KEYSTORE_PASS)
+on:
+  workflow_dispatch:
+    inputs:
+      dir: { description: 'папка в vprep-in с *.mp3.enc', default: 'ace_ds' }
+permissions:
+  contents: write
+jobs:
+  annot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { path: repo }
+      - uses: actions/checkout@v4
+        with: { ref: vprep-in, path: in }
+      - name: Расшифровка
+        env: { P: '${{ secrets.KEYSTORE_PASS }}' }
+        run: |
+          mkdir -p /tmp/a
+          for f in in/${{ inputs.dir }}/*.mp3.enc; do b=$(basename "$f" .enc); openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -in "$f" -out "/tmp/a/$b" -pass env:P; done
+          ls -la /tmp/a
+      - name: Gemini размечает
+        env: { GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}' }
+        run: |
+          pip install -q google-genai
+          python repo/tools/annot/annot.py /tmp/a /tmp/dataset.json
+      - name: Ветка annot-out (зашифровано)
+        env: { P: '${{ secrets.KEYSTORE_PASS }}' }
+        run: |
+          mkdir out && cd out
+          openssl enc -aes-256-cbc -pbkdf2 -iter 200000 -salt -in /tmp/dataset.json -out dataset.json.enc -pass env:P
+          git init -q -b annot-out && git config user.name gha && git config user.email gha@users.noreply.github.com
+          git add -A && git commit -q -m "annot ${{ github.run_number }}" && git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" annot-out
