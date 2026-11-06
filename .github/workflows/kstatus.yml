@@ -3,12 +3,21 @@ on:
   workflow_dispatch:
     inputs:
       slug: { default: 'emethscacute/ts-lego' }
+permissions:
+  contents: write
 jobs:
   s:
     runs-on: ubuntu-latest
     steps:
-      - env: { KAGGLE_USERNAME: '${{ secrets.KAGGLE_USERNAME }}', KK: '${{ secrets.KAGGLE_KEY }}' }
+      - name: Статус и выход
+        env: { KAGGLE_USERNAME: '${{ secrets.KAGGLE_USERNAME }}', KK: '${{ secrets.KAGGLE_KEY }}' }
         run: |
           pip install -q -U kaggle; export KAGGLE_KEY="$KK"; case "$KK" in KGAT*) export KAGGLE_API_TOKEN="$KK";; esac
           kaggle kernels status "${{ inputs.slug }}"
           mkdir o; kaggle kernels output "${{ inputs.slug }}" -p o >/dev/null 2>&1 || true; ls -la o; tail -c 3000 o/*.log 2>/dev/null | tr -d '\r' | grep -v "it/s\|token/s" | tail -25 || true
+      - name: Выход в ветку kaggle-out (зашифровано)
+        env: { P: '${{ secrets.KEYSTORE_PASS }}' }
+        run: |
+          mkdir -p out; cd o && for f in *; do [ -f "$f" ] && openssl enc -aes-256-cbc -pbkdf2 -iter 200000 -salt -in "$f" -out "../out/$f.enc" -pass env:P; done; cd ../out
+          git init -q -b kaggle-out && git config user.name gha && git config user.email gha@users.noreply.github.com
+          git add -A && git commit -q -m "kstatus ${{ github.run_number }}" && git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" kaggle-out
