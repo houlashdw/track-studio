@@ -1,0 +1,28 @@
+name: kdata
+# закрытый датасет на Kaggle из зашифрованных файлов vprep-in (треки vc2 + разметка): ноутбуку не нужен пароль
+on:
+  workflow_dispatch:
+    inputs:
+      slug: { default: 'ts-vc2-data' }
+permissions:
+  contents: read
+jobs:
+  d:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { ref: vprep-in, path: in }
+      - uses: actions/checkout@v4
+        with: { ref: annot-out, path: ann }
+      - name: Датасет
+        env: { P: '${{ secrets.KEYSTORE_PASS }}', KAGGLE_USERNAME: '${{ secrets.KAGGLE_USERNAME }}', KK: '${{ secrets.KAGGLE_KEY }}' }
+        run: |
+          pip install -q -U kaggle; export KAGGLE_KEY="$KK"; case "$KK" in KGAT*) export KAGGLE_API_TOKEN="$KK";; esac
+          mkdir d
+          for f in in/ace_ds/*.mp3.enc; do b=$(basename "$f" .enc); openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -in "$f" -out "d/$b" -pass env:P; done
+          openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -in ann/dataset.json.enc -out d/dataset.json -pass env:P
+          U=$(echo "$KAGGLE_USERNAME" | tr A-Z a-z)
+          echo "{\"title\": \"${{ inputs.slug }}\", \"id\": \"$U/${{ inputs.slug }}\", \"licenses\": [{\"name\": \"other\"}]}" > d/dataset-metadata.json
+          ls -la d
+          kaggle datasets create -p d -q 2>&1 | tail -3 || kaggle datasets version -p d -m upd 2>&1 | tail -3
+          kaggle datasets status "$U/${{ inputs.slug }}" || true

@@ -3,7 +3,7 @@ name: android
 on:
   push:
     branches: [main]
-    paths-ignore: ['tools/**', 'lab/**', 'colab/**', '.github/workflows/train-renri.yml', '.github/workflows/fetch-ears.yml', '.github/workflows/listen.yml', '.github/workflows/vprep.yml', '.github/workflows/train-voice.yml', '.github/workflows/vindex.yml', '.github/workflows/annot.yml', '.github/workflows/kaggle.yml', '.github/workflows/kstatus.yml', '.github/workflows/sep.yml', '.github/workflows/lab.yml', '.github/workflows/scout.yml', '.github/workflows/dsproto.yml', '.github/workflows/dsmodel.yml']
+    paths-ignore: ['tools/**', 'lab/**', 'colab/**', '.github/workflows/train-renri.yml', '.github/workflows/fetch-ears.yml', '.github/workflows/listen.yml', '.github/workflows/vprep.yml', '.github/workflows/train-voice.yml', '.github/workflows/vindex.yml', '.github/workflows/annot.yml', '.github/workflows/kaggle.yml', '.github/workflows/kstatus.yml', '.github/workflows/sep.yml', '.github/workflows/kdata.yml', '.github/workflows/lab.yml', '.github/workflows/scout.yml', '.github/workflows/dsproto.yml', '.github/workflows/dsmodel.yml']
   workflow_dispatch:
     inputs:
       voice:

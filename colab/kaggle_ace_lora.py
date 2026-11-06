@@ -44,22 +44,27 @@ for name, cap, bpm, lyr in json.load(open('/tmp/ace_songs.json')):
 
 if __name__ == '__main__':
     t0 = time.time(); os.makedirs(WORK, exist_ok=True)
+    KIN = (glob.glob('/kaggle/input/*/dataset.json') + glob.glob('/kaggle/input/*/*/dataset.json') + [None])[0]   # закрытый датасет Kaggle — пароль не нужен
     P = os.environ.get('P')
-    if not P:
+    if not P and not KIN:
         try:
             from kaggle_secrets import UserSecretsClient; P = UserSecretsClient().get_secret('KEYSTORE_PASS')
         except Exception: pass
-    if not P: raise SystemExit('нет пароля: Add-ons → Secrets → KEYSTORE_PASS (галочка для этого ноутбука)')
+    if not P and not KIN: raise SystemExit('нет данных: ни датасета Kaggle, ни пароля (Add-ons → Secrets → KEYSTORE_PASS)')
     sh('nvidia-smi --query-gpu=name,memory.total --format=csv || true')
     if not os.path.isdir(R): sh(f'git clone -q --depth 1 https://github.com/ACE-Step/ACE-Step-1.5.git {R}')
     sh(f'{sys.executable} -m pip install -q uv'); sh(f'cd {R} && {sys.executable} -m uv sync -q')
     UV = f'cd {R} && MPLBACKEND=Agg {sys.executable} -m uv run python'
     # 1) данные: 10 треков vc2 + разметка Gemini (текст с метками частей, описание, bpm, тональность)
     A = '/tmp/al_audio'; os.makedirs(A, exist_ok=True)
-    for i in range(10):
-        sh(f'wget -q -O /tmp/t.enc {RAW}/vprep-in/ace_ds/vc2_{i:02d}.mp3.enc'); dec('/tmp/t.enc', f'{A}/vc2_{i:02d}.mp3', P)
-    sh(f'wget -q -O /tmp/ds.enc {RAW}/annot-out/dataset.json.enc'); dec('/tmp/ds.enc', '/tmp/ds_raw.json', P)
-    ds = json.load(open('/tmp/ds_raw.json'))
+    if KIN:
+        for f in glob.glob(os.path.dirname(KIN) + '/*.mp3'): shutil.copy(f, A)
+        ds = json.load(open(KIN))
+    else:
+        for i in range(10):
+            sh(f'wget -q -O /tmp/t.enc {RAW}/vprep-in/ace_ds/vc2_{i:02d}.mp3.enc'); dec('/tmp/t.enc', f'{A}/vc2_{i:02d}.mp3', P)
+        sh(f'wget -q -O /tmp/ds.enc {RAW}/annot-out/dataset.json.enc'); dec('/tmp/ds.enc', '/tmp/ds_raw.json', P)
+        ds = json.load(open('/tmp/ds_raw.json'))
     for s in ds['samples']:
         s['audio_path'] = f"{A}/{s['filename']}"; s['custom_tag'] = TAG; s['bpm'] = int(s.get('bpm') or 0) or None
     ds['metadata'] = {'custom_tag': TAG, 'tag_position': 'prepend', 'genre_ratio': 0}
@@ -82,8 +87,7 @@ if __name__ == '__main__':
     print('адаптеры:', cands[:4], flush=True)
     if not cands: raise SystemExit('обучение не сохранило ни одного адаптера — смотри лог выше')
     AD = cands[0]
-    shutil.make_archive('/tmp/vc2_lokr', 'zip', AD)
-    subprocess.run(['openssl', 'enc', '-aes-256-cbc', '-pbkdf2', '-iter', '200000', '-salt', '-in', '/tmp/vc2_lokr.zip', '-out', WORK + '/vc2_lokr.zip.enc', '-pass', 'env:P'], check=True, env=dict(os.environ, P=P))
+    shutil.make_archive(WORK + '/vc2_lokr', 'zip', AD)   # выход ноутбука закрытый; в GitHub он уходит зашифрованным
     # 4) пробные песни с дообученной моделью (те же 4 текста, что в пробе базовой модели)
     sh(f'wget -q -O /tmp/kace.py {RAW}/main/colab/kaggle_ace.py')
     import importlib.util

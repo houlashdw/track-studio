@@ -7,6 +7,7 @@ on:
       slug: { description: 'имя ноутбука на Kaggle', default: 'ts-lego' }
       gpu: { description: 'NvidiaTeslaT4 / NvidiaTeslaP100', default: 'NvidiaTeslaT4' }
       wait: { description: 'ждать минут', default: '330' }
+      data: { description: 'датасеты Kaggle через запятую (user/slug)', default: '' }
 permissions:
   contents: write
 jobs:
@@ -29,7 +30,7 @@ jobs:
           import json, os
           json.dump({'id': os.environ['KAGGLE_USERNAME'] + '/${{ inputs.slug }}', 'title': '${{ inputs.slug }}', 'code_file': 'main.py', 'language': 'python',
                      'kernel_type': 'script', 'is_private': True, 'enable_gpu': True, 'enable_internet': True, 'accelerator': '${{ inputs.gpu }}',
-                     'dataset_sources': [], 'competition_sources': [], 'kernel_sources': []}, open('k/kernel-metadata.json', 'w'))
+                     'dataset_sources': [x for x in '${{ inputs.data }}'.split(',') if x], 'competition_sources': [], 'kernel_sources': []}, open('k/kernel-metadata.json', 'w'))
           PY
           (kaggle kernels push -p k --accelerator "${{ inputs.gpu }}" || kaggle kernels push -p k) | tee push.txt
           K=$(grep -o "kaggle.com/code/[^ ]*" push.txt | head -1 | sed "s#kaggle.com/code/##"); [ -n "$K" ] || K="$(echo $KAGGLE_USERNAME | tr A-Z a-z)/${{ inputs.slug }}"; echo "KREF=$K" >> $GITHUB_ENV; echo "ноутбук: $K"
