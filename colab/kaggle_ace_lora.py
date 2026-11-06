@@ -59,7 +59,7 @@ if __name__ == '__main__':
     sh(f'{sys.executable} -m pip install -q uv'); sh(f'cd {R} && {sys.executable} -m uv sync -q')
     UV = f'cd {R} && MPLBACKEND=Agg {sys.executable} -m uv run python'
     # 1) данные: 10 треков vc2 + разметка Gemini (текст с метками частей, описание, bpm, тональность)
-    A = '/tmp/al_audio'; os.makedirs(A, exist_ok=True)
+    A = R + '/al_data/audio'; os.makedirs(A, exist_ok=True)
     if KIN:
         for f in glob.glob(os.path.dirname(KIN) + '/*.mp3'): shutil.copy(f, A)
         ds = json.load(open(KIN))
@@ -75,7 +75,7 @@ if __name__ == '__main__':
     print('песен в разметке:', len(ds['samples']), flush=True)
     # 2) модели + подготовка тензоров
     sh(f'{UV} -c "from acestep.model_downloader import ensure_main_model; print(ensure_main_model())"')
-    CK = R + '/checkpoints'; T = '/tmp/al_tensors'; O = '/tmp/al_out'
+    CK = R + '/checkpoints'; T = R + '/al_data/tensors'; O = R + '/al_data/out'   # внутри папки ACE: тренер не пускает пути вне неё
     sh(f'{UV} -m acestep.training_v2.cli.train_fixed --preprocess --dataset-json /tmp/ds.json --audio-dir {A} --tensor-output {T} '
        f'--checkpoint-dir {CK} --model-variant turbo --max-duration 240 --precision bf16')
     # 3) обучение LoKr (быстрый адаптер); если bf16 на T4 не пойдёт — fp32
