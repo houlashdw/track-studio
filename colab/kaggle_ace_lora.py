@@ -80,7 +80,7 @@ if __name__ == '__main__':
        f'--checkpoint-dir {CK} --model-variant turbo --max-duration 240 --precision bf16')
     # 3) обучение LoKr (быстрый адаптер); если bf16 на T4 не пойдёт — fp32
     base = (f'-m acestep.training_v2.cli.train_fixed --checkpoint-dir {CK} --model-variant turbo --dataset-dir {T} --output-dir {O} '
-            f'--adapter-type lokr --lr 0.03 --epochs {EPOCHS} --save-every {EVERY} --batch-size 1 --gradient-accumulation 4 --gradient-checkpointing')
+            f'--yes --plain --adapter-type lokr --lr 0.03 --epochs {EPOCHS} --save-every {EVERY} --batch-size 1 --gradient-accumulation 4 --gradient-checkpointing')
     rc = sh(f'cd {R} && MPLBACKEND=Agg timeout {TLIM} {sys.executable} -m uv run python {base} --precision bf16', check=False)
     if rc not in (0, 124) and not glob.glob(O + '/checkpoints/*'):
         print('⚠ bf16 не пошёл, пробую fp32', flush=True); shutil.rmtree(O, ignore_errors=True)
