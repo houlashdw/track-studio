@@ -31,20 +31,21 @@ jobs:
                      'kernel_type': 'script', 'is_private': True, 'enable_gpu': True, 'enable_internet': True, 'accelerator': '${{ inputs.gpu }}',
                      'dataset_sources': [], 'competition_sources': [], 'kernel_sources': []}, open('k/kernel-metadata.json', 'w'))
           PY
-          kaggle kernels push -p k --accelerator "${{ inputs.gpu }}" || kaggle kernels push -p k
+          (kaggle kernels push -p k --accelerator "${{ inputs.gpu }}" || kaggle kernels push -p k) | tee push.txt
+          K=$(grep -o "kaggle.com/code/[^ ]*" push.txt | head -1 | sed "s#kaggle.com/code/##"); [ -n "$K" ] || K="$(echo $KAGGLE_USERNAME | tr A-Z a-z)/${{ inputs.slug }}"; echo "KREF=$K" >> $GITHUB_ENV; echo "ноутбук: $K"
       - name: Ожидание
         run: |
-          K="$KAGGLE_USERNAME/${{ inputs.slug }}"; end=$(( $(date +%s) + ${{ inputs.wait }} * 60 ))
+          K="$KREF"; end=$(( $(date +%s) + ${{ inputs.wait }} * 60 ))
           sleep 60
           while [ $(date +%s) -lt $end ]; do
             s=$(kaggle kernels status "$K" 2>&1 | tail -1); echo "$(date +%T) $s"
-            case "$s" in *COMPLETE*|*complete*|*ERROR*|*error*|*CANCEL*|*cancel*) break;; esac
+            case "$s" in *denied*) ;; *COMPLETE*|*complete*|*ERROR*|*CANCEL*|*cancel*) break;; esac
             sleep 60
           done
       - name: Результаты
         env: { P: '${{ secrets.KEYSTORE_PASS }}' }
         run: |
-          K="$KAGGLE_USERNAME/${{ inputs.slug }}"; mkdir -p raw out
+          K="$KREF"; mkdir -p raw out
           kaggle kernels output "$K" -p raw || true
           ls -la raw
           tail -c 6000 raw/*.log 2>/dev/null | tr -d '\r' | tail -60 || true
