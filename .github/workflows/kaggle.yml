@@ -8,6 +8,7 @@ on:
       gpu: { description: 'NvidiaTeslaT4 / NvidiaTeslaP100', default: 'NvidiaTeslaT4' }
       wait: { description: 'ждать минут', default: '330' }
       owner: { description: 'владелец на Kaggle', default: 'emethscacute' }
+      ksrc: { description: 'выходы других ноутбуков (user/slug,…)', default: '' }
       data: { description: 'датасеты Kaggle через запятую (user/slug)', default: '' }
 permissions:
   contents: write
@@ -31,7 +32,7 @@ jobs:
           import json, os
           json.dump({'id': '${{ inputs.owner }}/${{ inputs.slug }}', 'title': '${{ inputs.slug }}', 'code_file': 'main.py', 'language': 'python',
                      'kernel_type': 'script', 'is_private': True, 'enable_gpu': True, 'enable_internet': True, 'accelerator': '${{ inputs.gpu }}',
-                     'dataset_sources': [x for x in '${{ inputs.data }}'.split(',') if x], 'competition_sources': [], 'kernel_sources': []}, open('k/kernel-metadata.json', 'w'))
+                     'dataset_sources': [x for x in '${{ inputs.data }}'.split(',') if x], 'competition_sources': [], 'kernel_sources': [x for x in '${{ inputs.ksrc }}'.split(',') if x]}, open('k/kernel-metadata.json', 'w'))
           PY
           (kaggle kernels push -p k --accelerator "${{ inputs.gpu }}" || kaggle kernels push -p k) | tee push.txt
           K="${{ inputs.owner }}/${{ inputs.slug }}"; echo "KREF=$K" >> $GITHUB_ENV; echo "ноутбук: $K"
