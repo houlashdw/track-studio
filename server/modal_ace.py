@@ -25,7 +25,10 @@ app = modal.App('track-studio-ace', image=image)
 VOL = '/vol'
 
 
-@app.cls(gpu='L4', volumes={VOL: vol}, secrets=[modal.Secret.from_name('ts-key')], timeout=900, scaledown_window=120)
+GPU = os.environ.get('TS_GPU', 'T4')
+
+
+@app.cls(gpu=GPU, volumes={VOL: vol}, secrets=[modal.Secret.from_name('ts-key')], timeout=900, scaledown_window=120)
 class Ace:
     @modal.enter()
     def load(self):
@@ -34,6 +37,9 @@ class Ace:
         if not os.path.islink(ACE + '/checkpoints'):
             shutil.rmtree(ACE + '/checkpoints', ignore_errors=True); os.symlink(VOL + '/checkpoints', ACE + '/checkpoints')
         os.chdir(ACE); sys.path.insert(0, ACE)
+        from acestep import gpu_config   # T4 (до Ampere): ACE сам берёт fp16 → NaN; bf16 работает
+        gpu_config.cuda_supports_bfloat16 = lambda *a, **k: True
+        import acestep.core.generation.handler.memory_utils as _mu; _mu.cuda_supports_bfloat16 = gpu_config.cuda_supports_bfloat16
         from acestep.model_downloader import ensure_main_model, ensure_lm_model
         from acestep.handler import AceStepHandler
         from acestep.llm_inference import LLMHandler
