@@ -1,0 +1,243 @@
+11-07 11:10:24.945     0     0 I init    : Parsing file /system/etc/init/lmkd.rc...
+11-07 11:10:25.469     0     0 I init    : starting service 'lmkd'...
+11-07 11:10:25.470     0     0 I init    : Created socket '/dev/socket/lmkd', mode 660, user 1000, group 1000
+11-07 11:10:25.474     0     0 I init    : ... started service 'lmkd' has pid 151
+11-07 11:10:28.910     0     0 D BpfLoader: map /sys/fs/bpf/map_bpfMemEvents_lmkd_rb id 59
+11-07 11:10:28.911     0     0 D BpfLoader: prog /sys/fs/bpf/prog_bpfMemEvents_tracepoint_vmscan_mm_vmscan_direct_reclaim_begin_lmkd id 52
+11-07 11:10:28.911     0     0 D BpfLoader: prog /sys/fs/bpf/prog_bpfMemEvents_tracepoint_vmscan_mm_vmscan_direct_reclaim_end_lmkd id 53
+11-07 11:10:28.911     0     0 D BpfLoader: prog /sys/fs/bpf/prog_bpfMemEvents_tracepoint_vmscan_mm_vmscan_kswapd_wake_lmkd id 54
+11-07 11:10:28.912     0     0 D BpfLoader: prog /sys/fs/bpf/prog_bpfMemEvents_tracepoint_vmscan_mm_vmscan_kswapd_sleep_lmkd id 55
+11-07 11:10:29.354     0     0 I init    : service 'lmkd' requested start, but it is already running (flags: 36)
+11-07 11:10:30.253   364   364 D nativeloader: InitDefaultPublicLibraries for_preload=1: libandroid.so:libaaudio.so:libamidi.so:libbinder_ndk.so:libc.so:libcamera2ndk.so:libdl.so:libEGL.so:libGLESv1_CM.so:libGLESv2.so:libGLESv3.so:libicu.so:libicui18n.so:libicuuc.so:libjnigraphics.so:liblog.so:libmediandk.so:libm.so:libnativehelper.so:libnativewindow.so:libOpenMAXAL.so:libOpenSLES.so:libRS.so:libstdc++.so:libsync.so:libvulkan.so:libwebviewchromium_plat_support.so:libz.so
+11-07 11:10:31.272   364   364 D nativeloader: InitDefaultPublicLibraries for_preload=0: libandroid.so:libaaudio.so:libamidi.so:libbinder_ndk.so:libc.so:libcamera2ndk.so:libclang_rt.hwasan-aarch64-android.so:libdl.so:libEGL.so:libGLESv1_CM.so:libGLESv2.so:libGLESv3.so:libjnigraphics.so:liblog.so:libmediandk.so:libm.so:libnativewindow.so:libOpenMAXAL.so:libOpenSLES.so:libRS.so:libstdc++.so:libsync.so:libvulkan.so:libwebviewchromium_plat_support.so:libz.so
+11-07 11:10:31.311   364   364 D nativeloader: Load libwebviewchromium_loader.so using system ns (caller=/system/framework/framework.jar!classes4.dex): ok
+11-07 11:10:38.357   561   596 I ActivityManager: Connection with lmkd established
+11-07 11:10:38.357   151   151 I lowmemorykiller: lmkd data connection established
+11-07 11:10:45.994   944   944 I AndroidRuntime: VM exiting with result code 0, cleanup skipped.
+11-07 11:10:48.788     0     0 I init    : processing action (sys.boot_completed=1) from (/system/etc/init/lmkd.rc:13)
+11-07 11:10:48.795     0     0 I init    : starting service 'exec 22 (/system/bin/lmkd --boot_completed)'...
+11-07 11:10:48.669   151   151 I lowmemorykiller: lmkd data connection established
+11-07 11:10:48.821     0     0 I init    : ... started service 'exec 22 (/system/bin/lmkd --boot_completed)' has pid 1380
+11-07 11:10:48.673   151   151 I lowmemorykiller: Using memevents for direct reclaim and kswapd detection
+11-07 11:10:48.674   151   151 I lowmemorykiller: lmkd data connection dropped
+11-07 11:10:48.675   151   151 I lowmemorykiller: closing lmkd data connection
+11-07 11:10:48.845     0     0 I init    : Service 'exec 22 (/system/bin/lmkd --boot_completed)' (pid 1380) exited with status 0 oneshot service took 0.043000 seconds in background
+11-07 11:10:48.848     0     0 I init    : Sending signal 9 to service 'exec 22 (/system/bin/lmkd --boot_completed)' (pid 1380) process group...
+11-07 11:10:53.452  1381  2075 W chromium: [1107/111053.452744:WARNING:dns_config_service_android.cc(81)] Failed to read DnsConfig.
+11-07 11:10:56.164   561   618 I ArtService: Adjusting the compiler filter for 'com.trackstudio.app' from 'speed-profile' to 'verify' because there is no valid profile
+11-07 11:10:56.164   704   710 I artd    : Dex parent of /data/app/~~TZ9Vxw01gLuR8YpkP9Ta7A==/com.trackstudio.app-9QV0iblc3P_O0jqYYxd4_w==/base.apk is not writable: Permission denied
+11-07 11:10:56.164   704   710 I artd    : GetBestInfo checking odex in dalvik-cache (/data/dalvik-cache/x86_64/data@app@~~TZ9Vxw01gLuR8YpkP9Ta7A==@com.trackstudio.app-9QV0iblc3P_O0jqYYxd4_w==@base.apk@classes.dex)
+11-07 11:10:56.164   704   710 I artd    : Loading /data/dalvik-cache/x86_64/data@app@~~TZ9Vxw01gLuR8YpkP9Ta7A==@com.trackstudio.app-9QV0iblc3P_O0jqYYxd4_w==@base.apk@classes.dex with executable: 0
+11-07 11:10:56.164   704   710 I artd    : OatFileAssistant test for existing oat file /data/dalvik-cache/x86_64/data@app@~~TZ9Vxw01gLuR8YpkP9Ta7A==@com.trackstudio.app-9QV0iblc3P_O0jqYYxd4_w==@base.apk@classes.dex: File /data/dalvik-cache/x86_64/data@app@~~TZ9Vxw01gLuR8YpkP9Ta7A==@com.trackstudio.app-9QV0iblc3P_O0jqYYxd4_w==@base.apk@classes.vdex does not exist.
+11-07 11:10:56.164   704   710 I artd    : GetBestInfo checking odex next to the dex file (/data/app/~~TZ9Vxw01gLuR8YpkP9Ta7A==/com.trackstudio.app-9QV0iblc3P_O0jqYYxd4_w==/oat/x86_64/base.odex)
+11-07 11:10:56.164   704   710 I artd    : Loading /data/app/~~TZ9Vxw01gLuR8YpkP9Ta7A==/com.trackstudio.app-9QV0iblc3P_O0jqYYxd4_w==/oat/x86_64/base.odex with executable: 0
+11-07 11:10:56.164   704   710 I artd    : OatFileAssistant test for existing oat file /data/app/~~TZ9Vxw01gLuR8YpkP9Ta7A==/com.trackstudio.app-9QV0iblc3P_O0jqYYxd4_w==/oat/x86_64/base.odex: File /data/app/~~TZ9Vxw01gLuR8YpkP9Ta7A==/com.trackstudio.app-9QV0iblc3P_O0jqYYxd4_w==/oat/x86_64/base.vdex does not exist.
+11-07 11:10:56.164   704   710 I artd    : GetBestInfo checking vdex in dalvik-cache (/data/dalvik-cache/x86_64/data@app@~~TZ9Vxw01gLuR8YpkP9Ta7A==@com.trackstudio.app-9QV0iblc3P_O0jqYYxd4_w==@base.apk@classes.vdex)
+11-07 11:10:56.164   704   710 I artd    : unable to open vdex file /data/dalvik-cache/x86_64/data@app@~~TZ9Vxw01gLuR8YpkP9Ta7A==@com.trackstudio.app-9QV0iblc3P_O0jqYYxd4_w==@base.apk@classes.vdex: File /data/dalvik-cache/x86_64/data@app@~~TZ9Vxw01gLuR8YpkP9Ta7A==@com.trackstudio.app-9QV0iblc3P_O0jqYYxd4_w==@base.apk@classes.vdex does not exist.
+11-07 11:10:56.164   704   710 I artd    : OatFileAssistant test for existing oat file /data/dalvik-cache/x86_64/data@app@~~TZ9Vxw01gLuR8YpkP9Ta7A==@com.trackstudio.app-9QV0iblc3P_O0jqYYxd4_w==@base.apk@classes.vdex: File /data/dalvik-cache/x86_64/data@app@~~TZ9Vxw01gLuR8YpkP9Ta7A==@com.trackstudio.app-9QV0iblc3P_O0jqYYxd4_w==@base.apk@classes.vdex does not exist.
+11-07 11:10:56.164   704   710 I artd    : GetBestInfo checking vdex next to the dex file (/data/app/~~TZ9Vxw01gLuR8YpkP9Ta7A==/com.trackstudio.app-9QV0iblc3P_O0jqYYxd4_w==/oat/x86_64/base.vdex)
+11-07 11:10:56.164   704   710 I artd    : unable to open vdex file /data/app/~~TZ9Vxw01gLuR8YpkP9Ta7A==/com.trackstudio.app-9QV0iblc3P_O0jqYYxd4_w==/oat/x86_64/base.vdex: File /data/app/~~TZ9Vxw01gLuR8YpkP9Ta7A==/com.trackstudio.app-9QV0iblc3P_O0jqYYxd4_w==/oat/x86_64/base.vdex does not exist.
+11-07 11:10:56.164   704   710 I artd    : OatFileAssistant test for existing oat file /data/app/~~TZ9Vxw01gLuR8YpkP9Ta7A==/com.trackstudio.app-9QV0iblc3P_O0jqYYxd4_w==/oat/x86_64/base.vdex: File /data/app/~~TZ9Vxw01gLuR8YpkP9Ta7A==/com.trackstudio.app-9QV0iblc3P_O0jqYYxd4_w==/oat/x86_64/base.vdex does not exist.
+11-07 11:10:56.164   704   710 I artd    : GetBestInfo checking dm (/data/app/~~TZ9Vxw01gLuR8YpkP9Ta7A==/com.trackstudio.app-9QV0iblc3P_O0jqYYxd4_w==/base.dm)
+11-07 11:10:56.164   704   710 W ziparchive: Unable to open '/data/app/~~TZ9Vxw01gLuR8YpkP9Ta7A==/com.trackstudio.app-9QV0iblc3P_O0jqYYxd4_w==/base.dm': No such file or directory
+11-07 11:10:56.164   704   710 I artd    : OatFileAssistant test for existing oat file /data/app/~~TZ9Vxw01gLuR8YpkP9Ta7A==/com.trackstudio.app-9QV0iblc3P_O0jqYYxd4_w==/base.dm: I/O error
+11-07 11:10:56.164   704   710 I artd    : GetBestInfo checking dm (/data/app/~~TZ9Vxw01gLuR8YpkP9Ta7A==/com.trackstudio.app-9QV0iblc3P_O0jqYYxd4_w==/base.dm)
+11-07 11:10:56.164   704   710 W ziparchive: Unable to open '/data/app/~~TZ9Vxw01gLuR8YpkP9Ta7A==/com.trackstudio.app-9QV0iblc3P_O0jqYYxd4_w==/base.dm': No such file or directory
+11-07 11:10:56.164   704   710 I artd    : OatFileAssistant test for existing oat file /data/app/~~TZ9Vxw01gLuR8YpkP9Ta7A==/com.trackstudio.app-9QV0iblc3P_O0jqYYxd4_w==/base.dm: I/O error
+11-07 11:10:56.203   704   710 I artd    : Running dex2oat: /apex/com.android.art/bin/art_exec --drop-capabilities --set-task-profile=Dex2OatBootComplete --set-priority=background --keep-fds=7:8:9:10 -- /apex/com.android.art/bin/dex2oat64 --zip-fd=7 --zip-location=/data/app/~~TZ9Vxw01gLuR8YpkP9Ta7A==/com.trackstudio.app-9QV0iblc3P_O0jqYYxd4_w==/base.apk --oat-fd=8 --oat-location=/data/app/~~TZ9Vxw01gLuR8YpkP9Ta7A==/com.trackstudio.app-9QV0iblc3P_O0jqYYxd4_w==/oat/x86_64/base.odex --output-vdex-fd=9 --swap-fd=10 --class-loader-context=PCL[] --classpath-dir=/data/app/~~TZ9Vxw01gLuR8YpkP9Ta7A==/com.trackstudio.app-9QV0iblc3P_O0jqYYxd4_w== --instruction-set=x86_64 --instruction-set-features=default --instruction-set-variant=x86_64 --compiler-filter=verify --compilation-reason=install --compact-dex-level=none --max-image-block-size=524288 --resolve-startup-const-strings=true --generate-mini-debug-info --runtime-arg -Xtarget-sdk-version:34 --runtime-arg -Xhidden-api-policy:enabled --runtime-arg -Xms64m --runtime-arg -Xmx512m --comments=app-name:com.trackstudio.app,app-version-name:1.80,app-version-code:80,art-version:350820300
+11-07 11:10:56.203   704   710 I artd    : Opened FDs: 7:/data/app/~~TZ9Vxw01gLuR8YpkP9Ta7A==/com.trackstudio.app-9QV0iblc3P_O0jqYYxd4_w==/base.apk 8:/data/app/~~TZ9Vxw01gLuR8YpkP9Ta7A==/com.trackstudio.app-9QV0iblc3P_O0jqYYxd4_w==/oat/x86_64/base.odex.u8uihy.tmp 9:/data/app/~~TZ9Vxw01gLuR8YpkP9Ta7A==/com.trackstudio.app-9QV0iblc3P_O0jqYYxd4_w==/oat/x86_64/base.vdex.GRmjFJ.tmp 10:/data/app/~~TZ9Vxw01gLuR8YpkP9Ta7A==/com.trackstudio.app-9QV0iblc3P_O0jqYYxd4_w==/oat/x86_64/base.odex.swap.kj2UGG.tmp 
+11-07 11:10:56.274  2324  2324 W dex2oat64: /apex/com.android.art/bin/dex2oat64 --zip-fd=7 --zip-location=/data/app/~~TZ9Vxw01gLuR8YpkP9Ta7A==/com.trackstudio.app-9QV0iblc3P_O0jqYYxd4_w==/base.apk --oat-fd=8 --oat-location=/data/app/~~TZ9Vxw01gLuR8YpkP9Ta7A==/com.trackstudio.app-9QV0iblc3P_O0jqYYxd4_w==/oat/x86_64/base.odex --output-vdex-fd=9 --swap-fd=10 --class-loader-context=PCL[] --classpath-dir=/data/app/~~TZ9Vxw01gLuR8YpkP9Ta7A==/com.trackstudio.app-9QV0iblc3P_O0jqYYxd4_w== --instruction-set=x86_64 --instruction-set-features=default --instruction-set-variant=x86_64 --compiler-filter=verify --compilation-reason=install --compact-dex-level=none --max-image-block-size=524288 --resolve-startup-const-strings=true --generate-mini-debug-info --runtime-arg -Xtarget-sdk-version:34 --runtime-arg -Xhidden-api-policy:enabled --runtime-arg -Xms64m --runtime-arg -Xmx512m --comments=app-name:com.trackstudio.app,app-version-name:1.80,app-version-code:80,art-version:350820300
+11-07 11:10:56.275  2324  2324 I dex2oat64: /apex/com.android.art/bin/dex2oat64 --output-vdex-fd=9 --class-loader-context=PCL[] --classpath-dir=/data/app/~~TZ9Vxw01gLuR8YpkP9Ta7A==/com.trackstudio.app-9QV0iblc3P_O0jqYYxd4_w== --compiler-filter=verify --compilation-reason=install --compact-dex-level=none --max-image-block-size=524288 --resolve-startup-const-strings=true --generate-mini-debug-info --comments=app-name:com.trackstudio.app,app-version-name:1.80,app-version-code:80,art-version:350820300
+11-07 11:10:56.420   561   618 I ArtService: Dexopt result: [packageName = com.trackstudio.app] DexContainerFileDexoptResult{dexContainerFile=/data/app/~~TZ9Vxw01gLuR8YpkP9Ta7A==/com.trackstudio.app-9QV0iblc3P_O0jqYYxd4_w==/base.apk, primaryAbi=true, abi=x86_64, actualCompilerFilter=verify, status=PERFORMED, dex2oatWallTimeMillis=212, dex2oatCpuTimeMillis=40, sizeBytes=244032, sizeBeforeBytes=0, extendedStatusFlags=[]}
+11-07 11:10:56.426   561   618 V BackupManagerService: [UserID:0] restoreAtInstall pkg=com.trackstudio.app token=1 restoreSet=0
+11-07 11:10:56.513   561   618 I AppsFilter: interaction: PackageSetting{2ae675 com.android.microdroid.empty_payload/10202} -> PackageSetting{25552cb com.trackstudio.app/10209} BLOCKED
+11-07 11:10:56.974   561  2315 V SplashScreenExceptionList: SplashScreen checking exception for package com.trackstudio.app (target sdk:34) -> false
+11-07 11:10:56.978   919   967 V WindowManagerShell: Transition requested (#7): android.os.BinderProxy@9932e8e TransitionRequestInfo { type = OPEN, triggerTask = TaskInfo{userId=0 taskId=8 displayId=0 isRunning=true baseIntent=Intent { flg=0x10000000 cmp=com.trackstudio.app/.MainActivity } baseActivity=ComponentInfo{com.trackstudio.app/com.trackstudio.app.MainActivity} topActivity=ComponentInfo{com.trackstudio.app/com.trackstudio.app.MainActivity} origActivity=null realActivity=ComponentInfo{com.trackstudio.app/com.trackstudio.app.MainActivity} numActivities=1 lastActiveTime=37574 supportsMultiWindow=true resizeMode=1 isResizeable=true minWidth=-1 minHeight=-1 defaultMinSize=220 token=WCT{android.window.IWindowContainerToken$Stub$Proxy@bae46af} topActivityType=1 pictureInPictureParams=null shouldDockBigOverlays=false launchIntoPipHostTaskId=-1 lastParentTaskIdBeforePip=-1 displayCutoutSafeInsets=null topActivityInfo=ActivityInfo{d179abc com.trackstudio.app.MainActivity} launchCookies=[] positionInParent=Point(0, 0) parentTaskId=-1 isFocused=false isVisible=false isVisibleRequested=false isSleeping=false locusId=null displayAreaFeatureId=1 isTopActivityTransparent=false appCompatTaskInfo=AppCompatTaskInfo { topActivityInSizeCompat=false topActivityEligibleForLetterboxEducation= falseisLetterboxEducationEnabled= true isLetterboxDoubleTapEnabled= false topActivityEligibleForUserAspectRatioButton= false topActivityBoundsLetterboxed= false isFromLetterboxDoubleTap= false topActivityLetterboxVerticalPosition= -1 topActivityLetterboxHorizontalPosition= -1 topActivityLetterboxWidth=320 topActivityLetterboxHeight=640 isUserFullscreenOverrideEnabled=false isSystemFullscreenOverrideEnabled=false cameraCompatTaskInfo=CameraCompatTaskInfo { cameraCompatControlState=hidden freeformCameraCompatMode=inactive}}}, pipTask = null, remoteTransition = null, displayChange = null, flags = 0, debugId = 7 }
+11-07 11:10:56.993   561  2315 I ActivityTaskManager: START u0 {flg=0x10000000 cmp=com.trackstudio.app/.MainActivity} with LAUNCH_SINGLE_TASK from uid 2000 (BAL_ALLOW_PERMISSION) result code=0
+11-07 11:10:57.007   561  1939 I AppsFilter: interaction: PackageSetting{796a989 com.android.microdroid.empty_payload/10202} -> PackageSetting{bc41d8e com.trackstudio.app/10209} BLOCKED
+11-07 11:10:57.010  1195  1195 I TopTaskTracker: onTaskMovedToFront: (moved taskInfo to front) taskId=8, baseIntent=Intent { flg=0x10000000 cmp=com.trackstudio.app/.MainActivity }
+11-07 11:10:57.013   561   643 D CoreBackPreview: Window{d600b53 u0 Splash Screen com.trackstudio.app}: Setting back callback OnBackInvokedCallbackInfo{mCallback=android.window.IOnBackInvokedCallback$Stub$Proxy@cb75545, mPriority=0, mIsAnimationCallback=false}
+11-07 11:10:57.146   561   582 V WindowManager: Sent Transition (#7) createdAt=11-07 11:10:56.944 via request=TransitionRequestInfo { type = OPEN, triggerTask = TaskInfo{userId=0 taskId=8 displayId=0 isRunning=true baseIntent=Intent { flg=0x10000000 cmp=com.trackstudio.app/.MainActivity } baseActivity=ComponentInfo{com.trackstudio.app/com.trackstudio.app.MainActivity} topActivity=ComponentInfo{com.trackstudio.app/com.trackstudio.app.MainActivity} origActivity=null realActivity=ComponentInfo{com.trackstudio.app/com.trackstudio.app.MainActivity} numActivities=1 lastActiveTime=37574 supportsMultiWindow=true resizeMode=1 isResizeable=true minWidth=-1 minHeight=-1 defaultMinSize=220 token=WCT{RemoteToken{7ba0b8f Task{aa55d92 #8 type=standard A=10209:com.trackstudio.app}}} topActivityType=1 pictureInPictureParams=null shouldDockBigOverlays=false launchIntoPipHostTaskId=-1 lastParentTaskIdBeforePip=-1 displayCutoutSafeInsets=null topActivityInfo=ActivityInfo{956ae1c com.trackstudio.app.MainActivity} launchCookies=[] positionInParent=Point(0, 0) parentTaskId=-1 isFocused=false isVisible=false isVisibleRequested=false isSleeping=false locusId=null displayAreaFeatureId=1 isTopActivityTransparent=false appCompatTaskInfo=AppCompatTaskInfo { topActivityInSizeCompat=false topActivityEligibleForLetterboxEducation= falseisLetterboxEducationEnabled= true isLetterboxDoubleTapEnabled= false topActivityEligibleForUserAspectRatioButton= false topActivityBoundsLetterboxed= false isFromLetterboxDoubleTap= false topActivityLetterboxVerticalPosition= -1 topActivityLetterboxHorizontalPosition= -1 topActivityLetterboxWidth=320 topActivityLetterboxHeight=640 isUserFullscreenOverrideEnabled=false isSystemFullscreenOverrideEnabled=false cameraCompatTaskInfo=CameraCompatTaskInfo { cameraCompatControlState=hidden freeformCameraCompatMode=inactive}}}, pipTask = null, remoteTransition = null, displayChange = null, flags = 0, debugId = 7 }
+11-07 11:10:57.158   561   582 V WindowManager:         {WCT{RemoteToken{7ba0b8f Task{aa55d92 #8 type=standard A=10209:com.trackstudio.app}}} m=OPEN f=NONE leash=Surface(name=Task=8)/@0x4b77fa7 sb=Rect(0, 0 - 320, 640) eb=Rect(0, 0 - 320, 640) d=0 taskParent=-1},
+11-07 11:10:57.186   561   595 I ActivityManager: Start proc 2400:com.trackstudio.app/u0a209 for next-top-activity {com.trackstudio.app/com.trackstudio.app.MainActivity}
+11-07 11:10:57.380  2400  2400 I trackstudio.app: Using CollectorTypeCMC GC.
+11-07 11:10:57.382  2400  2400 W trackstudio.app: Unexpected CPU variant for x86: x86_64.
+11-07 11:10:57.382  2400  2400 W trackstudio.app: Known variants: atom, sandybridge, silvermont, goldmont, goldmont-plus, goldmont-without-sha-xsaves, tremont, kabylake, default
+11-07 11:10:57.384  2400  2400 E trackstudio.app: Not starting debugger since process cannot load the jdwp agent.
+11-07 11:10:57.421  2400  2400 D nativeloader: Configuring clns-7 for other apk /data/app/~~TZ9Vxw01gLuR8YpkP9Ta7A==/com.trackstudio.app-9QV0iblc3P_O0jqYYxd4_w==/base.apk. target_sdk_version=34, uses_libraries=, library_path=/data/app/~~TZ9Vxw01gLuR8YpkP9Ta7A==/com.trackstudio.app-9QV0iblc3P_O0jqYYxd4_w==/lib/x86_64:/data/app/~~TZ9Vxw01gLuR8YpkP9Ta7A==/com.trackstudio.app-9QV0iblc3P_O0jqYYxd4_w==/base.apk!/lib/x86_64, permitted_path=/data:/mnt/expand:/data/user/0/com.trackstudio.app
+11-07 11:10:57.450  2400  2400 V ActivityThread: getPackageInfo() caused update to cached ApplicationInfo for package com.trackstudio.app
+11-07 11:10:57.453   561   584 E AppHibernationService: Package com.trackstudio.app is not installed for user 0
+11-07 11:10:57.453   561   584 E AppHibernationService: Package com.trackstudio.app is not installed for any user
+11-07 11:10:57.453   561   584 E AppHibernationService: Package com.trackstudio.app is not installed for user 0
+11-07 11:10:57.453   561   584 E AppHibernationService: Package com.trackstudio.app is not installed for any user
+11-07 11:10:57.540  2400  2400 W trackstudio.app: Entry not found
+11-07 11:10:57.566  2400  2400 D nativeloader: Load /system/lib64/libwebviewchromium_plat_support.so using ns clns-9 from class loader (caller=/data/app/~~HXjfMA66i9XTY1AswcbWiw==/com.google.android.webview-9fZJsD0RXcM6vGdCZaLMGg==/WebViewGoogle.apk): ok
+11-07 11:10:57.640  2400  2429 I chromium: [INFO:variations_seed_loader.cc(66)] Failed to open file for reading.: No such file or directory (2)
+11-07 11:10:57.641  2400  2429 I cr_VariationsUtils: Failed reading seed file "/data/user/0/com.trackstudio.app/app_webview/variations_seed_new"
+11-07 11:10:57.641  2400  2429 I chromium: [INFO:variations_seed_loader.cc(66)] Failed to open file for reading.: No such file or directory (2)
+11-07 11:10:57.641  2400  2429 I cr_VariationsUtils: Failed reading seed file "/data/user/0/com.trackstudio.app/app_webview/variations_seed"
+11-07 11:10:57.739  1195  1243 D PackageUpdatedTask: Package updated: mOp=ADD packages=[com.trackstudio.app]
+11-07 11:10:57.812   561   887 I SdkSandboxManager: No SDKs used. Skipping SDK data reconcilation for CallingInfo{mUid=10209, mPackageName='com.trackstudio.app, mAppProcessToken='null'}
+11-07 11:10:57.814  2400  2450 W chromium: [WARNING:dns_config_service_android.cc(81)] Failed to read DnsConfig.
+11-07 11:10:57.818   561   866 I AppWidgetServiceImpl: Updating package stopped masked state for uid 10209 package com.trackstudio.app isStopped false
+11-07 11:10:57.867   561  1115 I ActivityManager: Start proc 2433:com.google.android.webview:webview_service/u0a151 for service {com.google.android.webview/org.chromium.android_webview.services.VariationsSeedServer}
+11-07 11:10:58.039  1416  1416 I AiAiEcho: AppFetcherImplV2 updateApps package:[com.trackstudio.app], userId:[0], reason:[package is added.].
+11-07 11:10:58.060   561  1490 I ActivityManager: Start proc 2467:com.google.android.webview:sandboxed_process0:org.chromium.content.app.SandboxedProcessService0:0/u0ai9000 for  {com.trackstudio.app/org.chromium.content.app.SandboxedProcessService0:0}
+11-07 11:10:58.089   561   561 I AppsFilter: interaction: PackageSetting{796a989 com.android.microdroid.empty_payload/10202} -> PackageSetting{bc41d8e com.trackstudio.app/10209} BLOCKED
+11-07 11:10:58.162   561   881 D ShortcutService: adding package: com.trackstudio.app userId0
+11-07 11:10:58.162   561   881 D ShortcutService: handlePackageAdded: com.trackstudio.app user=0
+11-07 11:10:58.162   561   881 D ShortcutService: rescanPackageIfNeeded 0@com.trackstudio.app, forceRescan=true , isNewApp=true
+11-07 11:10:58.162   561   881 D ShortcutService: Package com.trackstudio.app has 0 manifest shortcut(s), and 0 share target(s)
+11-07 11:10:58.276  2467  2467 I cr_WebViewApkApp: Launched version=124.0.6367.219 minSdkVersion=29 isBundle=false processName=com.google.android.webview:sandboxed_process0:org.chromium.content.app.SandboxedProcessService0:0
+11-07 11:10:58.323   561  1489 D CoreBackPreview: Window{6b26cf4 u0 com.trackstudio.app/com.trackstudio.app.MainActivity}: Setting back callback OnBackInvokedCallbackInfo{mCallback=android.window.IOnBackInvokedCallback$Stub$Proxy@d65f166, mPriority=0, mIsAnimationCallback=false}
+11-07 11:10:58.371  1195  1243 D SessionCommitReceiver: Removing PromiseIcon for package: com.trackstudio.app, install reason: 0, alreadyAddedPromiseIcon: false
+11-07 11:10:58.465  1416  1416 I AiAiEcho: AppFetcherImpl onPackageChanged com.trackstudio.app.
+11-07 11:10:58.466  1416  2176 I AiAiEcho: AppIndexer Package:[com.trackstudio.app] UserProfile:[0] Enabled:[true].
+11-07 11:10:58.466  1416  2176 I AiAiEcho: AppFetcherImplV2 updateApps package:[com.trackstudio.app], userId:[0], reason:[package is updated.].
+11-07 11:10:58.502  1195  1243 D PackageUpdatedTask: Package updated: mOp=UPDATE packages=[com.trackstudio.app]
+11-07 11:10:58.606   561   582 I ActivityTaskManager: Displayed com.trackstudio.app/.MainActivity for user 0: +1s989ms
+11-07 11:10:58.700   561  1488 D CoreBackPreview: Window{d600b53 u0 Splash Screen com.trackstudio.app EXITING}: Setting back callback null
+11-07 11:10:58.701   561  1937 W InputManager-JNI: Input channel object 'd600b53 Splash Screen com.trackstudio.app (client)' was disposed without first being removed with the input manager!
+11-07 11:10:58.722  2467  2502 W chromium: [WARNING:runtime_features.cc(694)] SharedStorage for M118+ cannot be enabled in this configuration. Use --enable-features=SharedStorageAPI,SharedStorageAPIM118 in addition.
+11-07 11:10:58.722  2467  2502 W chromium: [WARNING:runtime_features.cc(730)] AttributionReportingCrossAppWeb cannot be enabled in this configuration. Use --enable-features=ConversionMeasurement,AttributionReportingCrossAppWeb in addition.
+11-07 11:10:58.729   561   682 I ImeTracker: com.trackstudio.app:ddf08ecb: onRequestHide at ORIGIN_SERVER reason HIDE_UNSPECIFIED_WINDOW fromUser false
+11-07 11:10:58.729   561   682 I ImeTracker: com.trackstudio.app:ddf08ecb: onCancelled at PHASE_SERVER_SHOULD_HIDE
+11-07 11:10:58.745  1381  1381 I GoogleInputMethodService: GoogleInputMethodService.onStartInput():1986 onStartInput(EditorInfo{EditorInfo{packageName=com.trackstudio.app, inputType=0, inputTypeString=NULL, enableLearning=false, autoCorrection=false, autoComplete=false, imeOptions=0, privateImeOptions=null, actionName=UNSPECIFIED, actionLabel=null, initialSelStart=-1, initialSelEnd=-1, initialCapsMode=0, label=null, fieldId=0, fieldName=null, extras=null, hintText=null, hintLocales=[]}}, false)
+11-07 11:10:58.754   561  1489 W PackageConfigPersister: App-specific configuration not found for packageName: com.trackstudio.app and userId: 0
+11-07 11:10:58.903   561   595 I ActivityManager: Start proc 2551:com.google.android.webview:webview_apk/u0a151 for service {com.google.android.webview/org.chromium.android_webview.nonembedded.AwComponentUpdateService}
+11-07 11:10:58.986  2467  2502 I chromium: [INFO:viewport_data.cc(133)] E2E_Used ViewportFitCover
+11-07 11:10:59.019  2467  2502 I chromium: [INFO:document_style_environment_variables.cc(104)] E2E_Used SafeAreaInsetBottom
+11-07 11:10:59.127  2467  2502 I chromium: [INFO:document_style_environment_variables.cc(104)] E2E_Used SafeAreaInsetBottom
+11-07 11:10:59.128  2467  2502 I chromium: [INFO:document_style_environment_variables.cc(104)] E2E_Used SafeAreaInsetBottom
+11-07 11:10:59.280   922   922 I SafetyLabelChangedBroadcastReceiver: received broadcast packageName: com.trackstudio.app, current user: UserHandle{0}, packageChangeEvent: NEW_INSTALL, intent user: UserHandle{0}
+11-07 11:10:59.319  2467  2502 I chromium: [INFO:document_style_environment_variables.cc(104)] E2E_Used SafeAreaInsetBottom
+11-07 11:10:59.613  1082  1082 D CarrierSvcBindHelper: onPackageAdded: com.trackstudio.app
+11-07 11:10:59.778  1082  1296 D ImsResolver: maybeAddedImsService, packageName: com.trackstudio.app
+11-07 11:10:59.969  1416  1426 W ogle.android.as: ApkAssets: Deleting an ApkAssets object '<empty> and /data/app/~~TZ9Vxw01gLuR8YpkP9Ta7A==/com.trackstudio.app-9QV0iblc3P_O0jqYYxd4_w==/base.apk' with 1 weak references
+11-07 11:11:00.025  2551  2615 W cr_AWNetworkFetcherTask: 	at org.chromium.android_webview.nonembedded.NetworkFetcherTask.download(chromium-TrichromeWebViewGoogle6432.apk-stable-636771938:56)
+11-07 11:11:00.625   561   881 D ShortcutService: changing package: com.trackstudio.app userId0
+11-07 11:11:00.625   561   881 D ShortcutService: handlePackageChanged: com.trackstudio.app user=0
+11-07 11:11:00.625   561   881 D ShortcutService: rescanPackageIfNeeded 0@com.trackstudio.app, forceRescan=true , isNewApp=true
+11-07 11:11:00.625   561   881 D ShortcutService: Package com.trackstudio.app has 0 manifest shortcut(s), and 0 share target(s)
+11-07 11:11:00.747  1082  1082 D CarrierSvcBindHelper: onPackageModified: com.trackstudio.app
+11-07 11:11:00.778  1082  1296 D ImsResolver: maybeAddedImsService, packageName: com.trackstudio.app
+11-07 11:11:01.716  1520  2844 W chromium: [1107/111101.716580:WARNING:url_request_context_config.cc(716)] Unrecognized Cronet experimental option "enable_telemetry" with params "false
+11-07 11:11:01.716  1520  2844 W chromium: 
+11-07 11:11:02.300  2860  2889 D nativeloader: Load /data/app/~~XjjT6nJbaOSunZ-LkCnXhA==/com.android.chrome-mFRBZpAQ8AZQmJIkmMs1ZQ==/Chrome.apk!/lib/x86_64/libchromium_android_linker.so using ns clns-8 from class loader (caller=/data/app/~~XjjT6nJbaOSunZ-LkCnXhA==/com.android.chrome-mFRBZpAQ8AZQmJIkmMs1ZQ==/Chrome.apk): ok
+11-07 11:11:05.092  1339  1348 W gle.android.gms: ApkAssets: Deleting an ApkAssets object '<empty> and /data/app/~~TZ9Vxw01gLuR8YpkP9Ta7A==/com.trackstudio.app-9QV0iblc3P_O0jqYYxd4_w==/base.apk' with 1 weak references
+11-07 11:11:05.229  1214  3006 I FontLog : Package com.trackstudio.app has no metadata [CONTEXT service_id=132 ]
+11-07 11:11:05.342  1339  2997 I Blockstore: [DataStoreImpl] Clearing Blockstore Data for package com.trackstudio.app [CONTEXT service_id=258 ]
+11-07 11:11:06.300  1339  1348 W gle.android.gms: ApkAssets: Deleting an ApkAssets object '<empty> and /data/app/~~TZ9Vxw01gLuR8YpkP9Ta7A==/com.trackstudio.app-9QV0iblc3P_O0jqYYxd4_w==/base.apk' with 1 weak references
+11-07 11:11:06.987  1099  1107 W ndroid.settings: ApkAssets: Deleting an ApkAssets object '<empty> and /data/app/~~TZ9Vxw01gLuR8YpkP9Ta7A==/com.trackstudio.app-9QV0iblc3P_O0jqYYxd4_w==/base.apk' with 1 weak references
+11-07 11:11:07.434   919   929 W ndroid.systemui: ApkAssets: Deleting an ApkAssets object '<empty> and /data/app/~~TZ9Vxw01gLuR8YpkP9Ta7A==/com.trackstudio.app-9QV0iblc3P_O0jqYYxd4_w==/base.apk' with 3 weak references
+11-07 11:11:07.606  1099  1107 W ndroid.settings: ApkAssets: Deleting an ApkAssets object '<empty> and /data/app/~~TZ9Vxw01gLuR8YpkP9Ta7A==/com.trackstudio.app-9QV0iblc3P_O0jqYYxd4_w==/base.apk' with 1 weak references
+11-07 11:11:08.919  1360  1371 W .apps.wellbeing: ApkAssets: Deleting an ApkAssets object '<empty> and /data/app/~~TZ9Vxw01gLuR8YpkP9Ta7A==/com.trackstudio.app-9QV0iblc3P_O0jqYYxd4_w==/base.apk' with 1 weak references
+11-07 11:11:09.016  1520  3459 W chromium: [1107/111109.016868:WARNING:url_request_context_config.cc(716)] Unrecognized Cronet experimental option "enable_telemetry" with params "false
+11-07 11:11:09.016  1520  3459 W chromium: 
+11-07 11:11:09.366  1520  1785 D nativeloader: Load /system/lib64/libwebviewchromium_plat_support.so using ns clns-9 from class loader (caller=/data/app/~~HXjfMA66i9XTY1AswcbWiw==/com.google.android.webview-9fZJsD0RXcM6vGdCZaLMGg==/WebViewGoogle.apk): ok
+11-07 11:11:09.501  1520  3471 I chromium: [INFO:variations_seed_loader.cc(66)] Failed to open file for reading.: No such file or directory (2)
+11-07 11:11:09.502  1520  3471 I chromium: [INFO:variations_seed_loader.cc(66)] Failed to open file for reading.: No such file or directory (2)
+11-07 11:11:09.826   561   595 I ActivityManager: Start proc 3476:com.google.android.webview:sandboxed_process0:org.chromium.content.app.SandboxedProcessService0:0/u0i1 for  {com.google.android.googlequicksearchbox/org.chromium.content.app.SandboxedProcessService0:0}
+11-07 11:11:09.874  3476  3476 I cr_WebViewApkApp: Launched version=124.0.6367.219 minSdkVersion=29 isBundle=false processName=com.google.android.webview:sandboxed_process0:org.chromium.content.app.SandboxedProcessService0:0
+11-07 11:11:10.209  1520  3491 E chromium: [ERROR:simple_file_enumerator.cc(21)] opendir /data/user/0/com.google.android.googlequicksearchbox/cache/WebView/Default/HTTP Cache/Code Cache/js: No such file or directory (2)
+11-07 11:11:10.209  1520  3491 E chromium: [ERROR:simple_index_file.cc(614)] Could not reconstruct index from disk
+11-07 11:11:10.209  1520  3491 E chromium: [ERROR:simple_file_enumerator.cc(21)] opendir /data/user/0/com.google.android.googlequicksearchbox/cache/WebView/Default/HTTP Cache/Code Cache/wasm: No such file or directory (2)
+11-07 11:11:10.209  1520  3491 E chromium: [ERROR:simple_index_file.cc(614)] Could not reconstruct index from disk
+11-07 11:11:10.590  1195  1202 W s.nexuslauncher: ApkAssets: Deleting an ApkAssets object '<empty> and /data/app/~~TZ9Vxw01gLuR8YpkP9Ta7A==/com.trackstudio.app-9QV0iblc3P_O0jqYYxd4_w==/base.apk' with 1 weak references
+11-07 11:11:11.506  1360  1371 W .apps.wellbeing: ApkAssets: Deleting an ApkAssets object '<empty> and /data/app/~~TZ9Vxw01gLuR8YpkP9Ta7A==/com.trackstudio.app-9QV0iblc3P_O0jqYYxd4_w==/base.apk' with 1 weak references
+11-07 11:11:11.549  1339  1348 W gle.android.gms: ApkAssets: Deleting an ApkAssets object '<empty> and /data/app/~~TZ9Vxw01gLuR8YpkP9Ta7A==/com.trackstudio.app-9QV0iblc3P_O0jqYYxd4_w==/base.apk' with 1 weak references
+11-07 11:11:16.083  2400  2411 W trackstudio.app: ApkAssets: Deleting an ApkAssets object '<empty> and /data/app/~~HXjfMA66i9XTY1AswcbWiw==/com.google.android.webview-9fZJsD0RXcM6vGdCZaLMGg==/WebViewGoogle.apk' with 2 weak references
+11-07 11:11:17.377  1360  1371 W .apps.wellbeing: ApkAssets: Deleting an ApkAssets object '<empty> and /data/app/~~TZ9Vxw01gLuR8YpkP9Ta7A==/com.trackstudio.app-9QV0iblc3P_O0jqYYxd4_w==/base.apk' with 1 weak references
+11-07 11:11:18.192  2467  2502 I chromium: [INFO:audio_latency.cc(179)] audioHardwareBufferSize = 4360
+11-07 11:11:18.201  2400  2453 D trackstudio.app: PlayerBase::PlayerBase()
+11-07 11:11:19.057  1360  1371 W .apps.wellbeing: ApkAssets: Deleting an ApkAssets object '<empty> and /data/app/~~TZ9Vxw01gLuR8YpkP9Ta7A==/com.trackstudio.app-9QV0iblc3P_O0jqYYxd4_w==/base.apk' with 1 weak references
+11-07 11:11:20.242  1099  1107 W ndroid.settings: ApkAssets: Deleting an ApkAssets object '<empty> and /data/app/~~TZ9Vxw01gLuR8YpkP9Ta7A==/com.trackstudio.app-9QV0iblc3P_O0jqYYxd4_w==/base.apk' with 1 weak references
+11-07 11:11:24.267  3259  3440 D StrictMode: 	at org.chromium.net.CronetEngine$Builder.getEnabledCronetProviders(PG:25)
+11-07 11:11:24.267  3259  3440 D StrictMode: 	at org.chromium.net.CronetEngine$Builder.createBuilderDelegate(PG:16)
+11-07 11:11:24.267  3259  3440 D StrictMode: 	at org.chromium.net.CronetEngine$Builder.<init>(PG:1)
+11-07 11:11:24.267  3259  3440 D StrictMode: 	at org.chromium.net.ExperimentalCronetEngine$Builder.<init>(PG:1)
+11-07 11:11:24.274  3259  3440 D StrictMode: 	at org.chromium.net.CronetEngine$Builder.getEnabledCronetProviders(PG:25)
+11-07 11:11:24.274  3259  3440 D StrictMode: 	at org.chromium.net.CronetEngine$Builder.createBuilderDelegate(PG:16)
+11-07 11:11:24.274  3259  3440 D StrictMode: 	at org.chromium.net.CronetEngine$Builder.<init>(PG:1)
+11-07 11:11:24.274  3259  3440 D StrictMode: 	at org.chromium.net.ExperimentalCronetEngine$Builder.<init>(PG:1)
+11-07 11:11:24.274  3259  3440 D StrictMode: 	at org.chromium.net.CronetEngine$Builder.getEnabledCronetProviders(PG:25)
+11-07 11:11:24.274  3259  3440 D StrictMode: 	at org.chromium.net.CronetEngine$Builder.createBuilderDelegate(PG:16)
+11-07 11:11:24.274  3259  3440 D StrictMode: 	at org.chromium.net.CronetEngine$Builder.<init>(PG:1)
+11-07 11:11:24.274  3259  3440 D StrictMode: 	at org.chromium.net.ExperimentalCronetEngine$Builder.<init>(PG:1)
+11-07 11:11:24.275  3259  3440 D StrictMode: 	at org.chromium.net.CronetEngine$Builder.getEnabledCronetProviders(PG:25)
+11-07 11:11:24.275  3259  3440 D StrictMode: 	at org.chromium.net.CronetEngine$Builder.createBuilderDelegate(PG:16)
+11-07 11:11:24.275  3259  3440 D StrictMode: 	at org.chromium.net.CronetEngine$Builder.<init>(PG:1)
+11-07 11:11:24.275  3259  3440 D StrictMode: 	at org.chromium.net.ExperimentalCronetEngine$Builder.<init>(PG:1)
+11-07 11:11:24.279  3259  3440 D StrictMode: 	at org.chromium.net.CronetEngine$Builder.getEnabledCronetProviders(PG:25)
+11-07 11:11:24.279  3259  3440 D StrictMode: 	at org.chromium.net.CronetEngine$Builder.createBuilderDelegate(PG:16)
+11-07 11:11:24.279  3259  3440 D StrictMode: 	at org.chromium.net.CronetEngine$Builder.<init>(PG:1)
+11-07 11:11:24.279  3259  3440 D StrictMode: 	at org.chromium.net.ExperimentalCronetEngine$Builder.<init>(PG:1)
+11-07 11:11:24.279  3259  3440 D StrictMode: 	at org.chromium.net.CronetEngine$Builder.getEnabledCronetProviders(PG:25)
+11-07 11:11:24.279  3259  3440 D StrictMode: 	at org.chromium.net.CronetEngine$Builder.createBuilderDelegate(PG:16)
+11-07 11:11:24.279  3259  3440 D StrictMode: 	at org.chromium.net.CronetEngine$Builder.<init>(PG:1)
+11-07 11:11:24.279  3259  3440 D StrictMode: 	at org.chromium.net.ExperimentalCronetEngine$Builder.<init>(PG:1)
+11-07 11:11:24.682  3259  3900 I cr_CronetUrlRequestContext: destroyNativeStreamLocked org.chromium.net.impl.CronetBidirectionalStream@8f8f96b
+11-07 11:11:25.413  1339  3676 I cr_CronetUrlRequestContext: destroyNativeStreamLocked org.chromium.net.impl.CronetBidirectionalStream@b962bbf
+11-07 11:11:27.509  3259  3900 I cr_CronetUrlRequestContext: destroyNativeStreamLocked org.chromium.net.impl.CronetBidirectionalStream@f336a34
+11-07 11:11:27.955     0     0 I init    : processing action (persist.device_config.lmkd_native.thrashing_limit_critical=*) from (/system/etc/init/lmkd.rc:47)
+11-07 11:11:27.960     0     0 I init    : processing action (lmkd.reinit=1) from (/system/etc/init/lmkd.rc:10)
+11-07 11:11:27.962     0     0 I init    : starting service 'exec 23 (/system/bin/lmkd --reinit)'...
+11-07 11:11:27.982     0     0 I init    : ... started service 'exec 23 (/system/bin/lmkd --reinit)' has pid 4010
+11-07 11:11:27.838   151   151 I lowmemorykiller: lmkd data connection established
+11-07 11:11:28.042     0     0 I init    : Service 'exec 23 (/system/bin/lmkd --reinit)' (pid 4010) exited with status 0 oneshot service took 0.070000 seconds in background
+11-07 11:11:28.045     0     0 I init    : Sending signal 9 to service 'exec 23 (/system/bin/lmkd --reinit)' (pid 4010) process group...
+11-07 11:11:27.881   151   151 I lowmemorykiller: Using psi monitors for memory pressure detection
+11-07 11:11:27.881   151   151 I lowmemorykiller: Properties reinitilized
+11-07 11:11:27.882  4010  4010 I lowmemorykiller: lmkd updated properties successfully
+11-07 11:11:27.882   151   151 I lowmemorykiller: lmkd data connection dropped
+11-07 11:11:27.882   151   151 I lowmemorykiller: closing lmkd data connection
+11-07 11:11:42.561  2400  2400 I chromium: [INFO:CONSOLE(190)] "бит: ноты за 24.0 с (2 потока)", source: https://appassets.androidplatform.net/index.html (190)
+11-07 11:11:46.371  1360  1371 W .apps.wellbeing: ApkAssets: Deleting an ApkAssets object '<empty> and /data/app/~~TZ9Vxw01gLuR8YpkP9Ta7A==/com.trackstudio.app-9QV0iblc3P_O0jqYYxd4_w==/base.apk' with 1 weak references
+11-07 11:11:53.422  1398  1413 I MediaProvider: Open with lower FS for /storage/emulated/0/Download/TrackStudio/ci-test.txt. Uid: 10209
+11-07 11:11:56.735  2400  2409 I trackstudio.app: Background concurrent mark compact GC freed 72KB AllocSpace bytes, 6(2840KB) LOS objects, 49% free, 4086KB/8172KB, paused 9.549ms,1.527ms total 52.311ms
+11-07 11:11:57.118  2400  2409 I trackstudio.app: Background concurrent mark compact GC freed 308KB AllocSpace bytes, 11(5292KB) LOS objects, 49% free, 4098KB/8196KB, paused 15.165ms,4.105ms total 56.558ms
+11-07 11:11:57.290  1398  1413 I MediaProvider: Open with lower FS for /storage/emulated/0/Download/TrackStudio/холодный-коридор.wav. Uid: 10209
+11-07 11:12:01.482  1339  1348 W gle.android.gms: ApkAssets: Deleting an ApkAssets object '<empty> and /data/app/~~TZ9Vxw01gLuR8YpkP9Ta7A==/com.trackstudio.app-9QV0iblc3P_O0jqYYxd4_w==/base.apk' with 1 weak references
+11-07 11:12:29.588   561   663 D ActivityManager: freezing 3476 com.google.android.webview:sandboxed_process0:org.chromium.content.app.SandboxedProcessService0:0
+11-07 11:12:52.878  2400  4301 D nativeloader: Load /data/app/~~TZ9Vxw01gLuR8YpkP9Ta7A==/com.trackstudio.app-9QV0iblc3P_O0jqYYxd4_w==/base.apk!/lib/x86_64/libonnxruntime4j_jni.so using ns clns-7 from class loader (caller=/data/app/~~TZ9Vxw01gLuR8YpkP9Ta7A==/com.trackstudio.app-9QV0iblc3P_O0jqYYxd4_w==/base.apk): ok
+11-07 11:12:52.890  2400  4301 I TrackStudio: ds load, free mem 192 MB
+11-07 11:12:53.468  2400  4301 I TrackStudio: ds ready
+11-07 11:12:57.896  2400  2409 I trackstudio.app: NativeAlloc concurrent mark compact GC freed 785KB AllocSpace bytes, 6(18MB) LOS objects, 49% free, 3042KB/6085KB, paused 175us,400us total 114.965ms
+11-07 11:13:01.084  2400  2400 I chromium: [INFO:CONSOLE(190)] "бит: ноты за 3.9 с (2 потока)", source: https://appassets.androidplatform.net/index.html (190)
+11-07 11:13:15.917   561   656 D ActivityManager: sync unfroze 3476 com.google.android.webview:sandboxed_process0:org.chromium.content.app.SandboxedProcessService0:0 for 6
+11-07 11:13:15.996  1520  1943 E cr_CronetUrlRequestContext: 	at org.chromium.net.impl.af.run(PG:47)
+11-07 11:13:26.050   561   663 D ActivityManager: freezing 3476 com.google.android.webview:sandboxed_process0:org.chromium.content.app.SandboxedProcessService0:0
+11-07 11:13:31.449  2400  2400 I chromium: [INFO:CONSOLE(190)] "голос: трек озвучен за 34.3 с, режим CPU, заранее 0/8", source: https://appassets.androidplatform.net/index.html (190)
+11-07 11:13:43.639  1398  1413 I MediaProvider: Open with lower FS for /storage/emulated/0/Download/TrackStudio/report-voice_ds.zip. Uid: 10209
+11-07 11:13:48.857  2400  2400 I chromium: [INFO:CONSOLE(190)] "бит: ноты за 5.1 с (2 потока)", source: https://appassets.androidplatform.net/index.html (190)
+11-07 11:14:13.313  2400  4301 I TrackStudio: kokoro native ready, elem 10, dur /encoder/Cast_output_0__pred
+11-07 11:14:16.337  2400  2400 I chromium: [INFO:CONSOLE(190)] "голос Kokoro: нативно на процессоре телефона", source: https://appassets.androidplatform.net/index.html (190)
+11-07 11:14:35.819  2400  2400 I chromium: [INFO:CONSOLE(190)] "голос: трек озвучен за 19.5 с, режим телефон · ноты, заранее 0/8", source: https://appassets.androidplatform.net/index.html (190)
+11-07 11:14:45.518  2400  2400 I chromium: [INFO:CONSOLE(190)] "бит: ноты за 2.5 с (2 потока)", source: https://appassets.androidplatform.net/index.html (190)
+11-07 11:14:47.833  2400  2453 D trackstudio.app: PlayerBase::PlayerBase()
+11-07 11:15:04.086  2400  2400 I chromium: [INFO:CONSOLE(190)] "голос: трек озвучен за 21.1 с, режим телефон · ноты, заранее 0/9", source: https://appassets.androidplatform.net/index.html (190)
+11-07 11:15:13.651  1398  1413 I MediaProvider: Open with lower FS for /storage/emulated/0/Download/TrackStudio/report-voice.zip. Uid: 10209
+11-07 11:15:16.338  2400  2400 I chromium: [INFO:CONSOLE(190)] "бит: ноты за 2.5 с (2 потока)", source: https://appassets.androidplatform.net/index.html (190)
+11-07 11:15:18.522  2400  4301 I TrackStudio: ds load, free mem 192 MB
+11-07 11:15:19.071  2400  4301 I TrackStudio: ds ready
+11-07 11:15:36.736   561   656 D ActivityManager: sync unfroze 3476 com.google.android.webview:sandboxed_process0:org.chromium.content.app.SandboxedProcessService0:0 for 6
+11-07 11:15:36.756   561  1115 W ProcessStats: Tracking association SourceState{1b51778 com.google.android.googlequicksearchbox:search/10144 ImpBg #6287} whose proc state 6 is better than process ProcessState{fdd4d0 com.google.android.webview:sandboxed_process0:org.chromium.content.app.SandboxedProcessService0:0/10144 pkg=com.google.android.googlequicksearchbox} proc state 14 (2 skipped)
+11-07 11:15:37.445   561   664 I RescueParty: Starting to observe: [android], updated namespace: lmkd_native
+11-07 11:15:37.606     0     0 I init    : processing action (persist.device_config.lmkd_native.thrashing_limit_critical=*) from (/system/etc/init/lmkd.rc:47)
+11-07 11:15:37.609     0     0 I init    : processing action (lmkd.reinit=1) from (/system/etc/init/lmkd.rc:10)
+11-07 11:15:37.613     0     0 I init    : starting service 'exec 24 (/system/bin/lmkd --reinit)'...
+11-07 11:15:37.633     0     0 I init    : ... started service 'exec 24 (/system/bin/lmkd --reinit)' has pid 4485
+11-07 11:15:37.484   151   151 I lowmemorykiller: lmkd data connection established
+11-07 11:15:37.517   151   151 I lowmemorykiller: Using psi monitors for memory pressure detection
+11-07 11:15:37.517   151   151 I lowmemorykiller: Properties reinitilized
+11-07 11:15:37.517  4485  4485 I lowmemorykiller: lmkd updated properties successfully
+11-07 11:15:37.518   151   151 I lowmemorykiller: lmkd data connection dropped
+11-07 11:15:37.518   151   151 I lowmemorykiller: closing lmkd data connection
+11-07 11:15:37.678     0     0 I init    : Service 'exec 24 (/system/bin/lmkd --reinit)' (pid 4485) exited with status 0 oneshot service took 0.060000 seconds in background
+11-07 11:15:37.680     0     0 I init    : Sending signal 9 to service 'exec 24 (/system/bin/lmkd --reinit)' (pid 4485) process group...
+11-07 11:15:41.695  2400  2400 I chromium: [INFO:CONSOLE(190)] "голос: трек озвучен за 23.2 с, режим телефон · ноты, заранее 0/9", source: https://appassets.androidplatform.net/index.html (190)
+11-07 11:15:46.958   561   663 D ActivityManager: freezing 3476 com.google.android.webview:sandboxed_process0:org.chromium.content.app.SandboxedProcessService0:0
+11-07 11:15:52.575  2400  2400 I chromium: [INFO:CONSOLE(190)] "бит: ноты за 3.5 с (2 потока)", source: https://appassets.androidplatform.net/index.html (190)
+11-07 11:15:54.877  2400  2453 D trackstudio.app: PlayerBase::PlayerBase()
+11-07 11:16:22.500  2400  2400 I chromium: [INFO:CONSOLE(190)] "голос: трек озвучен за 33.4 с, режим телефон · ноты, заранее 0/8", source: https://appassets.androidplatform.net/index.html (190)
+11-07 11:16:35.220  1398  1413 I MediaProvider: Open with lower FS for /storage/emulated/0/Download/TrackStudio/report-voice_sing.zip. Uid: 10209

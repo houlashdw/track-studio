@@ -1,0 +1,6 @@
+total 19952
+-rwxrwx--- 1 u0_a196 media_rw       16 2026-11-07 11:11 ci-test.txt
+-rwxrwx--- 1 u0_a196 media_rw  1336139 2026-11-07 11:15 report-voice.zip
+-rwxrwx--- 1 u0_a196 media_rw  1347176 2026-11-07 11:13 report-voice_ds.zip
+-rwxrwx--- 1 u0_a196 media_rw  1351550 2026-11-07 11:16 report-voice_sing.zip
+-rwxrwx--- 1 u0_a196 media_rw 16366316 2026-11-07 11:11 холодный-коридор.wav
