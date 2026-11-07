@@ -9,6 +9,7 @@ import os, sys, subprocess, json, time, glob, shutil
 WORK = '/kaggle/working' if os.path.isdir('/kaggle/working') else os.path.abspath('al_out')
 R = '/tmp/ace'; RAW = 'https://raw.githubusercontent.com/houlashdw/track-studio'
 EPOCHS = os.environ.get('EPOCHS', '300'); EVERY = os.environ.get('EVERY', '50'); LR = os.environ.get('LR', '0.03'); ADT = os.environ.get('ADT', 'lokr')
+VARIANT = os.environ.get('VARIANT', 'turbo'); GEN_TASK = os.environ.get('GEN_TASK', 'text2music')
 GEN_LM = os.environ.get('GEN_LM', '0') == '1'; ALLCK = os.environ.get('ALLCK', '0') == '1'; TLIM = int(os.environ.get('TLIM', str(5 * 3600)))
 TAG = 'vc2'
 
@@ -31,7 +32,8 @@ from acestep.handler import AceStepHandler
 from acestep.llm_inference import LLMHandler
 from acestep.inference import GenerationParams, GenerationConfig, generate_music
 ROOT = os.getcwd(); OUT = sys.argv[1]; ADS = sys.argv[2].split(','); USE_LM = os.environ.get('GEN_LM') == '1'; NAMES = os.environ.get('GEN_SONGS', '').split(',')
-dit = AceStepHandler(); print(dit.initialize_service(project_root=ROOT, config_path='acestep-v15-turbo', device='cuda', offload_to_cpu=False), flush=True)
+VAR = os.environ.get('VARIANT', 'turbo'); TASK = os.environ.get('GEN_TASK', 'text2music')
+dit = AceStepHandler(); print(dit.initialize_service(project_root=ROOT, config_path='acestep-v15-' + VAR, device='cuda', offload_to_cpu=False), flush=True)
 lm = LLMHandler()
 if USE_LM:
     from acestep.model_downloader import ensure_lm_model; ensure_lm_model('acestep-5Hz-lm-1.7B')
@@ -44,10 +46,16 @@ for AD in ADS:
     for name, cap, bpm, lyr in json.load(open('/tmp/ace_songs.json')):
         if NAMES[0] and name not in NAMES: continue
         t0 = time.time()
-        p = GenerationParams(task_type='text2music', thinking=USE_LM, caption='vc2, ' + cap, lyrics=lyr, bpm=bpm, duration=110, vocal_language='ru', seed=11)
+        if TASK == 'lego':   # наш бит из приложения + голос
+            if not os.path.exists(f'/tmp/beats/{name}.mp3'): continue
+            p = GenerationParams(task_type='lego', src_audio=f'/tmp/beats/{name}.mp3', instruction='Generate the vocals track based on the audio context:',
+                                 caption='vc2, female vocal in Russian, ' + cap, lyrics=lyr, bpm=bpm, vocal_language='ru', repainting_start=0.0, repainting_end=-1, inference_steps=50, seed=101)
+        else:
+            p = GenerationParams(task_type='text2music', thinking=USE_LM, caption='vc2, ' + cap, lyrics=lyr, bpm=bpm, duration=110, vocal_language='ru', seed=11,
+                                 inference_steps=8 if VAR == 'turbo' else 50, shift=3.0 if VAR == 'turbo' else 1.0)
         r = generate_music(dit, lm, p, GenerationConfig(batch_size=1, audio_format='mp3', mp3_bitrate='192k', use_random_seed=False), save_dir='/tmp/ace_gen')
         if r.success and r.audios:
-            dst = f'{OUT}/lora_{tag}_{name}.mp3'; shutil.copy(r.audios[0]['path'], dst); print('✅', dst, '%.0f с' % (time.time() - t0), flush=True)
+            dst = f'{OUT}/{TASK}_{VAR}_{tag}_{name}.mp3'; shutil.copy(r.audios[0]['path'], dst); print('✅', dst, '%.0f с' % (time.time() - t0), flush=True)
         else: print('⚠', name, getattr(r, 'error', r), flush=True)
 '''
 
@@ -83,12 +91,12 @@ if __name__ == '__main__':
     json.dump(ds, open('/tmp/ds.json', 'w'), ensure_ascii=False, indent=1)
     print('песен в разметке:', len(ds['samples']), flush=True)
     # 2) модели + подготовка тензоров
-    sh(f'{UV} -c "from acestep.model_downloader import ensure_main_model; print(ensure_main_model())"')
+    sh(f'{UV} -c "from acestep.model_downloader import ensure_main_model, ensure_dit_model; print(ensure_main_model()); print(ensure_dit_model(\'acestep-v15-{VARIANT}\'))"')
     CK = R + '/checkpoints'; T = R + '/al_data/tensors'; O = R + '/al_data/out'   # внутри папки ACE: тренер не пускает пути вне неё
     sh(f'{UV} -m acestep.training_v2.cli.train_fixed --preprocess --dataset-json /tmp/ds.json --audio-dir {A} --tensor-output {T} '
-       f'--checkpoint-dir {CK} --model-variant turbo --max-duration 240 --precision bf16')
+       f'--checkpoint-dir {CK} --model-variant {VARIANT} --max-duration 240 --precision bf16')
     # 3) обучение LoKr (быстрый адаптер); если bf16 на T4 не пойдёт — fp32
-    base = (f'-m acestep.training_v2.cli.train_fixed --checkpoint-dir {CK} --model-variant turbo --dataset-dir {T} --output-dir {O} '
+    base = (f'-m acestep.training_v2.cli.train_fixed --checkpoint-dir {CK} --model-variant {VARIANT} --dataset-dir {T} --output-dir {O} '
             f'--yes --plain --adapter-type {ADT} --lr {LR} --epochs {EPOCHS} --save-every {EVERY} --batch-size 1 --gradient-accumulation 4 --gradient-checkpointing')
     rc = sh(f'cd {R} && MPLBACKEND=Agg timeout {TLIM} {sys.executable} -m uv run python {base} --precision bf16', check=False)
     if rc not in (0, 124) and not glob.glob(O + '/checkpoints/*'):
@@ -108,5 +116,8 @@ if __name__ == '__main__':
     json.dump(k.SONGS, open('/tmp/ace_songs.json', 'w'), ensure_ascii=False)
     open(R + '/gen_lora.py', 'w').write(GEN)
     ads = sorted([d for d in cands if 'epoch_' in d], key=lambda d: int(d.split('epoch_')[1].split('_')[0])) if ALLCK else [AD]
-    sh(f'cd {R} && MPLBACKEND=Agg GEN_LM={int(GEN_LM)} GEN_SONGS={os.environ.get("GEN_SONGS", "")} {sys.executable} -m uv run python gen_lora.py {WORK} {",".join(ads)}', check=False)
+    if GEN_TASK == 'lego':
+        os.makedirs('/tmp/beats', exist_ok=True)
+        for n in ['ballad', 'trap', 'dance']: sh(f'wget -q -O /tmp/beats/{n}.mp3 {RAW}/vprep-in/beats/{n}.mp3', check=False)
+    sh(f'cd {R} && MPLBACKEND=Agg VARIANT={VARIANT} GEN_TASK={GEN_TASK} GEN_LM={int(GEN_LM)} GEN_SONGS={os.environ.get("GEN_SONGS", "")} {sys.executable} -m uv run python gen_lora.py {WORK} {",".join(ads)}', check=False)
     print('готово за %.0f мин → Output: lora_*.mp3 и vc2_lokr.zip.enc (адаптер: %s)' % ((time.time() - t0) / 60, os.path.basename(AD)))
