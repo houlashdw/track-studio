@@ -1,0 +1,30 @@
+name: modal
+# Modal: проверка токена / деплой сервера ACE (секреты MODAL_TOKEN_ID / MODAL_TOKEN_SECRET)
+on:
+  workflow_dispatch:
+    inputs:
+      cmd: { description: 'check / deploy / run', default: 'check' }
+      file: { default: 'server/modal_ace.py' }
+permissions:
+  contents: read
+jobs:
+  m:
+    runs-on: ubuntu-latest
+    env: { MODAL_TOKEN_ID: '${{ secrets.MODAL_TOKEN_ID }}', MODAL_TOKEN_SECRET: '${{ secrets.MODAL_TOKEN_SECRET }}' }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - run: pip install -q -U modal
+      - name: Проверка
+        if: inputs.cmd == 'check'
+        run: |
+          [ -n "$MODAL_TOKEN_ID" ] && [ -n "$MODAL_TOKEN_SECRET" ] || { echo "::error::нет секретов MODAL_TOKEN_ID / MODAL_TOKEN_SECRET"; exit 1; }
+          modal app list 2>&1 | tail -5
+          echo OK
+      - name: Деплой
+        if: inputs.cmd == 'deploy'
+        run: modal deploy "${{ inputs.file }}"
+      - name: Запуск
+        if: inputs.cmd == 'run'
+        run: modal run "${{ inputs.file }}"
