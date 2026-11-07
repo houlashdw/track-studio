@@ -9,6 +9,7 @@ on:
       wait: { description: 'ждать минут', default: '330' }
       owner: { description: 'владелец на Kaggle', default: 'emethscacute' }
       ksrc: { description: 'выходы других ноутбуков (user/slug,…)', default: '' }
+      env: { description: 'переменные для скрипта: A=1 B=2', default: '' }
       data: { description: 'датасеты Kaggle через запятую (user/slug)', default: '' }
 permissions:
   contents: write
@@ -27,7 +28,7 @@ jobs:
           case "$KK" in KGAT*) echo "KAGGLE_API_TOKEN=$KK" >> $GITHUB_ENV;; esac
       - name: Отправка ноутбука
         run: |
-          mkdir k && cp "${{ inputs.script }}" k/main.py
+          mkdir k && { echo "import os; os.environ.update(dict(x.split('=', 1) for x in '${{ inputs.env }}'.split()))"; cat "${{ inputs.script }}"; } > k/main.py
           python - <<'PY'
           import json, os
           json.dump({'id': '${{ inputs.owner }}/${{ inputs.slug }}', 'title': '${{ inputs.slug }}', 'code_file': 'main.py', 'language': 'python',
