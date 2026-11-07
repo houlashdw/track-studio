@@ -5,26 +5,46 @@ on:
     inputs:
       cmd: { description: 'check / deploy / run', default: 'check' }
       file: { default: 'server/modal_ace.py' }
+      adapter: { description: 'файл адаптера в ветке voice-ace (зашифр.)', default: '' }
+      adname: { default: 'e100' }
 permissions:
-  contents: read
+  contents: write
 jobs:
   m:
     runs-on: ubuntu-latest
     env: { MODAL_TOKEN_ID: '${{ secrets.MODAL_TOKEN_ID }}', MODAL_TOKEN_SECRET: '${{ secrets.MODAL_TOKEN_SECRET }}' }
     steps:
       - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
       - uses: actions/setup-python@v5
         with: { python-version: '3.11' }
-      - run: pip install -q -U modal
+      - run: pip install -q -U modal fastapi
       - name: Проверка
         if: inputs.cmd == 'check'
         run: |
           [ -n "$MODAL_TOKEN_ID" ] && [ -n "$MODAL_TOKEN_SECRET" ] || { echo "::error::нет секретов MODAL_TOKEN_ID / MODAL_TOKEN_SECRET"; exit 1; }
           modal app list 2>&1 | tail -5
           echo OK
+      - name: Ключ сервера и голос
+        if: inputs.cmd == 'deploy' || inputs.cmd == 'run'
+        env: { P: '${{ secrets.KEYSTORE_PASS }}', TSK: '${{ secrets.TS_KEY }}' }
+        run: |
+          K="$TSK"; [ -n "$K" ] || K=$(printf %s "$P" | sha256sum | cut -c1-32)
+          modal secret create ts-key TS_KEY="$K" --force >/dev/null && echo "ключ сервера: задан"
+          if [ -n "${{ inputs.adapter }}" ]; then
+            git fetch -q origin voice-ace:ko && git show "ko:${{ inputs.adapter }}" > /tmp/a.enc
+            openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -in /tmp/a.enc -out /tmp/a.zip -pass env:P && mkdir -p /tmp/ad && cd /tmp/ad && unzip -q /tmp/a.zip
+            modal volume create ts-ace 2>/dev/null || true
+            modal volume put -f ts-ace /tmp/ad "/adapters/turbo/${{ inputs.adname }}" && echo "голос загружен"
+          fi
       - name: Деплой
         if: inputs.cmd == 'deploy'
         run: modal deploy "${{ inputs.file }}"
       - name: Запуск
         if: inputs.cmd == 'run'
-        run: modal run "${{ inputs.file }}"
+        env: { P: '${{ secrets.KEYSTORE_PASS }}' }
+        run: |
+          modal run "${{ inputs.file }}" --out /tmp/test_out.mp3
+          mkdir o && openssl enc -aes-256-cbc -pbkdf2 -iter 200000 -salt -in /tmp/test_out.mp3 -out o/test_out.mp3.enc -pass env:P && cd o
+          git init -q -b modal-out && git config user.name gha && git config user.email gha@users.noreply.github.com
+          git add -A && git commit -q -m "modal test" && git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" modal-out
