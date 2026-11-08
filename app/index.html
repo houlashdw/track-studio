@@ -553,7 +553,7 @@ short lines in English…
         <div id="cloudOpts" hidden>
           <div class="seg3 mt8" id="cloudVoiceSeg"><button type="button" data-v="1" class="on">Голос vc2</button><button type="button" data-v="0.5">Наполовину</button><button type="button" data-v="0">Голос ACE</button></div>
           <p class="hint" style="margin:10px 2px 0">Бит</p>
-          <div class="seg3 mt8" id="cloudBeatSeg"><button type="button" data-v="ours" class="on">Наш (из приложения)</button><button type="button" data-v="oursace">Наш, сведённый ACE</button><button type="button" data-v="ace">ACE целиком</button></div>
+          <div class="seg3 mt8" id="cloudBeatSeg"><button type="button" data-v="ours" class="on">Наш (из приложения)</button><button type="button" data-v="ace">ACE целиком</button></div>
           <p class="hint" style="margin:10px 2px 0">Подача</p>
           <div class="seg3 mt8" id="cloudDelSeg"><button type="button" data-v="auto" class="on">Авто</button><button type="button" data-v="soft">Нежно</button><button type="button" data-v="power">Мощно</button><button type="button" data-v="rap">Рэп-флоу</button><button type="button" data-v="atl">Atlanta</button></div>
           <p class="hint" style="margin:10px 2px 0">Язык и голос</p>
@@ -3525,7 +3525,7 @@ async function cloudMake() {
   if (del === 'soft') tags.push('soft gentle intimate delivery'); if (del === 'power') tags.push('powerful belting vocal, strong chest voice');
   if (tim === 'low') tags.push('low husky deep voice'); if (tim === 'high') tags.push('high-pitched airy breathy voice');
   if (dirt === 'dirty') tags.push('gritty distorted saturated vocal, distorted guitars'); if (dirt === 'clean') tags.push('clean clear polished vocal, crisp diction');
-  const bm = cloudGet('ts_cbeat', 'ours'); if (bm === 'ours' || bm === 'oursace') return cloudOurs(key, prompt + ', ' + tags.join(', '), bm === 'oursace');
+  const bm = cloudGet('ts_cbeat', 'ours'); if (bm !== 'ace') return cloudOurs(key, prompt + ', ' + tags.join(', '), bm === 'oursace');
   const q = { caption: prompt + ', ' + tags.join(', '), lyrics: cloudLyrics(), bpm: bpmM ? +bpmM[1] : null,
     duration: $('#quick') && $('#quick').checked ? 60 : 150, voice: cloudVoice(), lang, seed: -1 };
   stop(); setBusy(true); const t0 = Date.now(); const msg = $('#cloudMsg');
