@@ -553,7 +553,7 @@ short lines in English…
         <div id="cloudOpts" hidden>
           <div class="seg3 mt8" id="cloudVoiceSeg"><button type="button" data-v="1" class="on">Голос vc2</button><button type="button" data-v="0.5">Наполовину</button><button type="button" data-v="0">Голос ACE</button></div>
           <p class="hint" style="margin:10px 2px 0">Бит</p>
-          <div class="seg3 mt8" id="cloudBeatSeg"><button type="button" data-v="ours" class="on">Наш (из приложения)</button><button type="button" data-v="ace">ACE целиком</button></div>
+          <div class="seg3 mt8" id="cloudBeatSeg"><button type="button" data-v="ours" class="on">Наш (из приложения)</button><button type="button" data-v="oursace">Наш, сведённый ACE</button><button type="button" data-v="ace">ACE целиком</button></div>
           <p class="hint" style="margin:10px 2px 0">Подача</p>
           <div class="seg3 mt8" id="cloudDelSeg"><button type="button" data-v="auto" class="on">Авто</button><button type="button" data-v="soft">Нежно</button><button type="button" data-v="power">Мощно</button><button type="button" data-v="rap">Рэп-флоу</button><button type="button" data-v="atl">Atlanta</button></div>
           <p class="hint" style="margin:10px 2px 0">Язык и голос</p>
@@ -3525,7 +3525,7 @@ async function cloudMake() {
   if (del === 'soft') tags.push('soft gentle intimate delivery'); if (del === 'power') tags.push('powerful belting vocal, strong chest voice');
   if (tim === 'low') tags.push('low husky deep voice'); if (tim === 'high') tags.push('high-pitched airy breathy voice');
   if (dirt === 'dirty') tags.push('gritty distorted saturated vocal, distorted guitars'); if (dirt === 'clean') tags.push('clean clear polished vocal, crisp diction');
-  if (cloudGet('ts_cbeat', 'ours') === 'ours') return cloudOurs(key, prompt + ', ' + tags.join(', '));
+  const bm = cloudGet('ts_cbeat', 'ours'); if (bm === 'ours' || bm === 'oursace') return cloudOurs(key, prompt + ', ' + tags.join(', '), bm === 'oursace');
   const q = { caption: prompt + ', ' + tags.join(', '), lyrics: cloudLyrics(), bpm: bpmM ? +bpmM[1] : null,
     duration: $('#quick') && $('#quick').checked ? 60 : 150, voice: cloudVoice(), lang, seed: -1 };
   stop(); setBusy(true); const t0 = Date.now(); const msg = $('#cloudMsg');
@@ -3548,7 +3548,7 @@ async function cloudMake() {
   finally { clearInterval(tick); setBusy(false); }
 }
 /* наш бит (собирается здесь, без голоса) → сервер: ACE «lego» допевает голос под этот бит → назад только голос → кладём на НАШ бит */
-async function cloudOurs(key, caption) {
+async function cloudOurs(key, caption, full) {
   const msg = $('#cloudMsg'), vm = $('#voiceMode'), was = vm.value, t0 = Date.now();
   if (!($('#lyrics').value || '').trim()) { msg.textContent = 'Для голоса нужен текст песни.'; $('#lyrics').focus(); return; }
   vm.value = 'off'; msg.textContent = 'Собираю наш бит…';
@@ -3560,7 +3560,7 @@ async function cloudOurs(key, caption) {
     const b64 = await new Promise((ok, no) => { const fr = new FileReader(); fr.onload = () => ok(String(fr.result).split(',')[1]); fr.onerror = no; fr.readAsDataURL(encodeMp3(beat, 160)); });
     for (let i = 0; ; i++) { try { const pr = await fetch(CLOUD_URL + '/ping'); if (pr.ok) break; } catch (e) { } if (i > 24) throw new Error('сервер не просыпается'); await new Promise((ok) => setTimeout(ok, 5000)); }
     const bpm = S.spec && S.spec.bpm ? Math.round(S.spec.bpm) : null;
-    const r = await fetch(CLOUD_URL + '/lego', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Key': key }, body: JSON.stringify({ beat_b64: b64, caption, lyrics: cloudLyrics(), bpm, voice: cloudVoice(), lang: cloudGet('ts_clang', 'ru'), seed: -1 }) });
+    const r = await fetch(CLOUD_URL + '/lego', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Key': key }, body: JSON.stringify({ beat_b64: b64, caption, lyrics: cloudLyrics(), bpm, voice: cloudVoice(), lang: cloudGet('ts_clang', 'ru'), full: !!full, seed: -1 }) });
     if (r.status === 401) { cloudSet('ts_ckey', ''); throw new Error('неверный ключ сервера'); }
     if (!r.ok) throw new Error('сервер: ' + r.status + ' ' + (await r.text()).slice(0, 200));
     const id = (await r.json()).id; let vb = null;
@@ -3572,6 +3572,11 @@ async function cloudOurs(key, caption) {
       vb = await j.arrayBuffer(); break;
     }
     if (!vb) throw new Error('слишком долго — попробуй ещё раз');
+    if (full) {   /* наш бит в звучании ACE + голос: берём как есть */
+      const fb = await S.ctx.decodeAudioData(vb); S.buffer = fb; S.peaks = computePeaks(fb, 1600); drawWave(0); $('#player').dataset.ready = '1'; play(0);
+      CLOUD.blob = new Blob([vb], { type: 'audio/mpeg' }); $('#cloudActs').hidden = false; $('#cloudAudio').hidden = true;
+      msg.textContent = 'Готово за ' + Math.round((Date.now() - t0) / 1000) + ' с: наш бит, сведённый ACE, + голос.'; return;
+    }
     let voc = await S.ctx.decodeAudioData(vb);
     if (voc.sampleRate !== sr) { const oc = new OfflineAudioContext(2, Math.ceil(voc.duration * sr), sr), bs = oc.createBufferSource(); bs.buffer = voc; bs.connect(oc.destination); bs.start(); voc = await oc.startRendering(); }
     msg.textContent = 'Свожу голос с битом (наши эффекты)…';
@@ -3581,13 +3586,17 @@ async function cloudOurs(key, caption) {
     const act = (x) => { let s2 = 0, n = 0; for (let i = 0; i < x.length; i += 64) { const a = Math.abs(x[i]); if (a > 0.02) { s2 += a * a; n++; } } return n ? Math.sqrt(s2 / n) : 0; };
     const bl = beat.getChannelData(0), vl = vp.getChannelData(0); let bs2 = 0, nb = 0; for (let i = 0; i < Math.min(bl.length, vl.length); i += 64) if (Math.abs(vl[i]) > 0.02) { bs2 += bl[i] * bl[i]; nb++; }
     const bRms = nb ? Math.sqrt(bs2 / nb) : act(bl), vRms = act(vl) || 1, rapish = cloudGet('ts_cdel', 'auto') === 'rap' || cloudGet('ts_cdel', 'auto') === 'atl' || $('#voiceMode').value === 'rap';
-    const vg = clamp((bRms * Math.pow(10, (rapish ? 6 : 5) / 20)) / vRms, 0.2, 6);
-    const out = S.ctx.createBuffer(2, beat.length, sr);
+    /* как в миксе ACE: голос лишь чуть над битом (+1.5…2 дБ), бит слегка уступает голосу (до −2 дБ), потом общий мастер с компрессией — склеивает в одно целое */
+    const vg = clamp((bRms * Math.pow(10, (rapish ? 2 : 1.5) / 20)) / vRms, 0.2, 6);
+    const out = S.ctx.createBuffer(2, beat.length, sr), vL = vp.getChannelData(0), N = beat.length;
+    const duck = new Float32Array(N); { let e = 0; const at = Math.exp(-1 / (0.01 * sr)), rl = Math.exp(-1 / (0.25 * sr)), ref = vRms * 2;
+      for (let i = 0; i < N; i++) { const x = i < vL.length ? Math.abs(vL[i]) : 0; e = x > e ? at * e + (1 - at) * x : rl * e + (1 - rl) * x; duck[i] = 1 - 0.2 * Math.min(1, e / ref); } }
     for (let c = 0; c < 2; c++) {
       const o = out.getChannelData(c), b = beat.getChannelData(Math.min(c, beat.numberOfChannels - 1)), v = vp.getChannelData(Math.min(c, vp.numberOfChannels - 1));
-      for (let i = 0; i < o.length; i++) o[i] = b[i] * .9 + (i < v.length ? v[i] * vg : 0);
+      for (let i = 0; i < N; i++) o[i] = b[i] * duck[i] + (i < v.length ? v[i] * vg : 0);
     }
-    { let pk = 0; for (let c = 0; c < 2; c++) { const o = out.getChannelData(c); for (let i = 0; i < o.length; i += 4) pk = Math.max(pk, Math.abs(o[i])); } if (pk > 0.98) for (let c = 0; c < 2; c++) { const o = out.getChannelData(c); for (let i = 0; i < o.length; i++) o[i] *= 0.98 / pk; } }
+    try { const sp = S.spec || {}; await masterV2(out.getChannelData(0), out.getChannelData(1), N, sr, { prep: false, gr: 4, lufs: -12 + 1.5 * clamp(sp.energy == null ? 0.6 : sp.energy, 0, 1) }); }
+    catch (e) { let pk = 0; for (let c = 0; c < 2; c++) { const o = out.getChannelData(c); for (let i = 0; i < o.length; i += 4) pk = Math.max(pk, Math.abs(o[i])); } if (pk > 0.98) for (let c = 0; c < 2; c++) { const o = out.getChannelData(c); for (let i = 0; i < o.length; i++) o[i] *= 0.98 / pk; } }
     S.buffer = out; S.peaks = computePeaks(out, 1600); drawWave(0); $('#player').dataset.ready = '1'; play(0);
     CLOUD.blob = encodeMp3(out, 192); $('#cloudActs').hidden = false; $('#cloudAudio').hidden = true;
     msg.textContent = 'Готово за ' + Math.round((Date.now() - t0) / 1000) + ' с: наш бит + голос ACE. «Сохранить mp3» — ниже.';

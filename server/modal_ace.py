@@ -148,6 +148,8 @@ class AceLego:
                              vocal_language=q.get('lang', 'ru'), repainting_start=0.0, repainting_end=-1, inference_steps=int(q.get('steps', 50)), seed=seed)
         r = generate_music(self.dit, self.lm, p, GenerationConfig(batch_size=1, audio_format='wav', use_random_seed=seed < 0), save_dir='/tmp/lg')
         if not (r.success and r.audios): raise RuntimeError(str(getattr(r, 'error', r)))
+        if q.get('full'):   # «наш бит, сведённый ACE»: весь ответ ACE (наш бит в его звучании + голос) — склеено как у ACE
+            subprocess.run(['ffmpeg', '-v', 'error', '-y', '-i', r.audios[0]['path'], '-b:a', '192k', '/tmp/full.mp3'], check=True); return open('/tmp/full.mp3', 'rb').read()
         x, sr = sf.read(r.audios[0]['path'], dtype='float32', always_2d=True)
         if sr != 44100:
             subprocess.run(['ffmpeg', '-v', 'error', '-y', '-i', r.audios[0]['path'], '-ar', '44100', '/tmp/lg44.wav'], check=True); x, sr = sf.read('/tmp/lg44.wav', dtype='float32', always_2d=True)
