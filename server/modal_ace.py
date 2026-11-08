@@ -25,7 +25,7 @@ app = modal.App('track-studio-ace', image=image)
 VOL = '/vol'
 
 
-GPU = os.environ.get('TS_GPU', 'L4')   # карта привязана: L4 ~в 2 раза быстрее T4
+GPU = os.environ.get('TS_GPU', 'T4')   # L4 на этом аккаунте не стартовал (303 по таймауту) — T4
 
 
 @app.cls(gpu=GPU, volumes={VOL: vol}, secrets=[modal.Secret.from_name('ts-key')], timeout=900, scaledown_window=120)
