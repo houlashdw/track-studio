@@ -155,6 +155,21 @@ class AceLego:
         with torch.no_grad():
             st = apply_model(self.sep, torch.from_numpy(x.T.copy())[None].cuda(), shifts=1, split=True, overlap=0.25)[0]
         v = st[self.sep.sources.index('vocals')].cpu().numpy().T
+        # сдвиг ACE относительно нашего бита (огибающие атак, ±0.5 с): голос подвигаем, чтобы шёл ровно с битом
+        try:
+            subprocess.run(['ffmpeg', '-v', 'error', '-y', '-i', '/tmp/beat.mp3', '-ac', '1', '-ar', '44100', '/tmp/beat.wav'], check=True)
+            b0, _ = sf.read('/tmp/beat.wav', dtype='float32'); m0 = st.sum(0).mean(0).cpu().numpy() - v.mean(1)   # музыка из ответа ACE (без голоса)
+            H = 441
+            def env(z):
+                n = len(z) // H; e = np.sqrt((z[:n * H].reshape(n, H) ** 2).mean(1) + 1e-9); d = np.maximum(np.diff(np.log(e)), 0); return (d - d.mean()) / (d.std() + 1e-9)
+            eb, em = env(b0), env(m0); n = min(len(eb), len(em), 3000); eb, em = eb[:n], em[:n]
+            lags = range(-50, 51); cc = [float(np.dot(eb[max(0, -k):n - max(0, k)], em[max(0, k):n - max(0, -k)])) for k in lags]
+            lag = list(lags)[int(np.argmax(cc))] * H   # >0: ACE запаздывает
+            print('сдвиг ACE: %+.0f мс' % (lag / 44.1), flush=True)
+            if lag > 0: v = np.concatenate([v[lag:], np.zeros((lag, 2), np.float32)])
+            elif lag < 0: v = np.concatenate([np.zeros((-lag, 2), np.float32), v[:lag]])
+            self.last_lag = lag / 44.1
+        except Exception as e: print('сдвиг не вышел', e, flush=True)
         sf.write('/tmp/voc.wav', v, sr)
         subprocess.run(['ffmpeg', '-v', 'error', '-y', '-i', '/tmp/voc.wav', '-b:a', '192k', '/tmp/voc.mp3'], check=True)
         return open('/tmp/voc.mp3', 'rb').read()

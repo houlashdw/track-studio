@@ -38,7 +38,7 @@ jobs:
             modal volume put -f ts-ace /tmp/ad "/adapters/${{ inputs.adname }}" && echo "голос загружен"
           fi
       - name: Деплой
-        if: inputs.cmd == 'deploy'
+        if: inputs.cmd == 'deploy' || inputs.cmd == 'deployatl'
         run: modal deploy "${{ inputs.file }}"
       - name: Запуск
         if: inputs.cmd == 'run'
@@ -88,7 +88,7 @@ jobs:
           git init -q -b modal-out && git config user.name gha && git config user.email gha@users.noreply.github.com
           git add -A && git commit -q -m legotest && git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" modal-out
       - name: Atlanta (EN)
-        if: inputs.cmd == 'atl'
+        if: inputs.cmd == 'atl' || inputs.cmd == 'deployatl'
         env: { P: '${{ secrets.KEYSTORE_PASS }}', TSK: '${{ secrets.TS_KEY }}' }
         run: |
           K="$TSK"; [ -n "$K" ] || K=$(printf %s "$P" | sha256sum | cut -c1-32)
@@ -100,12 +100,12 @@ jobs:
           A = 'Atlanta trap, {w} rap vocal in English, melodic rap flow, triplet flow, ad-libs, autotune, hard 808, rolling hi-hats, dark synth melody'
           json.dump({'caption': A.format(w='female'), 'lyrics': L, 'bpm': 140, 'duration': 45, 'voice': 1.0, 'lang': 'en', 'seed': 7}, open('/tmp/at/f.json', 'w'))
           json.dump({'caption': A.format(w='male'), 'lyrics': L, 'bpm': 140, 'duration': 45, 'voice': 0, 'lang': 'en', 'seed': 7}, open('/tmp/at/m.json', 'w'))
-          json.dump({'beat_b64': base64.b64encode(open('/tmp/t45.mp3','rb').read()).decode(), 'caption': A.format(w='male'), 'lyrics': L, 'bpm': 140, 'voice': 0, 'lang': 'en', 'seed': 7}, open('/tmp/at/lego.json', 'w'))
+          json.dump({'beat_b64': base64.b64encode(open('/tmp/t45.mp3','rb').read()).decode(), 'caption': A.format(w='female'), 'lyrics': L, 'bpm': 140, 'voice': 1.0, 'lang': 'en', 'seed': 7}, open('/tmp/at/lego.json', 'w'))
           PY
           curl -s "$U/ping" --max-time 600; echo
-          for n in f m; do curl -s -o o/atl_ace_$n.mp3 -w "$n: %{http_code} %{size_download} %{time_total}\n" -X POST "$U/generate" -H "Content-Type: application/json" -H "X-Key: $K" --data-binary @/tmp/at/$n.json --max-time 900; done
+          for n in f; do curl -s -o o/atl_ace_$n.mp3 -w "$n: %{http_code} %{size_download} %{time_total}\n" -X POST "$U/generate" -H "Content-Type: application/json" -H "X-Key: $K" --data-binary @/tmp/at/$n.json --max-time 900; done
           ID=$(curl -s -X POST "$U/lego" -H "Content-Type: application/json" -H "X-Key: $K" --data-binary @/tmp/at/lego.json | python -c "import sys,json; print(json.load(sys.stdin)['id'])")
-          while :; do c=$(curl -s -o o/atl_lego_vocals_m.mp3 -w "%{http_code}" "$U/job/$ID" -H "X-Key: $K" --max-time 120); [ "$c" = 202 ] || break; sleep 10; done; echo "lego: $c"
+          while :; do c=$(curl -s -o o/atl_lego_vocals_f.mp3 -w "%{http_code}" "$U/job/$ID" -H "X-Key: $K" --max-time 120); [ "$c" = 202 ] || break; sleep 10; done; echo "lego: $c"
           cp /tmp/t45.mp3 o/trap_beat45.mp3
           cd o && for f in *.mp3; do openssl enc -aes-256-cbc -pbkdf2 -iter 200000 -salt -in "$f" -out "$f.enc" -pass env:P && rm "$f"; done
           git init -q -b modal-out && git config user.name gha && git config user.email gha@users.noreply.github.com
