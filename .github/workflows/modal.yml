@@ -3,7 +3,7 @@ name: modal
 on:
   workflow_dispatch:
     inputs:
-      cmd: { description: 'check / deploy / run', default: 'check' }
+      cmd: { description: 'check / deploy / run / http / styles', default: 'check' }
       file: { default: 'server/modal_ace.py' }
       adapter: { description: 'файл адаптера в ветке voice-ace (зашифр.)', default: '' }
       adname: { default: 'e100' }
@@ -26,7 +26,7 @@ jobs:
           modal app list 2>&1 | tail -5
           echo OK
       - name: Ключ сервера и голос
-        if: inputs.cmd == 'deploy' || inputs.cmd == 'run' || inputs.cmd == 'http'
+        if: inputs.cmd == 'deploy' || inputs.cmd == 'run' || inputs.cmd == 'http' || inputs.cmd == 'styles'
         env: { P: '${{ secrets.KEYSTORE_PASS }}', TSK: '${{ secrets.TS_KEY }}' }
         run: |
           K="$TSK"; [ -n "$K" ] || K=$(printf %s "$P" | sha256sum | cut -c1-32)
@@ -58,3 +58,12 @@ jobs:
           curl -s -o /dev/null -w "без ключа: %{http_code}\n" -X POST "$U/generate" -H "Content-Type: application/json" -d '{}' --max-time 600
           curl -s -o /tmp/h.mp3 -w "с ключом: %{http_code}, %{size_download} байт, %{time_total} с\n" -X POST "$U/generate" -H "Content-Type: application/json" -H "X-Key: $K" -H "Origin: https://appassets.androidplatform.net" \
             -d '{"caption":"dreamy russian pop, female vocal in Russian","lyrics":"[Verse]\nГород спит, а я не сплю опять\n\n[Chorus]\nМы горим до утра","duration":30,"voice":1}' --max-time 900
+      - name: Пробы стилей
+        if: inputs.cmd == 'styles'
+        env: { P: '${{ secrets.KEYSTORE_PASS }}' }
+        run: |
+          modal run "${{ inputs.file }}::styles" --outdir /tmp/st --voice 1.0
+          modal run "${{ inputs.file }}::styles" --outdir /tmp/st --voice 0.0
+          mkdir o && for f in /tmp/st/*.mp3; do openssl enc -aes-256-cbc -pbkdf2 -iter 200000 -salt -in "$f" -out "o/$(basename $f).enc" -pass env:P; done && cd o
+          git init -q -b modal-out && git config user.name gha && git config user.email gha@users.noreply.github.com
+          git add -A && git commit -q -m "styles" && git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" modal-out

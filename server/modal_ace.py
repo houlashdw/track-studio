@@ -98,3 +98,24 @@ def main(out: str = 'test_out.mp3'):
     b = Ace().generate.remote({'lyrics': '[Verse]\nГород спит, а я не сплю опять\nЗвёзды падают в мою тетрадь\n\n[Chorus]\nМы горим, мы горим до утра\nНебо светит, начинается игра',
                                'caption': 'sad emotional russian pop ballad, soft piano, intimate female vocal', 'bpm': 80, 'duration': 45, 'seed': 11})
     open(out, 'wb').write(b); print('тест: %d КБ за %.0f с' % (len(b) // 1024, time.time() - t0))
+
+
+STYLE_TESTS = [   # проверка, слушается ли ACE слов про подачу/тембр/высоту/перегруз (одни и те же текст и сид)
+    ('rap_trap', 'modern russian trap, hard 808, rolling hi-hats, confident female rap vocal in Russian, rhythmic fast flow, punchy delivery'),
+    ('rap_dark_low', 'dark russian drill, sliding 808, low husky female rap vocal in Russian, aggressive, deep voice'),
+    ('pop_high_airy', 'dreamy russian pop, bright synths, high-pitched airy breathy female vocal in Russian, soft and gentle'),
+    ('pop_powerful', 'russian pop rock anthem, big drums, powerful belting female vocal in Russian, strong chest voice'),
+    ('pop_distorted', 'russian alt rock, distorted guitars, gritty distorted saturated female vocal in Russian, raw and edgy'),
+    ('pop_clean', 'russian pop ballad, piano, clean clear polished female vocal in Russian, crisp diction'),
+]
+LYR_RAP = '[Verse]\nЯ на районе, свет фонарей\nВсё, что хотела, теперь у дверей\nМама, не плачь, я стала сильней\nДеньги не главное, главное — с ней\n\n[Hook]\nНочью не сплю, я пишу этот трек\nКаждая строчка — один мой побег'
+LYR_POP = '[Verse]\nГород спит, а я не сплю опять\nЗвёзды падают в мою тетрадь\n\n[Chorus]\nМы горим, мы горим до утра\nНебо светит, начинается игра'
+
+
+@app.local_entrypoint()
+def styles(outdir: str = 'styles_out', voice: float = 1.0):
+    os.makedirs(outdir, exist_ok=True); a = Ace()
+    for name, cap in STYLE_TESTS:
+        t0 = time.time()
+        b = a.generate.remote({'caption': cap, 'lyrics': LYR_RAP if name.startswith('rap') else LYR_POP, 'duration': 40, 'seed': 21, 'voice': voice})
+        open(f'{outdir}/{name}_v{int(voice * 10)}.mp3', 'wb').write(b); print(name, '%.0f с' % (time.time() - t0), flush=True)
