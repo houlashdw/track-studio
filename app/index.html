@@ -837,7 +837,7 @@ const STYLES = {
     name: 'Хаус', bpm: [120, 126], kick: 'four', snare: 'clap', hats: 'off', perc: ['conga', 'click'], bass: 'offbeat',
     chord: 'stab', cl: 2, arp: 'updown', arpRate: 2, lead: 'pluck', form: 'club', scales: ['dorian', 'minor', 'mixolydian', 'pentaMin'],
     kit: { kick: 'tight', snare: 'clap', bass: 'sawsub', lead: 'pluck', arp: 'bell', pad: 'tri', tex: 'hiss' },
-    d: { energy: .72, dark: .4, density: .5, space: .3, echo: .3, grit: .2, swing: .2, pump: .6, chaos: .2, glitch: .1, warp: .1 },
+    d: { energy: .72, dark: .4, density: .5, space: .3, echo: .3, grit: .2, swing: .3, pump: .6, chaos: .2, glitch: .1, warp: .1 },
     layers: L('kick snare hats perc bass pad arp lead tex fx'),
   },
   ambient: {
@@ -865,7 +865,7 @@ const STYLES = {
     name: 'Трэп', bpm: [134, 148], kick: 'trap', snare: 'half', hats: 'roll', perc: ['click', 'blip'], bass: '808',
     chord: 'pad', cl: 2, arp: 'up', arpRate: 2, lead: 'fm', form: 'story', scales: ['minor', 'phrygian', 'harmonic'],
     kit: { kick: 'long', snare: 'clap', bass: '808', lead: 'fm', arp: 'bell', pad: 'tri', tex: 'hiss' },
-    d: { energy: .7, dark: .8, density: .5, space: .35, echo: .35, grit: .3, swing: 0, pump: .1, chaos: .25, glitch: .15, warp: .1 },
+    d: { energy: .7, dark: .8, density: .5, space: .35, echo: .35, grit: .3, swing: .08, pump: .3, chaos: .25, glitch: .15, warp: .1 },
     layers: L('kick snare hats perc bass pad arp lead tex fx'),
   },
   lofi: {
@@ -879,7 +879,7 @@ const STYLES = {
     name: 'J-pop / аниме', bpm: [126, 176], kick: 'four', snare: 'clap', hats: 'eighth', perc: ['shaker', 'click'], bass: 'pulse8',
     chord: 'pad', cl: 2, arp: 'up', arpRate: 1, lead: 'saw', form: 'story', scales: ['major', 'minor', 'dorian'],
     kit: { kick: 'tight', snare: 'snare', bass: 'pulse', lead: 'saw', arp: 'pluck', pad: 'piano', tex: 'hiss' },
-    d: { energy: .8, dark: .2, density: .45, space: .45, echo: .35, grit: .06, swing: 0, pump: .15, chaos: .1, glitch: .04, warp: .08 },
+    d: { energy: .8, dark: .2, density: .45, space: .45, echo: .35, grit: .06, swing: .04, pump: .3, chaos: .1, glitch: .04, warp: .08 },
     layers: L('kick snare hats perc bass pad arp tex fx')   /* в поп-песне мелодию ведёт голос — синт-лида нет */,
   },
   synthwave: {
@@ -963,7 +963,7 @@ const STYLES = {
     name: 'Худ-трэп', bpm: [128, 146], kick: 'trap', snare: 'half', hats: 'roll', perc: ['click', 'tom'], bass: '808',
     chord: 'pad', cl: 2, arp: 'skip', arpRate: 2, lead: 'flute', form: 'story', scales: ['phrygian', 'minor', 'harmonic', 'arabic'],
     kit: { kick: 'long', snare: 'clap', bass: '808d', lead: 'flute', arp: 'bell', pad: 'strings', tex: 'rumble' },
-    d: { energy: .7, dark: .92, density: .45, space: .45, echo: .4, grit: .4, swing: 0, pump: .05, chaos: .2, glitch: .1, warp: .2 },
+    d: { energy: .7, dark: .92, density: .45, space: .45, echo: .4, grit: .4, swing: .05, pump: .25, chaos: .2, glitch: .1, warp: .2 },
     layers: L('kick snare hats perc bass pad arp lead tex fx'), sig: ['lead', 'bass'],
   },
   phonk: {
@@ -977,14 +977,14 @@ const STYLES = {
     name: 'Дрилл', bpm: [138, 146], kick: 'drill', snare: 'half', hats: 'drill', perc: ['click', 'blip'], bass: '808',
     chord: 'pad', cl: 2, arp: 'skip', arpRate: 2, lead: 'pluck', form: 'story', scales: ['minor', 'phrygian', 'harmonic'],
     kit: { kick: 'tight', snare: 'snare', bass: '808d', lead: 'pluck', arp: 'bell', pad: 'strings', tex: 'rumble' },
-    d: { energy: .75, dark: .88, density: .5, space: .35, echo: .3, grit: .45, swing: 0, pump: .05, chaos: .3, glitch: .12, warp: .1 },
+    d: { energy: .75, dark: .88, density: .5, space: .35, echo: .3, grit: .45, swing: .06, pump: .25, chaos: .3, glitch: .12, warp: .1 },
     layers: L('kick snare hats perc bass pad arp lead tex fx'), sig: ['kick', 'bass'],
   },
   plugg: {
     name: 'Плагг / pluggnb', bpm: [140, 160], kick: 'trap', snare: 'half', hats: 'roll', perc: ['blip', 'click'], bass: '808',
     chord: 'pad', cl: 2, arp: 'up', arpRate: 2, lead: 'square', form: 'story', scales: ['major', 'dorian', 'pentaMaj', 'lydian'],
     kit: { kick: 'long', snare: 'clap', bass: '808', lead: 'square', arp: 'bell', pad: 'tri', tex: 'vinyl' },
-    d: { energy: .55, dark: .3, density: .4, space: .6, echo: .5, grit: .1, swing: .04, pump: 0, chaos: .15, glitch: .06, warp: .25 },
+    d: { energy: .55, dark: .3, density: .4, space: .6, echo: .5, grit: .1, swing: .08, pump: .15, chaos: .15, glitch: .06, warp: .25 },
     layers: L('kick snare hats perc bass pad arp lead tex fx'), sig: ['lead', 'bass'],
   },
   jersey: {
@@ -1712,7 +1712,7 @@ function compose(spec) {
             else if (bassKind === 'pulse8' && s % 4 === 2 && R() < .5) dg = cd + nL;
             if (h.s !== 0 && bassKind !== 'drone' && bassKind !== 'rumble' && bassKind !== 'offbeat' && R() < .06 + spec.evolve * .1) dg += R() < .5 ? nL : pick(R, [2, 4, -1]);
             let m = scaleMidi(rootS - 12, L7, dg);
-            while (m > 52) m -= 12; while (m < 29) m += 12;
+            { const hi = /^808|^sub/.test(secBass) || bassKind === '808' || bassKind === 'sub' ? 40 : 52; while (m > hi) m -= 12; while (m < 29) m += 12; }   /* 808/саб: основной тон 43–82 Гц, как у эталонов ACE (40–60 Гц) */
             let sl = 0; if (SLIDE && (/^808/.test(secBass) || bassKind === '808') && b8prev != null && h.s !== 0 && R() < SLIDE) { if (m === b8prev && (spec.style === 'drill' || R() < .5)) { const up = spec.style === 'drill' ? pick(R, [12, 7, 5, -5]) : pick(R, [12, 12, 7]); if (m + up >= 29 && m + up <= 55) m += up; } sl = clamp(b8prev - m, -12, 12); }
             E('bass', ts + hum(.003), { m, d: Math.max(.06, h.len * stepDur), v: vel(h.vel, e), g: h.g && !sl ? 1 : 0, sl, k: secBass }); b8prev = m;
           }
