@@ -552,6 +552,10 @@ short lines in English…
         <label class="chk sm" style="display:flex"><input type="checkbox" id="cloudOn" data-testid="cloud-on"><span>☁ Облако (ACE-Step + голос vc2) — трек целиком на сервере, нужен интернет</span></label>
         <div id="cloudOpts" hidden>
           <div class="seg3 mt8" id="cloudVoiceSeg"><button type="button" data-v="1" class="on">Голос vc2</button><button type="button" data-v="0.5">Наполовину</button><button type="button" data-v="0">Голос ACE</button></div>
+          <p class="hint" style="margin:10px 2px 0">Подача</p>
+          <div class="seg3 mt8" id="cloudDelSeg"><button type="button" data-v="auto" class="on">Авто</button><button type="button" data-v="soft">Нежно</button><button type="button" data-v="power">Мощно</button><button type="button" data-v="rap">Рэп-флоу</button></div>
+          <p class="hint" style="margin:10px 2px 0">Тембр</p>
+          <div class="seg3 mt8" id="cloudTimSeg"><button type="button" data-v="auto" class="on">Авто</button><button type="button" data-v="low">Ниже, с хрипотцой</button><button type="button" data-v="high">Выше, воздушно</button></div>
           <p class="hint" id="cloudMsg" style="margin:8px 2px 0" aria-live="polite"></p>
           <audio id="cloudAudio" controls hidden style="width:100%;margin-top:8px"></audio>
           <div class="scroller acts2" id="cloudActs" hidden><button type="button" class="ghost" id="cloudSave">Сохранить mp3</button><button type="button" class="ghost" id="cloudKey">Ключ сервера</button></div>
@@ -3491,6 +3495,10 @@ function cloudInit() {
   on.onchange = sync; sync();
   $('#cloudVoiceSeg').querySelectorAll('button').forEach((b) => { b.classList.toggle('on', parseFloat(b.dataset.v) === CLOUD.voice);
     b.onclick = () => { CLOUD.voice = parseFloat(b.dataset.v); cloudSet('ts_cvoice', b.dataset.v); $('#cloudVoiceSeg').querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b)); }; });
+  for (const [id, k] of [['#cloudDelSeg', 'ts_cdel'], ['#cloudTimSeg', 'ts_ctim']]) {
+    const seg = $(id), cur = cloudGet(k, 'auto');
+    seg.querySelectorAll('button').forEach((b) => { b.classList.toggle('on', b.dataset.v === cur); b.onclick = () => { cloudSet(k, b.dataset.v); seg.querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b)); }; });
+  }
   $('#cloudKey').onclick = cloudAskKey;
   $('#cloudSave').onclick = () => { if (CLOUD.blob) saveBlob('ace_' + Date.now() + '.mp3', CLOUD.blob); };
 }
@@ -3503,7 +3511,13 @@ async function cloudMake() {
   if (!prompt) { $('#prompt').focus(); setStatus('Напиши, какой трек нужен.', 0, false); return; }
   let key = cloudGet('ts_ckey', ''); if (!key) key = cloudAskKey(); if (!key) { $('#cloudMsg').textContent = 'Нужен ключ сервера.'; return; }
   const bpmM = prompt.match(/(\d{2,3})\s*bpm/i), rap = $('#voiceMode').value === 'rap';
-  const q = { caption: prompt + (rap ? ', female rap vocal in Russian' : ', female vocal in Russian'), lyrics: cloudLyrics(), bpm: bpmM ? +bpmM[1] : null,
+  /* подача/тембр/перегруз — словами в описании (замер на сервере: «low husky deep» заметно опускает высоту голоса, перегруз и чистота слышны в звуке) */
+  const del = cloudGet('ts_cdel', 'auto'), tim = cloudGet('ts_ctim', 'auto'), dirt = dirtMode(), tags = [];
+  tags.push((rap || del === 'rap') ? 'female rap vocal in Russian, rhythmic fast flow, punchy delivery' : 'female vocal in Russian');
+  if (del === 'soft') tags.push('soft gentle intimate delivery'); if (del === 'power') tags.push('powerful belting vocal, strong chest voice');
+  if (tim === 'low') tags.push('low husky deep voice'); if (tim === 'high') tags.push('high-pitched airy breathy voice');
+  if (dirt === 'dirty') tags.push('gritty distorted saturated vocal, distorted guitars'); if (dirt === 'clean') tags.push('clean clear polished vocal, crisp diction');
+  const q = { caption: prompt + ', ' + tags.join(', '), lyrics: cloudLyrics(), bpm: bpmM ? +bpmM[1] : null,
     duration: $('#quick') && $('#quick').checked ? 60 : 150, voice: CLOUD.voice, seed: -1 };
   stop(); setBusy(true); const t0 = Date.now(); const msg = $('#cloudMsg');
   const tick = setInterval(() => { const s = Math.round((Date.now() - t0) / 1000); msg.textContent = 'Сервер делает трек… ' + s + ' с' + (s > 40 ? ' (первый запуск после паузы ~3–4 мин: сервер просыпается)' : ''); }, 1000);
