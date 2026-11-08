@@ -25,7 +25,7 @@ app = modal.App('track-studio-ace', image=image)
 VOL = '/vol'
 
 
-GPU = os.environ.get('TS_GPU', 'T4')
+GPU = os.environ.get('TS_GPU', 'L4')   # карта привязана: L4 ~в 2 раза быстрее T4
 
 
 @app.cls(gpu=GPU, volumes={VOL: vol}, secrets=[modal.Secret.from_name('ts-key')], timeout=900, scaledown_window=120)
@@ -177,7 +177,7 @@ class AceLego:
         seed = int(q.get('seed', -1))
         p = GenerationParams(task_type='lego', src_audio='/tmp/beat.mp3', instruction='Generate the vocals track based on the audio context:',
                              caption=('vc2, ' if voice > 0 else '') + q.get('caption', 'female vocal in Russian'), lyrics=q.get('lyrics', ''), bpm=q.get('bpm') or None,
-                             vocal_language=q.get('lang', 'ru'), repainting_start=0.0, repainting_end=-1, inference_steps=int(q.get('steps', 50)), seed=seed)
+                             vocal_language=q.get('lang', 'ru'), repainting_start=0.0, repainting_end=-1, inference_steps=int(q.get('steps', 30)), seed=seed)
         r = generate_music(self.dit, self.lm, p, GenerationConfig(batch_size=1, audio_format='wav', use_random_seed=seed < 0), save_dir='/tmp/lg')
         if not (r.success and r.audios): raise RuntimeError(str(getattr(r, 'error', r)))
         if q.get('full'):   # «наш бит, сведённый ACE»: весь ответ ACE (наш бит в его звучании + голос) — склеено как у ACE

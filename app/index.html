@@ -567,7 +567,7 @@ short lines in English…
           <div class="seg3 mt8" id="cloudLangSeg"><button type="button" data-v="ru" class="on">Русский</button><button type="button" data-v="en">English</button></div>
           <div class="seg3 mt8" id="cloudSexSeg"><button type="button" data-v="f" class="on">Женский (vc2)</button><button type="button" data-v="m">Мужской</button></div>
           <p class="hint" style="margin:10px 2px 0">Тембр</p>
-          <div class="seg3 mt8" id="cloudTimSeg"><button type="button" data-v="auto" class="on">Авто</button><button type="button" data-v="low">Ниже, с хрипотцой</button><button type="button" data-v="high">Выше, воздушно</button></div>
+          <div class="seg3 mt8" id="cloudTimSeg"><button type="button" data-v="anime" class="on">Аниме</button><button type="button" data-v="auto">Авто</button><button type="button" data-v="low">Ниже, с хрипотцой</button><button type="button" data-v="high">Выше, воздушно</button></div>
           <p class="hint" id="cloudMsg" style="margin:8px 2px 0" aria-live="polite"></p>
           <audio id="cloudAudio" controls hidden style="width:100%;margin-top:8px"></audio>
           <div class="scroller acts2" id="cloudActs" hidden><button type="button" class="ghost" id="cloudSave">Сохранить mp3</button><button type="button" class="ghost" id="cloudKey">Ключ сервера</button></div>
@@ -3513,7 +3513,7 @@ function cloudInit() {
   on.onchange = sync; sync();
   $('#cloudVoiceSeg').querySelectorAll('button').forEach((b) => { b.classList.toggle('on', parseFloat(b.dataset.v) === CLOUD.voice);
     b.onclick = () => { CLOUD.voice = parseFloat(b.dataset.v); cloudSet('ts_cvoice', b.dataset.v); $('#cloudVoiceSeg').querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b)); }; });
-  for (const [id, k, d] of [['#cloudDelSeg', 'ts_cdel', 'auto'], ['#cloudTimSeg', 'ts_ctim', 'auto'], ['#cloudBeatSeg', 'ts_cbeat', 'ours'], ['#cloudLangSeg', 'ts_clang', 'ru'], ['#cloudSexSeg', 'ts_csex', 'f']]) {
+  for (const [id, k, d] of [['#cloudDelSeg', 'ts_cdel', 'auto'], ['#cloudTimSeg', 'ts_ctim', 'anime'], ['#cloudBeatSeg', 'ts_cbeat', 'ours'], ['#cloudLangSeg', 'ts_clang', 'ru'], ['#cloudSexSeg', 'ts_csex', 'f']]) {
     const seg = $(id), cur = cloudGet(k, d);
     seg.querySelectorAll('button').forEach((b) => { b.classList.toggle('on', b.dataset.v === cur); b.onclick = () => { cloudSet(k, b.dataset.v); seg.querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b)); }; });
   }
@@ -3531,11 +3531,12 @@ async function cloudMake() {
   let key = cloudGet('ts_ckey', ''); if (!key) key = cloudAskKey(); if (!key) { $('#cloudMsg').textContent = 'Нужен ключ сервера.'; return; }
   const bpmM = prompt.match(/(\d{2,3})\s*bpm/i), rap = $('#voiceMode').value === 'rap';
   /* подача/тембр/перегруз — словами в описании (замер на сервере: «low husky deep» заметно опускает высоту голоса, перегруз и чистота слышны в звуке) */
-  const del = cloudGet('ts_cdel', 'auto'), tim = cloudGet('ts_ctim', 'auto'), dirt = dirtMode(), tags = [];
+  const del = cloudGet('ts_cdel', 'auto'), tim = cloudGet('ts_ctim', 'anime'), dirt = dirtMode(), tags = [];
   const lang = cloudGet('ts_clang', 'ru'), male = cloudGet('ts_csex', 'f') === 'm', who = (male ? 'male' : 'female'), inL = lang === 'en' ? 'in English' : 'in Russian';
   if (del === 'atl') tags.push('Atlanta trap, ' + who + ' rap vocal ' + inL + ', melodic rap flow, triplet flow, ad-libs, autotune, hard 808, rolling hi-hats');
   else tags.push((rap || del === 'rap') ? who + ' rap vocal ' + inL + ', rhythmic fast flow, punchy delivery' : who + ' vocal ' + inL);
   if (del === 'soft') tags.push('soft gentle intimate delivery'); if (del === 'power') tags.push('powerful belting vocal, strong chest voice');
+  if (tim === 'anime' && !male) tags.push('young female anime girl voice, high-pitched, cute and bright, feminine, alt J-pop vocal style');
   if (tim === 'low') tags.push('low husky deep voice'); if (tim === 'high') tags.push('high-pitched airy breathy voice');
   if (dirt === 'dirty') tags.push('gritty distorted saturated vocal, distorted guitars'); if (dirt === 'clean') tags.push('clean clear polished vocal, crisp diction');
   if (!($('#lyrics').value || '').trim() && $('#voiceMode').value !== 'off') {   /* текста нет — пишет ACE по описанию */
