@@ -1,4 +1,10 @@
-<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}
+/* простой режим: только облако (ACE + голос) — остальное спрятано, не удалено */
+body.simple .aixrow, body.simple #aixBox, body.simple #examples, body.simple #modeSeg, body.simple #dsRow, body.simple .trow2, body.simple #cloudOnRow,
+body.simple #rerollRow, body.simple #quickRow, body.simple [data-testid="voice-advanced"], body.simple #sndWrap, body.simple #moreRow, body.simple #fbRow,
+body.simple [data-tab="fx"], body.simple [data-tab="teach"], body.simple #lyrWrap .vrow { display: none !important; }
+#simpleRow { text-align: center; margin: 14px 0 4px; } #simpleRow button { background: none; border: 0; color: var(--mut, #888); text-decoration: underline; font-size: 13px; }
+</style></head><body>
 <title>Трек Студия</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -548,8 +554,9 @@ short lines in English…
         <label class="fld inl" for="look"><select id="look" aria-label="Звук"><option value="bright">Яркий</option><option value="retro">Ретро</option></select></label>
       </div>
       <button id="make" type="button" class="pri big" data-testid="create-track-btn">Создать трек</button>
+      <div id="simpleRow"><button type="button" id="simpleBtn"></button></div>
       <div class="aixbox" id="cloudBox" data-testid="cloud-box" style="margin-top:8px">
-        <label class="chk sm" style="display:flex"><input type="checkbox" id="cloudOn" data-testid="cloud-on"><span>☁ Облако (ACE-Step + голос vc2) — трек целиком на сервере, нужен интернет</span></label>
+        <label class="chk sm" style="display:flex" id="cloudOnRow"><input type="checkbox" id="cloudOn" data-testid="cloud-on"><span>☁ Облако (ACE-Step + голос vc2) — трек целиком на сервере, нужен интернет</span></label>
         <div id="cloudOpts" hidden>
           <div class="seg3 mt8" id="cloudVoiceSeg"><button type="button" data-v="1" class="on">Голос vc2</button><button type="button" data-v="0.5">Наполовину</button><button type="button" data-v="0">Голос ACE</button></div>
           <p class="hint" style="margin:10px 2px 0">Бит</p>
@@ -567,7 +574,7 @@ short lines in English…
         </div>
       </div>
       <label class="chk sm" style="margin:8px 2px 0;display:flex"><input type="checkbox" id="quick" checked data-testid="quick"><span>Быстрая проба — трек ~45 с (вдвое быстрее; сними для полной песни)</span></label>
-      <div class="scroller acts2">
+      <div class="scroller acts2" id="rerollRow">
         <button id="reroll" type="button" class="ghost" data-testid="reroll-btn">Ещё вариант</button>
         <button id="mutate" type="button" class="ghost gone" data-testid="mutate-btn">Микс</button>
         <button id="experiment" type="button" class="ghost gone" data-testid="chaos-btn">Хаос</button>
@@ -615,11 +622,11 @@ short lines in English…
         <button id="dlWav" type="button" disabled="" data-testid="download-wav-btn">WAV</button>
       </div>
       <details class="more inl" id="sndWrap"><summary>Звук</summary><div id="sndBox"></div></details>
-      <details class="more inl"><summary>Ещё</summary><div class="tr"><button id="dlReport" type="button" data-testid="report-btn">📤 Отчёт для Claude</button><button id="dlVox" type="button" title="Только голос, для анализа">Голос WAV</button><button id="dlJson" type="button" disabled="" class="ghost">Настройки</button></div></details>
+      <details class="more inl" id="moreRow"><summary>Ещё</summary><div class="tr"><button id="dlReport" type="button" data-testid="report-btn">📤 Отчёт для Claude</button><button id="dlVox" type="button" title="Только голос, для анализа">Голос WAV</button><button id="dlJson" type="button" disabled="" class="ghost">Настройки</button></div></details>
       <div id="fbBox" hidden data-testid="feedback-box">
         <div class="tlab">Оценка</div>
         <div class="fbchips" id="fbChips"></div>
-        <details class="more inl"><summary>Что не так?</summary><div class="fbchips" id="fbChips2"></div></details>
+        <details class="more inl" id="fbRow"><summary>Что не так?</summary><div class="fbchips" id="fbChips2"></div></details>
         <div class="row mt8"><button id="fbApply" type="button" class="ghost" hidden data-testid="fb-apply">↻ Пересобрать с учётом</button></div>
         <p class="hint" id="fbNote" data-testid="fb-note"></p>
       </div>
@@ -3496,8 +3503,11 @@ function cloudGet(k, d) { try { return localStorage.getItem(k) || d; } catch (e)
 function cloudSet(k, v) { try { localStorage.setItem(k, v); } catch (e) { } }
 function cloudIsOn() { const c = $('#cloudOn'); return !!(c && c.checked); }
 function cloudAskKey() { const k = window.prompt('Ключ сервера (один раз, хранится только на этом телефоне):', cloudGet('ts_ckey', '')); if (k != null) cloudSet('ts_ckey', k.trim()); return cloudGet('ts_ckey', ''); }
+function simpleSet(v) { cloudSet('ts_simple', v ? '1' : '0'); document.body.classList.toggle('simple', v); $('#simpleBtn').textContent = v ? 'Все настройки (старый режим)' : 'Простой режим (только облако)';
+  if (v) { const on = $('#cloudOn'); if (on && !on.checked) { on.checked = true; on.onchange && on.onchange(); } if ($('#voiceMode').value === 'off') $('#voiceMode').value = 'sing'; } }
 function cloudInit() {
   const on = $('#cloudOn'); if (!on) return;
+  setTimeout(() => { simpleSet(cloudGet('ts_simple', '1') === '1'); $('#simpleBtn').onclick = () => simpleSet(!document.body.classList.contains('simple')); }, 0);
   on.checked = cloudGet('ts_cloud', '0') === '1'; CLOUD.voice = parseFloat(cloudGet('ts_cvoice', '1'));
   const sync = () => { $('#cloudOpts').hidden = !on.checked; cloudSet('ts_cloud', on.checked ? '1' : '0'); $('#make').textContent = on.checked ? 'Создать в облаке' : 'Создать трек'; };
   on.onchange = sync; sync();
@@ -3528,6 +3538,15 @@ async function cloudMake() {
   if (del === 'soft') tags.push('soft gentle intimate delivery'); if (del === 'power') tags.push('powerful belting vocal, strong chest voice');
   if (tim === 'low') tags.push('low husky deep voice'); if (tim === 'high') tags.push('high-pitched airy breathy voice');
   if (dirt === 'dirty') tags.push('gritty distorted saturated vocal, distorted guitars'); if (dirt === 'clean') tags.push('clean clear polished vocal, crisp diction');
+  if (!($('#lyrics').value || '').trim() && $('#voiceMode').value !== 'off') {   /* текста нет — пишет ACE по описанию */
+    const msg0 = $('#cloudMsg'); msg0.textContent = 'Пишу текст песни…';
+    try {
+      for (let i = 0; i < 40; i++) { try { if ((await fetch(CLOUD_URL + '/ping')).ok) break; } catch (e) { } msg0.textContent = 'Пишу текст… (сервер просыпается, до 3–4 мин)'; await new Promise((ok) => setTimeout(ok, 5000)); }
+      const r = await fetch(CLOUD_URL + '/lyrics', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Key': key }, body: JSON.stringify({ caption: prompt + ', ' + tags.join(', '), lang: cloudGet('ts_clang', 'ru') }) });
+      if (r.ok) { const j = await r.json(); if (j.lyrics) $('#lyrics').value = j.lyrics; }
+    } catch (e) { }
+    if (!($('#lyrics').value || '').trim()) { msg0.textContent = 'Не вышло написать текст — впиши свой.'; return; }
+  }
   const bm = cloudGet('ts_cbeat', 'ours'); if (bm !== 'ace') return cloudOurs(key, prompt + ', ' + tags.join(', '), bm === 'oursace');
   const q = { caption: prompt + ', ' + tags.join(', '), lyrics: cloudLyrics(), bpm: bpmM ? +bpmM[1] : null,
     duration: $('#quick') && $('#quick').checked ? 60 : 150, voice: cloudVoice(), lang, seed: -1 };

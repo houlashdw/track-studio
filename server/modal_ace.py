@@ -58,6 +58,7 @@ class Ace:
         if self.has_voice:
             self.dit.set_use_lora(voice > 0)
             if voice > 0: self.dit.set_lora_scale(voice)
+        if not (q.get('lyrics') or '').strip(): q['lyrics'] = self._write(q.get('caption', ''), q.get('lang', 'ru'))['lyrics']   # нет текста — пишет сам
         cap = ('vc2, ' if voice > 0 else '') + q.get('caption', 'russian pop song, female vocal')
         seed = int(q.get('seed', -1))
         p = GenerationParams(task_type='text2music', thinking=True, caption=cap, lyrics=q.get('lyrics', ''), bpm=q.get('bpm') or None,
@@ -66,6 +67,16 @@ class Ace:
         r = generate_music(self.dit, self.lm, p, c, save_dir='/tmp/gen')
         if not (r.success and r.audios): raise RuntimeError(str(getattr(r, 'error', r)))
         return open(r.audios[0]['path'], 'rb').read()
+
+    def _write(self, caption, lang='ru'):
+        """текст песни по описанию: «простой режим» ACE (его языковая модель пишет куплеты/припев с метками)"""
+        from acestep.inference import create_sample
+        r = create_sample(self.lm, query=caption, instrumental=False, vocal_language=lang)
+        return {'lyrics': getattr(r, 'lyrics', '') or '', 'caption': getattr(r, 'caption', '') or caption, 'bpm': getattr(r, 'bpm', None)}
+
+    @modal.method()
+    def write(self, q: dict) -> dict:
+        return self._write(q.get('caption', ''), q.get('lang', 'ru'))
 
     @modal.method()
     def generate(self, q: dict) -> bytes:
@@ -89,6 +100,13 @@ class Ace:
             try: b = self._gen(q)
             except Exception as e: raise HTTPException(status_code=500, detail=str(e)[:300])
             return Response(content=b, media_type='audio/mpeg')
+        @api.post('/lyrics')
+        async def lyrics(request: Request, x_key: Optional[str] = Header(default=None)):
+            if not x_key or x_key != os.environ.get('TS_KEY'): raise HTTPException(status_code=401, detail='bad key')
+            q = await request.json()
+            try: return self._write(q.get('caption', ''), q.get('lang', 'ru'))
+            except Exception as e: raise HTTPException(status_code=500, detail=str(e)[:300])
+
         @api.post('/lego')   # долго (минуты) → задание; приложение спрашивает /job/<id>
         async def lego(request: Request, x_key: Optional[str] = Header(default=None)):
             if not x_key or x_key != os.environ.get('TS_KEY'): raise HTTPException(status_code=401, detail='bad key')
