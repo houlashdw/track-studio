@@ -3509,6 +3509,12 @@ async function cloudMake() {
   const tick = setInterval(() => { const s = Math.round((Date.now() - t0) / 1000); msg.textContent = 'Сервер делает трек… ' + s + ' с' + (s > 40 ? ' (первый запуск после паузы ~3–4 мин: сервер просыпается)' : ''); }, 1000);
   setStatus('Облако: генерация…', .3, true);
   try {
+    /* сервер мог «уснуть»: будим простым GET /ping (без предзапроса CORS), ждём до ~6 мин, потом шлём задание */
+    for (let i = 0; ; i++) {
+      try { const pr = await fetch(CLOUD_URL + '/ping'); if (pr.ok) break; } catch (e) { }
+      if (i > 24) throw new Error('сервер не просыпается — проверь интернет или кредиты Modal');
+      await new Promise((ok) => setTimeout(ok, 5000));
+    }
     const r = await fetch(CLOUD_URL + '/generate', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Key': key }, body: JSON.stringify(q) });
     if (r.status === 401) { cloudSet('ts_ckey', ''); throw new Error('неверный ключ сервера — нажми «Создать» ещё раз и введи ключ'); }
     if (!r.ok) throw new Error('сервер ответил ' + r.status + ': ' + (await r.text()).slice(0, 200));
