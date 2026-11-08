@@ -552,6 +552,8 @@ short lines in English…
         <label class="chk sm" style="display:flex"><input type="checkbox" id="cloudOn" data-testid="cloud-on"><span>☁ Облако (ACE-Step + голос vc2) — трек целиком на сервере, нужен интернет</span></label>
         <div id="cloudOpts" hidden>
           <div class="seg3 mt8" id="cloudVoiceSeg"><button type="button" data-v="1" class="on">Голос vc2</button><button type="button" data-v="0.5">Наполовину</button><button type="button" data-v="0">Голос ACE</button></div>
+          <p class="hint" style="margin:10px 2px 0">Бит</p>
+          <div class="seg3 mt8" id="cloudBeatSeg"><button type="button" data-v="ours" class="on">Наш (из приложения)</button><button type="button" data-v="ace">ACE целиком</button></div>
           <p class="hint" style="margin:10px 2px 0">Подача</p>
           <div class="seg3 mt8" id="cloudDelSeg"><button type="button" data-v="auto" class="on">Авто</button><button type="button" data-v="soft">Нежно</button><button type="button" data-v="power">Мощно</button><button type="button" data-v="rap">Рэп-флоу</button></div>
           <p class="hint" style="margin:10px 2px 0">Тембр</p>
@@ -3495,8 +3497,8 @@ function cloudInit() {
   on.onchange = sync; sync();
   $('#cloudVoiceSeg').querySelectorAll('button').forEach((b) => { b.classList.toggle('on', parseFloat(b.dataset.v) === CLOUD.voice);
     b.onclick = () => { CLOUD.voice = parseFloat(b.dataset.v); cloudSet('ts_cvoice', b.dataset.v); $('#cloudVoiceSeg').querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b)); }; });
-  for (const [id, k] of [['#cloudDelSeg', 'ts_cdel'], ['#cloudTimSeg', 'ts_ctim']]) {
-    const seg = $(id), cur = cloudGet(k, 'auto');
+  for (const [id, k, d] of [['#cloudDelSeg', 'ts_cdel', 'auto'], ['#cloudTimSeg', 'ts_ctim', 'auto'], ['#cloudBeatSeg', 'ts_cbeat', 'ours']]) {
+    const seg = $(id), cur = cloudGet(k, d);
     seg.querySelectorAll('button').forEach((b) => { b.classList.toggle('on', b.dataset.v === cur); b.onclick = () => { cloudSet(k, b.dataset.v); seg.querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b)); }; });
   }
   $('#cloudKey').onclick = cloudAskKey;
@@ -3517,6 +3519,7 @@ async function cloudMake() {
   if (del === 'soft') tags.push('soft gentle intimate delivery'); if (del === 'power') tags.push('powerful belting vocal, strong chest voice');
   if (tim === 'low') tags.push('low husky deep voice'); if (tim === 'high') tags.push('high-pitched airy breathy voice');
   if (dirt === 'dirty') tags.push('gritty distorted saturated vocal, distorted guitars'); if (dirt === 'clean') tags.push('clean clear polished vocal, crisp diction');
+  if (cloudGet('ts_cbeat', 'ours') === 'ours') return cloudOurs(key, prompt + ', ' + tags.join(', '));
   const q = { caption: prompt + ', ' + tags.join(', '), lyrics: cloudLyrics(), bpm: bpmM ? +bpmM[1] : null,
     duration: $('#quick') && $('#quick').checked ? 60 : 150, voice: CLOUD.voice, seed: -1 };
   stop(); setBusy(true); const t0 = Date.now(); const msg = $('#cloudMsg');
@@ -3537,6 +3540,43 @@ async function cloudMake() {
     msg.textContent = 'Готово за ' + Math.round((Date.now() - t0) / 1000) + ' с.'; setStatus('', 0, false);
   } catch (e) { msg.textContent = 'Не вышло: ' + (e && e.message || e); setStatus('', 0, false); }
   finally { clearInterval(tick); setBusy(false); }
+}
+/* наш бит (собирается здесь, без голоса) → сервер: ACE «lego» допевает голос под этот бит → назад только голос → кладём на НАШ бит */
+async function cloudOurs(key, caption) {
+  const msg = $('#cloudMsg'), vm = $('#voiceMode'), was = vm.value, t0 = Date.now();
+  if (!($('#lyrics').value || '').trim()) { msg.textContent = 'Для голоса нужен текст песни.'; $('#lyrics').focus(); return; }
+  vm.value = 'off'; msg.textContent = 'Собираю наш бит…';
+  try { await makeFromPrompt(); } finally { vm.value = was; }
+  if (!S.buffer) { msg.textContent = 'Бит не собрался.'; return; }
+  stop(); const beat = S.buffer, sr = beat.sampleRate;
+  setBusy(true); const tick = setInterval(() => { const s = Math.round((Date.now() - t0) / 1000); msg.textContent = 'Сервер поёт под наш бит… ' + s + ' с' + (s > 60 ? ' (обычно 2–5 мин; после паузы сервер ещё и просыпается)' : ''); }, 1000);
+  try {
+    const b64 = await new Promise((ok, no) => { const fr = new FileReader(); fr.onload = () => ok(String(fr.result).split(',')[1]); fr.onerror = no; fr.readAsDataURL(encodeMp3(beat, 160)); });
+    for (let i = 0; ; i++) { try { const pr = await fetch(CLOUD_URL + '/ping'); if (pr.ok) break; } catch (e) { } if (i > 24) throw new Error('сервер не просыпается'); await new Promise((ok) => setTimeout(ok, 5000)); }
+    const bpm = S.spec && S.spec.bpm ? Math.round(S.spec.bpm) : null;
+    const r = await fetch(CLOUD_URL + '/lego', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Key': key }, body: JSON.stringify({ beat_b64: b64, caption, lyrics: cloudLyrics(), bpm, voice: CLOUD.voice, seed: -1 }) });
+    if (r.status === 401) { cloudSet('ts_ckey', ''); throw new Error('неверный ключ сервера'); }
+    if (!r.ok) throw new Error('сервер: ' + r.status + ' ' + (await r.text()).slice(0, 200));
+    const id = (await r.json()).id; let vb = null;
+    for (let i = 0; i < 200; i++) {
+      await new Promise((ok) => setTimeout(ok, 6000));
+      const j = await fetch(CLOUD_URL + '/job/' + id, { headers: { 'X-Key': key } });
+      if (j.status === 202) continue;
+      if (!j.ok) throw new Error('сервер: ' + j.status + ' ' + (await j.text()).slice(0, 200));
+      vb = await j.arrayBuffer(); break;
+    }
+    if (!vb) throw new Error('слишком долго — попробуй ещё раз');
+    const voc = await S.ctx.decodeAudioData(vb);
+    const out = S.ctx.createBuffer(2, beat.length, sr);
+    for (let c = 0; c < 2; c++) {
+      const o = out.getChannelData(c), b = beat.getChannelData(Math.min(c, beat.numberOfChannels - 1)), v = voc.getChannelData(Math.min(c, voc.numberOfChannels - 1)), k = voc.sampleRate / sr;
+      for (let i = 0; i < o.length; i++) { const vi = i * k | 0; o[i] = b[i] * .85 + (vi < v.length ? v[vi] * 1.1 : 0); }
+    }
+    S.buffer = out; S.peaks = computePeaks(out, 1600); drawWave(0); $('#player').dataset.ready = '1'; play(0);
+    CLOUD.blob = encodeMp3(out, 192); $('#cloudActs').hidden = false; $('#cloudAudio').hidden = true;
+    msg.textContent = 'Готово за ' + Math.round((Date.now() - t0) / 1000) + ' с: наш бит + голос ACE. «Сохранить mp3» — ниже.';
+  } catch (e) { msg.textContent = 'Не вышло: ' + (e && e.message || e); }
+  finally { clearInterval(tick); setBusy(false); setStatus('', 0, false); }
 }
 async function makeFromPrompt() {
   const prompt = $('#prompt').value.trim();
