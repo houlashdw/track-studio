@@ -18,7 +18,7 @@ image = (
         f'git clone -q --depth 1 https://github.com/ACE-Step/ACE-Step-1.5.git {ACE}',
         f'cd {ACE} && uv pip install --system --index-strategy unsafe-best-match --extra-index-url https://download.pytorch.org/whl/cu128 -e .',
     )
-    .pip_install('fastapi[standard]')
+    .pip_install('fastapi[standard]', 'demucs==4.0.1')
 )
 vol = modal.Volume.from_name('ts-ace', create_if_missing=True)
 app = modal.App('track-studio-ace', image=image)
@@ -89,7 +89,75 @@ class Ace:
             try: b = self._gen(q)
             except Exception as e: raise HTTPException(status_code=500, detail=str(e)[:300])
             return Response(content=b, media_type='audio/mpeg')
+        @api.post('/lego')   # долго (минуты) → задание; приложение спрашивает /job/<id>
+        async def lego(request: Request, x_key: Optional[str] = Header(default=None)):
+            if not x_key or x_key != os.environ.get('TS_KEY'): raise HTTPException(status_code=401, detail='bad key')
+            q = await request.json()
+            if not q.get('beat_b64'): raise HTTPException(status_code=400, detail='нет бита')
+            return {'id': AceLego().lego.spawn(q).object_id}
+
+        @api.get('/job/{jid}')
+        def job(jid: str, x_key: Optional[str] = Header(default=None), k: Optional[str] = None):
+            key = x_key or k
+            if not key or key != os.environ.get('TS_KEY'): raise HTTPException(status_code=401, detail='bad key')
+            try: b = modal.FunctionCall.from_id(jid).get(timeout=0)
+            except TimeoutError: return Response(status_code=202, content=b'{"state":"running"}', media_type='application/json')
+            except Exception as e: raise HTTPException(status_code=500, detail=str(e)[:300])
+            return Response(content=b, media_type='audio/mpeg')
         return api
+
+
+@app.cls(gpu=GPU, volumes={VOL: vol}, timeout=1200, scaledown_window=120)
+class AceLego:
+    """наш бит (из приложения) → ACE-Step «lego» допевает вокал (полная модель base) → Demucs вырезает только голос → приложение кладёт его на свой бит"""
+    @modal.enter()
+    def load(self):
+        import sys, torch
+        os.makedirs(VOL + '/checkpoints', exist_ok=True); os.environ['TORCH_HOME'] = VOL + '/torch'
+        if not os.path.islink(ACE + '/checkpoints'):
+            shutil.rmtree(ACE + '/checkpoints', ignore_errors=True); os.symlink(VOL + '/checkpoints', ACE + '/checkpoints')
+        os.chdir(ACE); sys.path.insert(0, ACE)
+        from acestep import gpu_config
+        gpu_config.cuda_supports_bfloat16 = lambda *a, **k: True
+        import acestep.core.generation.handler.memory_utils as _mu; _mu.cuda_supports_bfloat16 = gpu_config.cuda_supports_bfloat16
+        from acestep.model_downloader import ensure_main_model, ensure_dit_model
+        from acestep.handler import AceStepHandler
+        from acestep.llm_inference import LLMHandler
+        t0 = time.time(); ensure_main_model(); ensure_dit_model('acestep-v15-base')
+        self.dit = AceStepHandler(); print(self.dit.initialize_service(project_root=ACE, config_path='acestep-v15-base', device='cuda', offload_to_cpu=False))
+        self.lm = LLMHandler()
+        ad = sorted(glob.glob(VOL + '/adapters/base/*')); self.has_voice = False
+        if ad: print(self.dit.load_lora(ad[-1])); self.has_voice = True
+        from demucs.pretrained import get_model
+        self.sep = get_model('htdemucs').cuda().eval(); vol.commit()
+        print('lego загрузка %.0f с, голос vc2: %s' % (time.time() - t0, self.has_voice))
+
+    @modal.method()
+    def lego(self, q: dict) -> bytes:
+        import subprocess, numpy as np, torch, soundfile as sf
+        from acestep.inference import GenerationParams, GenerationConfig, generate_music
+        from demucs.apply import apply_model
+        open('/tmp/beat.mp3', 'wb').write(base64.b64decode(q['beat_b64']))
+        voice = float(q.get('voice', 1.0)) if self.has_voice else 0.0
+        if self.has_voice:
+            self.dit.set_use_lora(voice > 0)
+            if voice > 0: self.dit.set_lora_scale(voice)
+        seed = int(q.get('seed', -1))
+        p = GenerationParams(task_type='lego', src_audio='/tmp/beat.mp3', instruction='Generate the vocals track based on the audio context:',
+                             caption=('vc2, ' if voice > 0 else '') + q.get('caption', 'female vocal in Russian'), lyrics=q.get('lyrics', ''), bpm=q.get('bpm') or None,
+                             vocal_language=q.get('lang', 'ru'), repainting_start=0.0, repainting_end=-1, inference_steps=int(q.get('steps', 50)), seed=seed)
+        r = generate_music(self.dit, self.lm, p, GenerationConfig(batch_size=1, audio_format='wav', use_random_seed=seed < 0), save_dir='/tmp/lg')
+        if not (r.success and r.audios): raise RuntimeError(str(getattr(r, 'error', r)))
+        x, sr = sf.read(r.audios[0]['path'], dtype='float32', always_2d=True)
+        if sr != 44100:
+            subprocess.run(['ffmpeg', '-v', 'error', '-y', '-i', r.audios[0]['path'], '-ar', '44100', '/tmp/lg44.wav'], check=True); x, sr = sf.read('/tmp/lg44.wav', dtype='float32', always_2d=True)
+        if x.shape[1] == 1: x = np.repeat(x, 2, 1)
+        with torch.no_grad():
+            st = apply_model(self.sep, torch.from_numpy(x.T.copy())[None].cuda(), shifts=1, split=True, overlap=0.25)[0]
+        v = st[self.sep.sources.index('vocals')].cpu().numpy().T
+        sf.write('/tmp/voc.wav', v, sr)
+        subprocess.run(['ffmpeg', '-v', 'error', '-y', '-i', '/tmp/voc.wav', '-b:a', '192k', '/tmp/voc.mp3'], check=True)
+        return open('/tmp/voc.mp3', 'rb').read()
 
 
 @app.local_entrypoint()
