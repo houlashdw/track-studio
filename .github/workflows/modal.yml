@@ -3,7 +3,7 @@ name: modal
 on:
   workflow_dispatch:
     inputs:
-      cmd: { description: 'check / deploy / run / http / styles / legotest / atl', default: 'check' }
+      cmd: { description: 'check / deploy / run / http / styles / legotest / atl / instr', default: 'check' }
       file: { default: 'server/modal_ace.py' }
       adapter: { description: 'файл адаптера в ветке voice-ace (зашифр.)', default: '' }
       adname: { description: 'папка в томе: turbo/e100, base/e75', default: 'turbo/e100' }
@@ -110,3 +110,13 @@ jobs:
           cd o && for f in *.mp3; do openssl enc -aes-256-cbc -pbkdf2 -iter 200000 -salt -in "$f" -out "$f.enc" -pass env:P && rm "$f"; done
           git init -q -b modal-out && git config user.name gha && git config user.email gha@users.noreply.github.com
           git add -A && git commit -q -m atl && git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" modal-out
+      - name: Учебный набор инструментала (ACE → стемы)
+        if: inputs.cmd == 'instr'
+        env: { P: '${{ secrets.KEYSTORE_PASS }}' }
+        run: |
+          modal deploy "${{ inputs.file }}" >/dev/null
+          modal run "${{ inputs.file }}::instr" --outdir /tmp/ins --per 4
+          cd /tmp/ins && tar cf /tmp/ins.tar . && cd - && mkdir o && openssl enc -aes-256-cbc -pbkdf2 -iter 200000 -salt -in /tmp/ins.tar -out o/instr.tar.enc -pass env:P && ls -la o
+          cd o && split -b 90m instr.tar.enc instr.tar.enc.part_ && rm instr.tar.enc
+          git init -q -b instr-data && git config user.name gha && git config user.email gha@users.noreply.github.com
+          git add -A && git commit -q -m instr && git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" instr-data

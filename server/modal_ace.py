@@ -133,6 +133,20 @@ class AceLego:
         print('lego загрузка %.0f с, голос vc2: %s' % (time.time() - t0, self.has_voice))
 
     @modal.method()
+    def stems(self, mp3: bytes) -> dict:
+        """инструментал → дорожки Demucs (drums/bass/other) в mp3 — для разбора паттернов и звуков"""
+        import subprocess, numpy as np, torch, soundfile as sf
+        from demucs.apply import apply_model
+        open('/tmp/in.mp3', 'wb').write(mp3); subprocess.run(['ffmpeg', '-v', 'error', '-y', '-i', '/tmp/in.mp3', '-ac', '2', '-ar', '44100', '/tmp/in.wav'], check=True)
+        x, sr = sf.read('/tmp/in.wav', dtype='float32', always_2d=True)
+        with torch.no_grad(): st = apply_model(self.sep, torch.from_numpy(x.T.copy())[None].cuda(), shifts=1, split=True, overlap=0.25)[0].cpu().numpy()
+        out = {}
+        for i, n in enumerate(self.sep.sources):
+            if n == 'vocals': continue
+            sf.write('/tmp/s.wav', st[i].T, sr); subprocess.run(['ffmpeg', '-v', 'error', '-y', '-i', '/tmp/s.wav', '-b:a', '128k', '/tmp/s.mp3'], check=True); out[n] = open('/tmp/s.mp3', 'rb').read()
+        return out
+
+    @modal.method()
     def lego(self, q: dict) -> bytes:
         import subprocess, numpy as np, torch, soundfile as sf
         from acestep.inference import GenerationParams, GenerationConfig, generate_music
@@ -204,3 +218,35 @@ def styles(outdir: str = 'styles_out', voice: float = 1.0):
         t0 = time.time()
         b = a.generate.remote({'caption': cap, 'lyrics': LYR_RAP if name.startswith('rap') else LYR_POP, 'duration': 40, 'seed': 21, 'voice': voice})
         open(f'{outdir}/{name}_v{int(voice * 10)}.mp3', 'wb').write(b); print(name, '%.0f с' % (time.time() - t0), flush=True)
+
+
+GENRES = {   # жанр приложения → описание для ACE (инструментал) и темп
+    'trap': ('modern trap instrumental, hard 808 bass, rolling hi-hats, snare on 3, dark synth melody', 140),
+    'drill': ('UK drill instrumental, sliding 808 bass, syncopated hi-hats, dark piano', 142),
+    'plugg': ('plugg instrumental, soft bells, airy synth pads, bouncy 808, light hi-hats', 150),
+    'rage': ('rage trap instrumental, distorted supersaw synth lead, heavy 808, aggressive', 155),
+    'phonk': ('drift phonk instrumental, cowbell melody, distorted 808, aggressive drums', 130),
+    'pop': ('modern pop instrumental, punchy drums, bright synths, warm bass, catchy chords', 118),
+    'house': ('deep house instrumental, four on the floor kick, offbeat hi-hats, groovy bassline, chords', 124),
+    'rock': ('pop rock instrumental, live drums, distorted electric guitars, bass guitar', 135),
+    'lofi': ('lofi hip hop instrumental, dusty drums, jazzy electric piano chords, vinyl crackle, mellow bass', 85),
+    'rnb': ('modern r&b instrumental, smooth electric piano, deep sub bass, crisp snaps, lush pads', 95),
+}
+
+
+@app.local_entrypoint()
+def instr(outdir: str = 'instr_out', per: int = 4):
+    """учебный набор для нашего инструментала: ACE делает инструменталы по жанрам → Demucs раскладывает на ударные/бас/остальное"""
+    import json
+    os.makedirs(outdir, exist_ok=True); a = Ace(); lg = AceLego(); meta = {}
+    for g, (cap, bpm) in GENRES.items():
+        for k in range(per):
+            t0 = time.time()
+            try:
+                b = a.generate.remote({'caption': cap, 'lyrics': '[Instrumental]', 'bpm': bpm, 'duration': 30, 'seed': 1000 + k, 'voice': 0})
+                st = lg.stems.remote(b)
+            except Exception as e: print(g, k, 'ошибка', e, flush=True); continue
+            open(f'{outdir}/{g}_{k}_mix.mp3', 'wb').write(b)
+            for n, v in st.items(): open(f'{outdir}/{g}_{k}_{n}.mp3', 'wb').write(v)
+            meta[f'{g}_{k}'] = {'genre': g, 'bpm': bpm, 'caption': cap}; print(g, k, '%.0f с' % (time.time() - t0), flush=True)
+    json.dump(meta, open(f'{outdir}/meta.json', 'w'), indent=1)
