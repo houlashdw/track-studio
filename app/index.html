@@ -558,7 +558,7 @@ short lines in English…
       <div class="aixbox" id="cloudBox" data-testid="cloud-box" style="margin-top:8px">
         <label class="chk sm" style="display:flex" id="cloudOnRow"><input type="checkbox" id="cloudOn" data-testid="cloud-on"><span>☁ Облако (ACE-Step + голос vc2) — трек целиком на сервере, нужен интернет</span></label>
         <div id="cloudOpts" hidden>
-          <div class="seg3 mt8" id="cloudVoiceSeg"><button type="button" data-v="1" class="on">Голос vc2</button><button type="button" data-v="0.5">Наполовину</button><button type="button" data-v="0">Голос ACE</button></div>
+          <div class="seg3 mt8" id="cloudVoiceSeg"><button type="button" data-v="0" class="on">Голос ACE (выше, аниме)</button><button type="button" data-v="0.5">Наполовину</button><button type="button" data-v="1">Голос vc2 (ниже)</button></div>
           <p class="hint" style="margin:10px 2px 0">Бит</p>
           <div class="seg3 mt8" id="cloudBeatSeg"><button type="button" data-v="ours" class="on">Наш (из приложения)</button><button type="button" data-v="ace">ACE целиком</button></div>
           <p class="hint" style="margin:10px 2px 0">Подача</p>
@@ -3508,7 +3508,7 @@ function simpleSet(v) { cloudSet('ts_simple', v ? '1' : '0'); document.body.clas
 function cloudInit() {
   const on = $('#cloudOn'); if (!on) return;
   setTimeout(() => { simpleSet(cloudGet('ts_simple', '1') === '1'); $('#simpleBtn').onclick = () => simpleSet(!document.body.classList.contains('simple')); }, 0);
-  on.checked = cloudGet('ts_cloud', '0') === '1'; CLOUD.voice = parseFloat(cloudGet('ts_cvoice', '1'));
+  on.checked = cloudGet('ts_cloud', '0') === '1'; CLOUD.voice = parseFloat(cloudGet('ts_cvoice', '0'));
   const sync = () => { $('#cloudOpts').hidden = !on.checked; cloudSet('ts_cloud', on.checked ? '1' : '0'); $('#make').textContent = on.checked ? 'Создать в облаке' : 'Создать трек'; };
   on.onchange = sync; sync();
   $('#cloudVoiceSeg').querySelectorAll('button').forEach((b) => { b.classList.toggle('on', parseFloat(b.dataset.v) === CLOUD.voice);
