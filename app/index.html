@@ -558,7 +558,7 @@ short lines in English…
           <div class="seg3 mt8" id="cloudDelSeg"><button type="button" data-v="auto" class="on">Авто</button><button type="button" data-v="soft">Нежно</button><button type="button" data-v="power">Мощно</button><button type="button" data-v="rap">Рэп-флоу</button><button type="button" data-v="atl">Atlanta</button></div>
           <p class="hint" style="margin:10px 2px 0">Язык и голос</p>
           <div class="seg3 mt8" id="cloudLangSeg"><button type="button" data-v="ru" class="on">Русский</button><button type="button" data-v="en">English</button></div>
-          <div class="seg3 mt8" id="cloudSexSeg"><button type="button" data-v="m" class="on">Мужской</button><button type="button" data-v="f">Женский (vc2)</button></div>
+          <div class="seg3 mt8" id="cloudSexSeg"><button type="button" data-v="f" class="on">Женский (vc2)</button><button type="button" data-v="m">Мужской</button></div>
           <p class="hint" style="margin:10px 2px 0">Тембр</p>
           <div class="seg3 mt8" id="cloudTimSeg"><button type="button" data-v="auto" class="on">Авто</button><button type="button" data-v="low">Ниже, с хрипотцой</button><button type="button" data-v="high">Выше, воздушно</button></div>
           <p class="hint" id="cloudMsg" style="margin:8px 2px 0" aria-live="polite"></p>
@@ -3500,14 +3500,14 @@ function cloudInit() {
   on.onchange = sync; sync();
   $('#cloudVoiceSeg').querySelectorAll('button').forEach((b) => { b.classList.toggle('on', parseFloat(b.dataset.v) === CLOUD.voice);
     b.onclick = () => { CLOUD.voice = parseFloat(b.dataset.v); cloudSet('ts_cvoice', b.dataset.v); $('#cloudVoiceSeg').querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b)); }; });
-  for (const [id, k, d] of [['#cloudDelSeg', 'ts_cdel', 'auto'], ['#cloudTimSeg', 'ts_ctim', 'auto'], ['#cloudBeatSeg', 'ts_cbeat', 'ours'], ['#cloudLangSeg', 'ts_clang', 'ru'], ['#cloudSexSeg', 'ts_csex', 'm']]) {
+  for (const [id, k, d] of [['#cloudDelSeg', 'ts_cdel', 'auto'], ['#cloudTimSeg', 'ts_ctim', 'auto'], ['#cloudBeatSeg', 'ts_cbeat', 'ours'], ['#cloudLangSeg', 'ts_clang', 'ru'], ['#cloudSexSeg', 'ts_csex', 'f']]) {
     const seg = $(id), cur = cloudGet(k, d);
     seg.querySelectorAll('button').forEach((b) => { b.classList.toggle('on', b.dataset.v === cur); b.onclick = () => { cloudSet(k, b.dataset.v); seg.querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b)); }; });
   }
   $('#cloudKey').onclick = cloudAskKey;
   $('#cloudSave').onclick = () => { if (CLOUD.blob) saveBlob('ace_' + Date.now() + '.mp3', CLOUD.blob); };
 }
-function cloudVoice() { return cloudGet('ts_csex', 'm') === 'm' ? 0 : CLOUD.voice; }   /* vc2 — женский голос: для мужского дообучение не включаем */
+function cloudVoice() { return cloudGet('ts_csex', 'f') === 'm' ? 0 : CLOUD.voice; }   /* vc2 — женский голос: для мужского дообучение не включаем */
 function cloudLyrics() {
   const t = ($('#lyrics').value || '').trim(); if ($('#voiceMode').value === 'off' || !t) return '[Instrumental]';
   return /\[[A-Za-zА-Яа-я -]+\]/.test(t) ? t : '[Verse]\n' + t;
@@ -3519,7 +3519,7 @@ async function cloudMake() {
   const bpmM = prompt.match(/(\d{2,3})\s*bpm/i), rap = $('#voiceMode').value === 'rap';
   /* подача/тембр/перегруз — словами в описании (замер на сервере: «low husky deep» заметно опускает высоту голоса, перегруз и чистота слышны в звуке) */
   const del = cloudGet('ts_cdel', 'auto'), tim = cloudGet('ts_ctim', 'auto'), dirt = dirtMode(), tags = [];
-  const lang = cloudGet('ts_clang', 'ru'), male = cloudGet('ts_csex', 'm') === 'm', who = (male ? 'male' : 'female'), inL = lang === 'en' ? 'in English' : 'in Russian';
+  const lang = cloudGet('ts_clang', 'ru'), male = cloudGet('ts_csex', 'f') === 'm', who = (male ? 'male' : 'female'), inL = lang === 'en' ? 'in English' : 'in Russian';
   if (del === 'atl') tags.push('Atlanta trap, ' + who + ' rap vocal ' + inL + ', melodic rap flow, triplet flow, ad-libs, autotune, hard 808, rolling hi-hats');
   else tags.push((rap || del === 'rap') ? who + ' rap vocal ' + inL + ', rhythmic fast flow, punchy delivery' : who + ' vocal ' + inL);
   if (del === 'soft') tags.push('soft gentle intimate delivery'); if (del === 'power') tags.push('powerful belting vocal, strong chest voice');
