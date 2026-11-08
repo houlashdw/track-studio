@@ -548,6 +548,15 @@ short lines in English…
         <label class="fld inl" for="look"><select id="look" aria-label="Звук"><option value="bright">Яркий</option><option value="retro">Ретро</option></select></label>
       </div>
       <button id="make" type="button" class="pri big" data-testid="create-track-btn">Создать трек</button>
+      <div class="aixbox" id="cloudBox" data-testid="cloud-box" style="margin-top:8px">
+        <label class="chk sm" style="display:flex"><input type="checkbox" id="cloudOn" data-testid="cloud-on"><span>☁ Облако (ACE-Step + голос vc2) — трек целиком на сервере, нужен интернет</span></label>
+        <div id="cloudOpts" hidden>
+          <div class="seg3 mt8" id="cloudVoiceSeg"><button type="button" data-v="1" class="on">Голос vc2</button><button type="button" data-v="0.5">Наполовину</button><button type="button" data-v="0">Голос ACE</button></div>
+          <p class="hint" id="cloudMsg" style="margin:8px 2px 0" aria-live="polite"></p>
+          <audio id="cloudAudio" controls hidden style="width:100%;margin-top:8px"></audio>
+          <div class="scroller acts2" id="cloudActs" hidden><button type="button" class="ghost" id="cloudSave">Сохранить mp3</button><button type="button" class="ghost" id="cloudKey">Ключ сервера</button></div>
+        </div>
+      </div>
       <label class="chk sm" style="margin:8px 2px 0;display:flex"><input type="checkbox" id="quick" checked data-testid="quick"><span>Быстрая проба — трек ~45 с (вдвое быстрее; сними для полной песни)</span></label>
       <div class="scroller acts2">
         <button id="reroll" type="button" class="ghost" data-testid="reroll-btn">Ещё вариант</button>
@@ -3467,6 +3476,48 @@ async function buildTrack(label) {
     console.error(err); setStatus('Не получилось собрать: ' + (err && err.message ? err.message : err), 0, false);
   } finally { setBusy(false); }
 }
+/* ===== Облако: ACE-Step 1.5 + дообученный голос vc2 на своём сервере (Modal). Трек целиком генерируется там; приложение шлёт промпт и текст, получает mp3.
+   Ключ сервера хранится только на телефоне (localStorage), в коде его нет. */
+const CLOUD_URL = 'https://fantasydrawingart--track-studio-ace-ace-web.us-east.modal.run';
+const CLOUD = { blob: null, url: null, voice: 1 };
+function cloudGet(k, d) { try { return localStorage.getItem(k) || d; } catch (e) { return d; } }
+function cloudSet(k, v) { try { localStorage.setItem(k, v); } catch (e) { } }
+function cloudIsOn() { const c = $('#cloudOn'); return !!(c && c.checked); }
+function cloudAskKey() { const k = window.prompt('Ключ сервера (один раз, хранится только на этом телефоне):', cloudGet('ts_ckey', '')); if (k != null) cloudSet('ts_ckey', k.trim()); return cloudGet('ts_ckey', ''); }
+function cloudInit() {
+  const on = $('#cloudOn'); if (!on) return;
+  on.checked = cloudGet('ts_cloud', '0') === '1'; CLOUD.voice = parseFloat(cloudGet('ts_cvoice', '1'));
+  const sync = () => { $('#cloudOpts').hidden = !on.checked; cloudSet('ts_cloud', on.checked ? '1' : '0'); $('#make').textContent = on.checked ? 'Создать в облаке' : 'Создать трек'; };
+  on.onchange = sync; sync();
+  $('#cloudVoiceSeg').querySelectorAll('button').forEach((b) => { b.classList.toggle('on', parseFloat(b.dataset.v) === CLOUD.voice);
+    b.onclick = () => { CLOUD.voice = parseFloat(b.dataset.v); cloudSet('ts_cvoice', b.dataset.v); $('#cloudVoiceSeg').querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b)); }; });
+  $('#cloudKey').onclick = cloudAskKey;
+  $('#cloudSave').onclick = () => { if (CLOUD.blob) saveBlob('ace_' + Date.now() + '.mp3', CLOUD.blob); };
+}
+function cloudLyrics() {
+  const t = ($('#lyrics').value || '').trim(); if ($('#voiceMode').value === 'off' || !t) return '[Instrumental]';
+  return /\[[A-Za-zА-Яа-я -]+\]/.test(t) ? t : '[Verse]\n' + t;
+}
+async function cloudMake() {
+  const prompt = $('#prompt').value.trim();
+  if (!prompt) { $('#prompt').focus(); setStatus('Напиши, какой трек нужен.', 0, false); return; }
+  let key = cloudGet('ts_ckey', ''); if (!key) key = cloudAskKey(); if (!key) { $('#cloudMsg').textContent = 'Нужен ключ сервера.'; return; }
+  const bpmM = prompt.match(/(\d{2,3})\s*bpm/i), rap = $('#voiceMode').value === 'rap';
+  const q = { caption: prompt + (rap ? ', female rap vocal in Russian' : ', female vocal in Russian'), lyrics: cloudLyrics(), bpm: bpmM ? +bpmM[1] : null,
+    duration: $('#quick') && $('#quick').checked ? 60 : 150, voice: CLOUD.voice, seed: -1 };
+  stop(); setBusy(true); const t0 = Date.now(); const msg = $('#cloudMsg');
+  const tick = setInterval(() => { const s = Math.round((Date.now() - t0) / 1000); msg.textContent = 'Сервер делает трек… ' + s + ' с' + (s > 40 ? ' (первый запуск после паузы ~3–4 мин: сервер просыпается)' : ''); }, 1000);
+  setStatus('Облако: генерация…', .3, true);
+  try {
+    const r = await fetch(CLOUD_URL + '/generate', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Key': key }, body: JSON.stringify(q) });
+    if (r.status === 401) { cloudSet('ts_ckey', ''); throw new Error('неверный ключ сервера — нажми «Создать» ещё раз и введи ключ'); }
+    if (!r.ok) throw new Error('сервер ответил ' + r.status + ': ' + (await r.text()).slice(0, 200));
+    CLOUD.blob = await r.blob(); if (CLOUD.url) URL.revokeObjectURL(CLOUD.url); CLOUD.url = URL.createObjectURL(CLOUD.blob);
+    const au = $('#cloudAudio'); au.src = CLOUD.url; au.hidden = false; $('#cloudActs').hidden = false; au.play().catch(() => { });
+    msg.textContent = 'Готово за ' + Math.round((Date.now() - t0) / 1000) + ' с.'; setStatus('', 0, false);
+  } catch (e) { msg.textContent = 'Не вышло: ' + (e && e.message || e); setStatus('', 0, false); }
+  finally { clearInterval(tick); setBusy(false); }
+}
 async function makeFromPrompt() {
   const prompt = $('#prompt').value.trim();
   if (!prompt) { $('#prompt').focus(); setStatus('Напиши, какой трек нужен.', 0, false); return; }
@@ -4126,7 +4177,8 @@ async function init() {
   { const v = $('#vtChk'); if (v) { try { v.checked = localStorage.getItem('ts_vt') === '1'; } catch (e) { } v.onchange = () => { try { localStorage.setItem('ts_vt', v.checked ? '1' : '0'); } catch (e) { } }; } }
   { const q = $('#quick'); if (q) { try { const v = localStorage.getItem('ts_quick'); if (v != null) q.checked = v === '1'; } catch (e) { } q.onchange = () => { try { localStorage.setItem('ts_quick', q.checked ? '1' : '0'); } catch (e) { } }; } }
   $('#lenOut').textContent = fmtTime($('#len').value);
-  $('#make').onclick = makeFromPrompt;
+  $('#make').onclick = () => (cloudIsOn() ? cloudMake() : makeFromPrompt());
+  cloudInit();
   $('#aixBtn').onclick = aixRun; dsUI(); $('#prompt').addEventListener('input', updateUnderstood); $('#voiceMode').addEventListener('change', updateUnderstood); $('#modeSeg').addEventListener('click', () => setTimeout(updateUnderstood, 0)); updateUnderstood();
   $('#prompt').addEventListener('keydown', (e) => { if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') makeFromPrompt(); });
   $('#surprise').onclick = () => { $('#prompt').value = EXAMPLES[Math.floor(Math.random() * EXAMPLES.length)]; $('#prompt').dispatchEvent(new Event('input')); makeFromPrompt(); };

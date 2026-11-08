@@ -71,12 +71,25 @@ class Ace:
     def generate(self, q: dict) -> bytes:
         return self._gen(q)
 
-    @modal.fastapi_endpoint(method='POST', docs=False)
-    def web(self, q: dict, x_key: Optional[str] = Header(default=None)):
-        if not x_key or x_key != os.environ.get('TS_KEY'): raise HTTPException(status_code=401, detail='bad key')
-        try: b = self._gen(q)
-        except Exception as e: raise HTTPException(status_code=500, detail=str(e)[:300])
-        return Response(content=b, media_type='audio/mpeg')
+    @modal.asgi_app()
+    def web(self):
+        from fastapi import FastAPI, Request
+        from fastapi.middleware.cors import CORSMiddleware
+        api = FastAPI(docs_url=None, redoc_url=None)
+        # приложение открывается с https://appassets.androidplatform.net — нужен CORS (ключ всё равно обязателен)
+        api.add_middleware(CORSMiddleware, allow_origins=['*'], allow_methods=['POST', 'GET', 'OPTIONS'], allow_headers=['*'])
+
+        @api.get('/ping')
+        def ping(): return {'ok': True, 'voice': self.has_voice}
+
+        @api.post('/generate')
+        async def gen(request: Request, x_key: Optional[str] = Header(default=None)):
+            if not x_key or x_key != os.environ.get('TS_KEY'): raise HTTPException(status_code=401, detail='bad key')
+            q = await request.json()
+            try: b = self._gen(q)
+            except Exception as e: raise HTTPException(status_code=500, detail=str(e)[:300])
+            return Response(content=b, media_type='audio/mpeg')
+        return api
 
 
 @app.local_entrypoint()

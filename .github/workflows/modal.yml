@@ -26,7 +26,7 @@ jobs:
           modal app list 2>&1 | tail -5
           echo OK
       - name: Ключ сервера и голос
-        if: inputs.cmd == 'deploy' || inputs.cmd == 'run'
+        if: inputs.cmd == 'deploy' || inputs.cmd == 'run' || inputs.cmd == 'http'
         env: { P: '${{ secrets.KEYSTORE_PASS }}', TSK: '${{ secrets.TS_KEY }}' }
         run: |
           K="$TSK"; [ -n "$K" ] || K=$(printf %s "$P" | sha256sum | cut -c1-32)
@@ -48,3 +48,13 @@ jobs:
           mkdir o && openssl enc -aes-256-cbc -pbkdf2 -iter 200000 -salt -in /tmp/test_out.mp3 -out o/test_out.mp3.enc -pass env:P && cd o
           git init -q -b modal-out && git config user.name gha && git config user.email gha@users.noreply.github.com
           git add -A && git commit -q -m "modal test" && git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" modal-out
+      - name: HTTP-проверка (как приложение)
+        if: inputs.cmd == 'deploy' || inputs.cmd == 'http'
+        env: { P: '${{ secrets.KEYSTORE_PASS }}', TSK: '${{ secrets.TS_KEY }}' }
+        run: |
+          K="$TSK"; [ -n "$K" ] || K=$(printf %s "$P" | sha256sum | cut -c1-32)
+          U=https://fantasydrawingart--track-studio-ace-ace-web.us-east.modal.run
+          curl -s -o /dev/null -w "CORS preflight: %{http_code}\n" -X OPTIONS "$U/generate" -H "Origin: https://appassets.androidplatform.net" -H "Access-Control-Request-Method: POST" -H "Access-Control-Request-Headers: content-type,x-key" --max-time 600
+          curl -s -o /dev/null -w "без ключа: %{http_code}\n" -X POST "$U/generate" -H "Content-Type: application/json" -d '{}' --max-time 600
+          curl -s -o /tmp/h.mp3 -w "с ключом: %{http_code}, %{size_download} байт, %{time_total} с\n" -X POST "$U/generate" -H "Content-Type: application/json" -H "X-Key: $K" -H "Origin: https://appassets.androidplatform.net" \
+            -d '{"caption":"dreamy russian pop, female vocal in Russian","lyrics":"[Verse]\nГород спит, а я не сплю опять\n\n[Chorus]\nМы горим до утра","duration":30,"voice":1}' --max-time 900
