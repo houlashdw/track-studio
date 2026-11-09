@@ -1587,7 +1587,7 @@ function compose(spec) {
     const bRph = [];
     /* скольжение 808 (как в дрилле/трэпе): нота стартует с высоты прошлой и съезжает на свою; в дрилле часто и со скачком (квинта/октава) */
     const SLIDE = window.__noSlide ? 0 : { drill: .42, hoodtrap: .2, trap: .16, phonk: .16, rage: .18, plugg: .14, melancore: .12, jersey: .08 }[spec.style] || 0; let b8prev = null;
-    const bassFor = (ph, alt) => { const key = ph * 2 + (alt ? 1 : 0); if (bRph[key]) return bRph[key]; if (bassKind === '808' && spec.layers.kick) { const kp = phD(ph)[alt ? 'B' : 'A'].k, h = [], Rq = mulberry32((spec.seed + sec.idx * 17 + key * 29) >>> 0), on = []; for (let i = 0; i < 16; i++) if (kp[i] > 0) on.push(i); on.forEach((s0, j) => { const nx = j + 1 < on.length ? on[j + 1] : 16; h.push({ s: s0, len: clamp(nx - s0, 2, 8) * (.8 + .2 * Rq()), vel: .85 + .15 * kp[s0], g: Rq() < .22 }); }); if (h.length) return (bRph[key] = h); } return (bRph[key] = bassRhythm(bassKind, mulberry32((spec.seed + sec.idx * 211 + key * 53) >>> 0), spec.density, alt)); };
+    const bassFor = (ph, alt) => { const key = ph * 2 + (alt ? 1 : 0); if (bRph[key]) return bRph[key]; if (bassKind === '808' && spec.layers.kick) { const kp = phD(ph)[alt ? 'B' : 'A'].k, h = [], Rq = mulberry32((spec.seed + sec.idx * 17 + key * 29) >>> 0), on = []; for (let i = 0; i < 16; i++) if (kp[i] > 0 && (window.__b8old || !on.length || i - on[on.length - 1] >= 6 || Rq() < .3)) on.push(i); on.forEach((s0, j) => { const nx = j + 1 < on.length ? on[j + 1] : 16; h.push({ s: s0, len: clamp(nx - s0, 2, 12) * (.85 + .15 * Rq()), vel: .85 + .15 * kp[s0], g: Rq() < .22 }); });   /* 808 тянется через несколько киков, как у эталонов (до ~1 с) */ if (h.length) return (bRph[key] = h); } return (bRph[key] = bassRhythm(bassKind, mulberry32((spec.seed + sec.idx * 211 + key * 53) >>> 0), spec.density, alt)); };
     const arpPh = [];
     const arpFor = (ph) => arpPh[ph] || (arpPh[ph] = (() => {
       const Rp = mulberry32((spec.seed + sec.idx * 313 + ph * 71) >>> 0);
@@ -2416,8 +2416,8 @@ const VOICE = {
       const t = k / SR; let s = 0;
       if (is8) {
         const ff = e.sl ? f * 2 ** (e.sl / 12 * Math.exp(-t / .07)) : f * (e.g ? 1 + 1 * Math.exp(-t / .04) : 1 + .35 * Math.exp(-t / .012)); ph += ff / SR;   /* sl — скольжение с прошлой ноты */
-        const a = t < .006 ? t / .006 : t < Math.min(.1, dd * .2) ? .9 : .8 * Math.exp(-(t - Math.min(.1, dd * .2)) / (dd / 5));
-        s = Math.tanh(Math.sin(TAU * ph) * (k0 === '808d' ? 4.2 : 1.6)) * a * v * (k0 === '808d' ? .58 : .72);
+        const a = (t < .006 ? t / .006 : t < Math.min(.1, dd * .2) ? .9 : .8 * Math.exp(-(t - Math.min(.1, dd * .2)) / (dd / 2.6))) * (t > dd ? Math.max(0, 1 - (t - dd) / .09) : 1);   /* длиннее хвост, мягкий конец */
+        s = Math.tanh(Math.sin(TAU * ph) * (k0 === '808d' ? 4.2 : 2.2)) * a * v * (k0 === '808d' ? .58 : .68);   /* сатурация: гармоники до ~400 Гц — 808 слышно на телефоне */
       } else if (k0 === 'sub') {
         ph += f / SR; p2 += 2 * f / SR; s = (Math.sin(TAU * ph) * .85 + triW(p2 % 1) * .1) * v * susE(t, .01, d * .9, .1);
       } else if (k0 === 'reese') {
@@ -3519,14 +3519,24 @@ function tonalMatch(buf, style) {
   const key = TONAL_MAP[style]; if (!key || window.__noTonal || !buf || buf.length < 8192 * 4) return buf;
   const fs = buf.sampleRate, L = buf.getChannelData(0), R = buf.numberOfChannels > 1 ? buf.getChannelData(1) : L, m = new Float32Array(L.length);
   for (let i = 0; i < m.length; i++) m[i] = 0.5 * (L[i] + R[i]);
-  const cur = tonalBands(m, fs), tgt = TONAL[key], lim = [5, 4, 4, 4, 4, 4, 5, 6];
-  const g = cur.map((c, i) => clamp((tgt[i] - c) * 0.6, -lim[i], lim[i])), mean = g.reduce((p, q) => p + q, 0) / 8;
+  const cur = tonalBands(m, fs), tgt = TONAL[key], lim = [5, 4, 5, 6, 6, 6, 6, 6];
+  const g = cur.map((c, i) => clamp((tgt[i] - c) * 0.8, -lim[i], lim[i])), mean = g.reduce((p, q) => p + q, 0) / 8;
   const gg = g.map((x) => x - mean * 0.5), fl = [rbj('ls', 55, .7, gg[0], fs), rbj('pk', 100, 1, gg[1], fs), rbj('pk', 250, 1, gg[2], fs), rbj('pk', 630, 1, gg[3], fs), rbj('pk', 1700, 1, gg[4], fs), rbj('pk', 4200, 1, gg[5], fs), rbj('pk', 8500, 1, gg[6], fs), rbj('hs', 12000, .7, gg[7], fs)];
   const out = new AudioBuffer({ numberOfChannels: buf.numberOfChannels, length: buf.length, sampleRate: fs });
   for (let c = 0; c < buf.numberOfChannels; c++) { let y = buf.getChannelData(c); for (const q of fl) y = tmFilt(y, q); out.copyToChannel(y, c); }
   S.tonal = { key, cur: cur.map((x) => +x.toFixed(1)), gain: gg.map((x) => +x.toFixed(1)) };
   return out; }
 globalThis.tonalMatch = tonalMatch;
+/* ширина бита: сторона (S) выше ~300 Гц +db, низ остаётся в моно — эталоны ACE шире нашего примерно на 5 дБ */
+function msWiden(buf, db) {
+  if (!buf || buf.numberOfChannels < 2 || !db) return buf;
+  const o = new AudioBuffer({ length: buf.length, numberOfChannels: 2, sampleRate: buf.sampleRate }); o.copyToChannel(buf.getChannelData(0), 0); o.copyToChannel(buf.getChannelData(1), 1); buf = o;
+  const L = buf.getChannelData(0), R = buf.getChannelData(1), n = buf.length, g = Math.pow(10, db / 20) - 1, a = Math.exp(-2 * Math.PI * 300 / buf.sampleRate);
+  let lp = 0, lo = 0;
+  for (let i = 0; i < n; i++) { const S = (L[i] - R[i]) * .5; lp = (1 - a) * S + a * lp; lo = lp; const add = (S - lo) * g; L[i] += add; R[i] -= add; }
+  return buf;
+}
+globalThis.msWiden = msWiden;
 /* ===== Облако: ACE-Step 1.5 + дообученный голос vc2 на своём сервере (Modal). Трек целиком генерируется там; приложение шлёт промпт и текст, получает mp3.
    Ключ сервера хранится только на телефоне (localStorage), в коде его нет. */
 const CLOUD_URL = 'https://fantasydrawingart--track-studio-ace-ace-web.us-east.modal.run';
@@ -8567,7 +8577,7 @@ self.onmessage = async (e) => { const m = e.data; try {
   globalThis.applyFx = async function (raw) {
     const f = S.fx, vf = S.vfx;
     const sing = $q('#voiceMode').value !== 'off' && $q('#lyrics').value.trim() && S.track && !S.instrOnly;
-    if (fxNeutral() && !sing && !(S.fix && S.fix.active)) { S.spd = 1; $q('#fxState').textContent = ''; try { if (!(S._tonC && S._tonC.src === raw)) S._tonC = { src: raw, out: globalThis.tonalMatch(raw, S.spec && S.spec.style) }; return S._tonC.out; } catch (e) { return raw; } }
+    if (fxNeutral() && !sing && !(S.fix && S.fix.active)) { S.spd = 1; $q('#fxState').textContent = ''; try { if (!(S._tonC && S._tonC.src === raw)) S._tonC = { src: raw, out: globalThis.msWiden(globalThis.tonalMatch(raw, S.spec && S.spec.style), 4) }; return S._tonC.out; } catch (e) { return raw; } }
     setStatus('Обрабатываю звук…', null, true); await new Promise((r) => setTimeout(r, 20));
     let music = raw;
     if (sing) { setStatus('Пересобираю музыку под голос…', 0.2, true); try { music = await ensureBacking((p) => setStatus('Музыка под голос…', 0.2 + p * 0.5, true)); } catch (e) { console.warn('backing', e); music = raw; } }
@@ -8575,7 +8585,7 @@ self.onmessage = async (e) => { const m = e.data; try {
     const L = music.length + Math.max(tailB, tailV);
     setStatus('Шина бита…', 0.75, true);
     const bk = JSON.stringify([f.rev, f.room, f.muffle, f.bass, f.dist, L]); let base;
-    if (S._bbC && S._bbC.src === music && S._bbC.k === bk) base = S._bbC.out; else { base = padTo(await beatBus(music, f, L), L); try { base = globalThis.tonalMatch(base, S.spec && S.spec.style); } catch (e) { console.warn('tonal', e); } S._bbC = { src: music, k: bk, out: base }; }
+    if (S._bbC && S._bbC.src === music && S._bbC.k === bk) base = S._bbC.out; else { base = padTo(await beatBus(music, f, L), L); try { base = globalThis.tonalMatch(base, S.spec && S.spec.style); base = globalThis.msWiden(base, 4); } catch (e) { console.warn('tonal', e); } S._bbC = { src: music, k: bk, out: base }; }
     if (sing) {
       const vox = await getVox(raw);
       setStatus('Шина голоса: подгон под трек…', 0.85, true);
