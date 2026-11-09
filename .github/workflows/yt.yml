@@ -1,0 +1,36 @@
+name: yt
+# биты «free for profit» с YouTube → закрытый датасет Kaggle (для дообучения ACE-Step) + зашифрованная копия в ветке yt-out
+on:
+  workflow_dispatch:
+    inputs:
+      n: { description: 'битов на жанр', default: '2' }
+      genres: { description: 'жанры через запятую', default: 'trap,drill' }
+      slug: { default: 'ts-beats' }
+      owner: { default: 'emethscacute' }
+permissions: { contents: write }
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v4
+      - name: Скачивание
+        env: { GENRES: '${{ inputs.genres }}' }
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg > /dev/null
+          pip install -q -U yt-dlp
+          python tools/yt/grab.py d ${{ inputs.n }}
+          ls d | wc -l; du -sh d
+      - name: Kaggle
+        env: { KAGGLE_USERNAME: '${{ secrets.KAGGLE_USERNAME }}', KK: '${{ secrets.KAGGLE_KEY }}' }
+        run: |
+          pip install -q -U kaggle; export KAGGLE_KEY="$KK"; case "$KK" in KGAT*) export KAGGLE_API_TOKEN="$KK";; esac
+          U="${{ inputs.owner }}"
+          echo "{\"title\": \"${{ inputs.slug }}\", \"id\": \"$U/${{ inputs.slug }}\", \"licenses\": [{\"name\": \"other\"}]}" > d/dataset-metadata.json
+          (kaggle datasets create -p d -q 2>&1 || kaggle datasets version -p d -m upd -q 2>&1) | tail -3
+      - name: В ветку
+        env: { P: '${{ secrets.KEYSTORE_PASS }}' }
+        run: |
+          tar cf b.tar d && mkdir out && openssl enc -aes-256-cbc -pbkdf2 -iter 200000 -salt -in b.tar -out out/beats.tar.enc -pass env:P && split -b 90m out/beats.tar.enc out/beats.tar.enc. && rm out/beats.tar.enc
+          cd out && git init -q -b yt-out && git config user.name gha && git config user.email gha@users.noreply.github.com
+          git add -A && git commit -q -m "yt ${{ github.run_number }}" && git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" yt-out
