@@ -9,3 +9,5 @@
 - @4EVRX CAST A SPELL 300 kit
 Ходы аккордов и ритмы мелодий выведены из MIDI «BLACKOUT» by @ogwaxtri — credit: @ogwaxtri.
 - Удары *_ace_*: вырезаны из инструменталов, сгенерированных ACE-Step 1.5 (MIT) на своём сервере — свободны для использования
+
+- Бесплатные трэп-киты с soundpacks.com (Supreme Beat Kit, Trippy Nation by Beatsmith, APlus Drum Kit, TSK) и Free 808 Producer Kit (github.com/GareBear99) — нарезаны в one-shot'ы, только для личного использования в этом приложении

@@ -2406,9 +2406,19 @@ const VOICE = {
   },
   bass(e) {
     const f = midiToFreq(e.m), d = e.d, v = e.v, k0 = e.k, sp = CFG.spec;
-    if (CFG.X.eng.bass === 'gen') { genNote('bass', f, Math.max(.08, d), v, CFG.X.gen.bass, e); return; }
+    if (CFG.X.eng.bass === 'gen' && !(CFG.sk && CFG.sk.b808 && (k0 === '808' || k0 === '808d'))) { genNote('bass', f, Math.max(.08, d), v, CFG.X.gen.bass, e); return; }
     const open = 380 + sp.energy * 1500 + sp.grit * 600;
     const is8 = k0 === '808' || k0 === '808d'; const dd = is8 ? Math.max(.35, Math.min(2.2, d * 1.05)) : d;
+    if (is8 && CFG.sk && CFG.sk.b808 && !e.syn) {   /* живой 808 из кита: сэмпл, транспонированный в ноту, со слайдом */
+      const B = CFG.sk.b808, pcm = B.pcm, base = f / B.hz, n = Math.floor((dd + .07) * SR); scratch(n); let pos = 0; const g = v * .7 * (B.g || 1);
+      for (let k = 0; k < n; k++) {
+        const t = k / SR, i0 = pos | 0; if (i0 >= pcm.length - 1) break; const fr = pos - i0;
+        const env = (t < .002 ? t / .002 : 1) * (t > dd ? Math.max(0, 1 - (t - dd) / .06) : 1);
+        T[k] = (pcm[i0] * (1 - fr) + pcm[i0 + 1] * fr) * env * g;
+        pos += e.sl ? base * 2 ** (e.sl / 12 * Math.exp(-t / .07)) : e.g ? base * (1 + .6 * Math.exp(-t / .05)) : base;
+      }
+      commit('bass', e.t, n); return;
+    }
     const n = Math.floor((dd + .25) * SR); scratch(n);
     let ph = 0, p2 = 0, p3 = 0, ph2 = 0; const q = new BQ(); let lf = 0; const lfoF = .2 + RND() * .6; const WOB = [.5, 1, 1.5, 2, 3][Math.floor(RND() * 5)];
     const susE = (t, a, hold, rel) => t < a ? t / a : t < hold ? 1 - .15 * ((t - a) / Math.max(.01, hold - a)) : Math.max(0, 1 - (t - hold) / rel) ** 2 * .85;
@@ -2919,7 +2929,7 @@ const SKIT = (() => {
   }
   const ready = (ms) => Promise.race([load(), new Promise((r) => setTimeout(() => r(0), ms || 2000))]);
   /* какой шанс у жанра на живые ударные; «жёсткие» жанры держат свою синт-бочку */
-  const P = { trap: .8, plugg: .8, hoodtrap: .8, drill: .8, phonk: .8, rage: .75, melancore: .8, jersey: .8, lofi: .85, jpop: .65, house: .6, techno: .5, synthwave: .5, dnb: .55, glitch: .6, dub: .6, dubstep: .5, trance: .45, cinematic: .4, ambient: .35, industrial: .4, hardstyle: .5, hardtekk: .5, jumpstyle: .5, gabber: .4 };
+  const P = { trap: 1, plugg: 1, hoodtrap: 1, drill: 1, phonk: 1, rage: 1, melancore: 1, jersey: 1, lofi: .85, jpop: .65, house: .6, techno: .5, synthwave: .5, dnb: .55, glitch: .6, dub: .6, dubstep: .5, trance: .45, cinematic: .4, ambient: .35, industrial: .4, hardstyle: .5, hardtekk: .5, jumpstyle: .5, gabber: .4 };
   const HARD = new Set(['hardstyle', 'hardtekk', 'jumpstyle', 'gabber']);
   function pick(spec) {
     if (!st.idx || window.__noSK || (spec.feat && spec.feat.noSK)) return null;
@@ -2931,6 +2941,21 @@ const SKIT = (() => {
       const it = L[Math.floor(R() * L.length)]; let r = 2 ** ((R() * 2 - 1) * 1.5 / 12);
       if (it.hz && c === 'kick') { const m = 69 + 12 * Math.log2(it.hz / 440), k = ((spec.key % 12) + 12) % 12; let d = (((k - m) % 12) + 12) % 12; if (d > 6) d -= 12; r = 2 ** (Math.max(-5, Math.min(5, d)) / 12); }   /* бочка в тональность трека */
       return { pcm: st.pcm[it.f], f: it.f, r, fam: it.fam || '' }; };
+    /* киты из интернета (kits.json): для трэп-семьи берём один кит целиком — бочка, снейр, клэп, хэты и 808 звучат как набор */
+    const NEW = new Set(['supreme', 'tsk', 'trippy', 'aplus', 'free808']);
+    const kitOf = (c, src) => (st.idx[c] || []).filter((it) => st.pcm[it.f] && it.src === src);
+    if (fam === 'trap' && !window.__oldKit) {
+      const srcs = [...NEW].filter((k) => kitOf('kick', k).length && kitOf('snare', k).length + kitOf('clap', k).length && kitOf('hat', k).length);
+      if (srcs.length) {
+        const src = srcs[Math.floor(R() * srcs.length)];
+        const pk = (c, alt) => { let L = kitOf(c, src); if (!L.length && alt) L = (st.idx[c] || []).filter((it) => st.pcm[it.f] && NEW.has(it.src)); if (!L.length) return null; const it = L[Math.floor(R() * L.length)];
+          let r = 1; if (it.hz && c === 'kick') { const m = 69 + 12 * Math.log2(it.hz / 440), k = ((spec.key % 12) + 12) % 12; let d = (((k - m) % 12) + 12) % 12; if (d > 6) d -= 12; r = 2 ** (Math.max(-4, Math.min(4, d)) / 12); }
+          return { pcm: st.pcm[it.f], f: it.f, r, fam: 'trap', hz: it.hz || 0 }; };
+        const sk = { kick: pk('kick'), snare: pk('snare') || pk('clap'), clap: pk('clap') || pk('snare'), hat: pk('hat'), ohat: pk('ohat', 1) || pk('hat'), b808: pk('808', 1) };
+        if (sk.b808 && !(sk.b808.hz > 25 && sk.b808.hz < 230)) sk.b808 = null;
+        sk.name = 'кит ' + src + ': ' + Object.entries(sk).filter(([k, v]) => v && v.f).map(([k, v]) => k + ':' + v.f.replace(/\.ogg$/, '')).join(' '); return sk;
+      }
+    }
     const sk = { kick: one('kick', HARD.has(spec.style) ? .75 : .85), snare: one('snare', .9), clap: one('clap', .9), hat: one('hat', .8), ohat: one('ohat', .8) };
     const parts = Object.entries(sk).filter(([k, v]) => v).map(([k, v]) => k + ':' + v.f.replace(/\.ogg$/, ''));
     if (!parts.length) return null; sk.name = parts.join(' '); return sk;
