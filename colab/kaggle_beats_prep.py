@@ -13,8 +13,8 @@ DESC = {'trap': 'dark melodic trap beat, heavy 808, rolling hi-hats, hard kick, 
         'pluggnb': 'pluggnb beat, smooth chords, bouncy 808, melodic', 'detroit': 'detroit trap beat, hard punchy drums, bouncy 808, piano loop',
         'atlanta': 'Atlanta trap beat, hard 808, rolling triplet hi-hats, dark synths', 'lofi': 'lofi hip hop beat, dusty drums, warm keys, vinyl crackle'}
 files = [f'{src}/{m["file"]}' for m in meta.values() if os.path.exists(f'{src}/{m["file"]}')]
-open('/tmp/list.txt', 'w').write('\n'.join(files))
-sh(f'cd /tmp && {sys.executable} -m demucs --two-stems vocals -n htdemucs --mp3 --mp3-bitrate 192 -o /tmp/sep $(cat /tmp/list.txt | sed "s/.*/\\"&\\"/" | tr "\\n" " ")')
+for i in range(0, len(files), 40):
+    subprocess.run([sys.executable, '-m', 'demucs', '--two-stems', 'vocals', '-n', 'htdemucs', '--mp3', '--mp3-bitrate', '192', '-o', '/tmp/sep'] + files[i:i + 40])
 out = []
 NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
 MAJ = np.array([6.35, 2.23, 3.48, 2.33, 4.38, 4.09, 2.52, 5.19, 2.39, 3.66, 2.29, 2.88]); MIN = np.array([6.33, 2.68, 3.52, 5.38, 2.6, 3.53, 2.54, 4.75, 3.98, 2.69, 3.34, 3.17])
