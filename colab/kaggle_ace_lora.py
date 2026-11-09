@@ -11,7 +11,7 @@ R = '/tmp/ace'; RAW = 'https://raw.githubusercontent.com/houlashdw/track-studio'
 EPOCHS = os.environ.get('EPOCHS', '300'); EVERY = os.environ.get('EVERY', '50'); LR = os.environ.get('LR', '0.03'); ADT = os.environ.get('ADT', 'lokr')
 VARIANT = os.environ.get('VARIANT', 'turbo'); GEN_TASK = os.environ.get('GEN_TASK', 'text2music')
 GEN_LM = os.environ.get('GEN_LM', '0') == '1'; ALLCK = os.environ.get('ALLCK', '0') == '1'; TLIM = int(os.environ.get('TLIM', str(5 * 3600)))
-TAG = 'vc2'
+TAG = os.environ.get('TAG', 'vc2')
 
 
 def sh(c, check=True, env=None):
@@ -51,7 +51,7 @@ for AD in ADS:
             p = GenerationParams(task_type='lego', src_audio=f'/tmp/beats/{name}.mp3', instruction='Generate the vocals track based on the audio context:',
                                  caption='vc2, female vocal in Russian, ' + cap, lyrics=lyr, bpm=bpm, vocal_language='ru', repainting_start=0.0, repainting_end=-1, inference_steps=50, seed=101)
         else:
-            p = GenerationParams(task_type='text2music', thinking=USE_LM, caption='vc2, ' + cap, lyrics=lyr, bpm=bpm, duration=110, vocal_language='ru', seed=11,
+            TG = os.environ.get('TAG', 'vc2'); p = GenerationParams(task_type='text2music', thinking=USE_LM, caption=TG + ', ' + cap, lyrics=lyr, bpm=bpm, duration=110 if TG == 'vc2' else 75, vocal_language='ru' if TG == 'vc2' else 'unknown', seed=11,
                                  inference_steps=8 if VAR == 'turbo' else 50, shift=3.0 if VAR == 'turbo' else 1.0)
         r = generate_music(dit, lm, p, GenerationConfig(batch_size=1, audio_format='mp3', mp3_bitrate='192k', use_random_seed=False), save_dir='/tmp/ace_gen')
         if r.success and r.audios:
@@ -85,6 +85,7 @@ if __name__ == '__main__':
             sh(f'wget -q -O /tmp/t.enc {RAW}/vprep-in/ace_ds/vc2_{i:02d}.mp3.enc'); dec('/tmp/t.enc', f'{A}/vc2_{i:02d}.mp3', P)
         sh(f'wget -q -O /tmp/ds.enc {RAW}/annot-out/dataset.json.enc'); dec('/tmp/ds.enc', '/tmp/ds_raw.json', P)
         ds = json.load(open('/tmp/ds_raw.json'))
+    ds['samples'] = [s for s in ds['samples'] if os.path.exists(f"{A}/{s['filename']}")]
     for s in ds['samples']:
         s['audio_path'] = f"{A}/{s['filename']}"; s['custom_tag'] = TAG; s['bpm'] = int(s.get('bpm') or 0) or None
     ds['metadata'] = {'custom_tag': TAG, 'tag_position': 'prepend', 'genre_ratio': 0}
@@ -108,12 +109,17 @@ if __name__ == '__main__':
     if not cands: raise SystemExit('обучение не сохранило ни одного адаптера — смотри лог выше')
     AD = cands[0]
     for d in (cands if ALLCK else cands[:1]):   # выход ноутбука закрытый; в GitHub он уходит зашифрованным
-        shutil.make_archive(WORK + '/vc2_' + ADT + '_' + os.path.basename(d).split('_loss')[0], 'zip', d)
+        shutil.make_archive(WORK + '/' + TAG + '_' + ADT + '_' + os.path.basename(d).split('_loss')[0], 'zip', d)
     # 4) пробные песни с дообученной моделью (те же 4 текста, что в пробе базовой модели)
     sh(f'wget -q -O /tmp/kace.py {RAW}/main/colab/kaggle_ace.py')
     import importlib.util
     sp = importlib.util.spec_from_file_location('kace', '/tmp/kace.py'); k = importlib.util.module_from_spec(sp); sp.loader.exec_module(k)
-    json.dump(k.SONGS, open('/tmp/ace_songs.json', 'w'), ensure_ascii=False)
+    SONGS = k.SONGS
+    if TAG != 'vc2':   # биты: по одному инструменталу на жанр из разметки
+        seen = {}
+        for s_ in ds['samples']: seen.setdefault(s_.get('genre', 'beat'), s_)
+        SONGS = [(g, s_['caption'], s_['bpm'] or 140, '[Instrumental]') for g, s_ in seen.items()]
+    json.dump(SONGS, open('/tmp/ace_songs.json', 'w'), ensure_ascii=False)
     open(R + '/gen_lora.py', 'w').write(GEN)
     ads = sorted([d for d in cands if 'epoch_' in d], key=lambda d: int(d.split('epoch_')[1].split('_')[0])) if ALLCK else [AD]
     if GEN_TASK == 'lego':
