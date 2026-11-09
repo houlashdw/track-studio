@@ -33,7 +33,7 @@ for f in files:
         if len(w) < 512: continue
         F = np.abs(np.fft.rfft(w * np.hanning(len(w)))) ** 2; fq = np.fft.rfftfreq(len(w), 1 / SR)
         lo, md, hi = F[(fq > 30) & (fq < 150)].sum(), F[(fq > 180) & (fq < 2500)].sum(), F[fq > 6000].sum(); tot = lo + md + hi + 1e-12
-        c = 'kick' if lo / tot > .7 else 'hat' if hi / tot > .6 and md / tot < .25 else 'snare' if md / tot > .45 and lo / tot < .3 else None
+        c = 'kick' if lo / tot > float(os.environ.get('KLO', '.55')) else 'hat' if hi / tot > .6 and md / tot < .25 else 'snare' if md / tot > .45 and lo / tot < .3 else None
         if not c: continue
         nxt = on[i + 1] - t if i + 1 < len(on) else 9; prv = t - on[i - 1] if i else 9
         if nxt < LEN[c] * .85 or prv < .1: continue
@@ -46,9 +46,10 @@ for f in files:
     yb, _ = librosa.load(dd + '/bass.wav', sr=SR, mono=True); ob = librosa.onset.onset_detect(y=yb, sr=SR, units='time', delta=0.1, backtrack=True); got = 0
     for i, t in enumerate(ob):
         nxt = ob[i + 1] - t if i + 1 < len(ob) else 9
-        if nxt < 1.4 or got >= 1: continue
+        if nxt < 1.0 or got >= 2: continue
         a = int(t * SR); seg = yb[max(0, a - 64): a + int(min(nxt, 2.8) * SR)].copy()
-        if len(seg) < int(1.3 * SR) or np.abs(seg).max() < .05: continue
+        if len(seg) < int(.9 * SR) or np.abs(seg).max() < .05: continue
         h = f0(seg)
-        if 28 < h < 120: save(seg, '808', b, {'hz': round(h, 1)}); got += 1
+        if 28 < h < 160: save(seg, '808', b, {'hz': round(h, 1)}); got += 1
 json.dump(idx, open(W + '/kits.json', 'w'), ensure_ascii=False, indent=0); print({c: len(v) for c, v in idx.items()})
+subprocess.run(['tar', 'czf', '/kaggle/working/kit.tgz', '-C', '/kaggle/working', 'kit'], check=True)   # выгрузка берёт только файлы верхнего уровня
