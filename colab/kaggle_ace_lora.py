@@ -77,6 +77,7 @@ if __name__ == '__main__':
     for _i in range(6):
         if sh(f'cd {R} && {sys.executable} -m uv sync -q', check=False) == 0: break
         print('uv sync не прошёл, повтор', _i, flush=True); time.sleep(30)
+    os.environ['UV_NO_SYNC'] = '1'; os.environ['UV_FROZEN'] = '1'   # не перерешать зависимости при каждом uv run (GitHub 504)
     UV = f'cd {R} && MPLBACKEND=Agg {sys.executable} -m uv run python'
     # 1) данные: 10 треков vc2 + разметка Gemini (текст с метками частей, описание, bpm, тональность)
     A = R + '/al_data/audio'; os.makedirs(A, exist_ok=True)
