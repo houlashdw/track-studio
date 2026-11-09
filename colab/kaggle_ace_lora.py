@@ -73,7 +73,8 @@ if __name__ == '__main__':
     if not P and not KIN: raise SystemExit('нет данных: ни датасета Kaggle, ни пароля (Add-ons → Secrets → KEYSTORE_PASS)')
     sh('nvidia-smi --query-gpu=name,memory.total --format=csv || true')
     if not os.path.isdir(R): sh(f'git clone -q --depth 1 https://github.com/ACE-Step/ACE-Step-1.5.git {R}')
-    sh(f'{sys.executable} -m pip install -q uv'); for _i in range(6):
+    sh(f'{sys.executable} -m pip install -q uv')
+    for _i in range(6):
         if sh(f'cd {R} && {sys.executable} -m uv sync -q', check=False) == 0: break
         print('uv sync не прошёл, повтор', _i, flush=True); time.sleep(30)
     UV = f'cd {R} && MPLBACKEND=Agg {sys.executable} -m uv run python'
