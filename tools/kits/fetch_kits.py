@@ -17,10 +17,20 @@ SR = 44100
 
 def get(url, dst):
     if 'mediafire.com' in url:
-        html = urllib.request.urlopen(urllib.request.Request(url, headers=UA), timeout=60).read().decode('utf-8', 'ignore')
-        m = re.search(r'href="(https?://download[^"]+)"', html)
-        if not m: raise RuntimeError('нет прямой ссылки MediaFire')
-        url = m.group(1)
+        qk = url.split('?')[-1]; direct = None
+        for api in [f'https://www.mediafire.com/api/1.5/file/get_links.php?quick_key={qk}&link_type=direct_download&response_format=json',
+                    f'https://www.mediafire.com/api/1.4/file/get_links.php?quick_key={qk}&link_type=direct_download&response_format=json']:
+            try:
+                j = json.loads(subprocess.run(['curl', '-sL', '-A', UA['User-Agent'], api], capture_output=True, text=True, timeout=60).stdout)
+                direct = j['response']['links'][0].get('direct_download'); print('api', bool(direct), flush=True)
+                if direct: break
+            except Exception as e: print('api ⚠', e, flush=True)
+        if not direct:
+            html = subprocess.run(['curl', '-sL', '-A', UA['User-Agent'], '-H', 'Accept: text/html', '-H', 'Accept-Language: en-US,en', f'https://www.mediafire.com/file/{qk}'], capture_output=True, text=True, timeout=60).stdout
+            m = re.search(r'href="(https?://download[^"]+)"', html); print('page', len(html), bool(m), html[:200].replace('\n', ' '), flush=True)
+            direct = m and m.group(1)
+        if not direct: raise RuntimeError('нет прямой ссылки MediaFire')
+        subprocess.run(['curl', '-sL', '-A', UA['User-Agent'], '-o', dst, direct], check=True, timeout=900); return
     with urllib.request.urlopen(urllib.request.Request(url, headers=UA), timeout=600) as r, open(dst, 'wb') as f:
         while True:
             b = r.read(1 << 20)
