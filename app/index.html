@@ -2942,12 +2942,12 @@ const SKIT = (() => {
       if (it.hz && c === 'kick') { const m = 69 + 12 * Math.log2(it.hz / 440), k = ((spec.key % 12) + 12) % 12; let d = (((k - m) % 12) + 12) % 12; if (d > 6) d -= 12; r = 2 ** (Math.max(-5, Math.min(5, d)) / 12); }   /* бочка в тональность трека */
       return { pcm: st.pcm[it.f], f: it.f, r, fam: it.fam || '' }; };
     /* киты из интернета (kits.json): для трэп-семьи берём один кит целиком — бочка, снейр, клэп, хэты и 808 звучат как набор */
-    const NEW = new Set(['trap', 'supreme', 'tsk', 'trippy', 'aplus', 'free808']);   /* trap — твой кит DETROIT */
+    const NEW = new Set(['trap', 'supreme', 'tsk', 'trippy', 'aplus', 'free808', 'tsai']);   /* trap — твой кит DETROIT */
     const kitOf = (c, src) => (st.idx[c] || []).filter((it) => st.pcm[it.f] && it.src === src);
     if (fam === 'trap' && !window.__oldKit) {
       const srcs = [...NEW].filter((k) => kitOf('kick', k).length && kitOf('snare', k).length + kitOf('clap', k).length && kitOf('hat', k).length);
       if (srcs.length) {
-        const src = srcs.includes('trap') && R() < .5 ? 'trap' : srcs[Math.floor(R() * srcs.length)];   /* твой DETROIT — в половине треков */
+        const src = window.__kitSrc && srcs.includes(window.__kitSrc) ? window.__kitSrc : srcs.includes('trap') && R() < .5 ? 'trap' : srcs[Math.floor(R() * srcs.length)];   /* твой DETROIT — в половине треков */
         const pk = (c, alt) => { let L = kitOf(c, src); if (!L.length && alt) L = (st.idx[c] || []).filter((it) => st.pcm[it.f] && NEW.has(it.src)); if (!L.length) return null; const it = L[Math.floor(R() * L.length)];
           let r = 1; if (it.hz && c === 'kick') { const m = 69 + 12 * Math.log2(it.hz / 440), k = ((spec.key % 12) + 12) % 12; let d = (((k - m) % 12) + 12) % 12; if (d > 6) d -= 12; r = 2 ** (Math.max(-4, Math.min(4, d)) / 12); }
           return { pcm: st.pcm[it.f], f: it.f, r, fam: 'trap', hz: it.hz || 0 }; };
