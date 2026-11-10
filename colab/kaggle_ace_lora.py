@@ -97,6 +97,18 @@ if __name__ == '__main__':
             if os.path.getsize('/tmp/crop.mp3') > 100000: shutil.move('/tmp/crop.mp3', f)
     for s in ds['samples']:
         s['audio_path'] = f"{A}/{s['filename']}"; s['custom_tag'] = TAG; s['bpm'] = int(s.get('bpm') or 0) or None
+    CAPS = {'rage': 'rage beat, hyper aggressive distorted supersaw synth lead, blown-out distorted 808, fast hi-hats, energetic, dark futuristic',
+            'plugg': 'plugg beat, airy dreamy bells and soft synth melody, smooth bouncy 808, sparse drums, triplet hi-hats, mellow half-time feel',
+            'phonk': 'drift phonk beat, loud cowbell melody, heavily distorted 808, memphis drum samples, aggressive'}
+    if os.environ.get('GTAG') == '1':   # своя метка у каждого жанра + перевес слабых жанров копиями
+        OV = dict(x.split(':') for x in os.environ.get('OVERS', '').split(',') if ':' in x); extra = []
+        for s in ds['samples']:
+            g = s.get('genre', 'beat'); s['custom_tag'] = f'{TAG} {g}'
+            if g in CAPS: s['caption'] = CAPS[g] + ', instrumental, no vocals, free for profit type beat'
+            for k in range(int(OV.get(g, 1)) - 1):
+                fn = s['filename'].replace('.mp3', f'_d{k}.mp3'); shutil.copy(s['audio_path'], f'{A}/{fn}')
+                extra.append(dict(s, filename=fn, audio_path=f'{A}/{fn}'))
+        ds['samples'] += extra
     ds['metadata'] = {'custom_tag': TAG, 'tag_position': 'prepend', 'genre_ratio': 0}
     json.dump(ds, open('/tmp/ds.json', 'w'), ensure_ascii=False, indent=1)
     print('песен в разметке:', len(ds['samples']), flush=True)
@@ -128,6 +140,7 @@ if __name__ == '__main__':
         seen = {}
         for s_ in ds['samples']: seen.setdefault(s_.get('genre', 'beat'), s_)
         SONGS = [(g, s_['caption'], s_['bpm'] or 140, '[Instrumental]') for g, s_ in seen.items()]
+        if os.environ.get('GTAG') == '1': SONGS = [(g, g + ', ' + c, b, l) for g, c, b, l in SONGS]   # → «tsbeat rage, …»
     json.dump(SONGS, open('/tmp/ace_songs.json', 'w'), ensure_ascii=False)
     open(R + '/gen_lora.py', 'w').write(GEN)
     ads = sorted([d for d in cands if 'epoch_' in d], key=lambda d: int(d.split('epoch_')[1].split('_')[0])) if ALLCK else [AD]
