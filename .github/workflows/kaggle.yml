@@ -53,6 +53,6 @@ jobs:
           kaggle kernels output "$K" -p raw || true
           ls -la raw
           tail -c 6000 raw/*.log 2>/dev/null | tr -d '\r' | tail -60 || true
-          cd raw && for f in *; do [ -f "$f" ] && openssl enc -aes-256-cbc -pbkdf2 -iter 200000 -salt -in "$f" -out "../out/$f.enc" -pass env:P; done; cd ../out
+          cd raw && find . -maxdepth 1 -type f -size +95M -print -delete; for f in *; do [ -f "$f" ] && openssl enc -aes-256-cbc -pbkdf2 -iter 200000 -salt -in "$f" -out "../out/$f.enc" -pass env:P; done; cd ../out
           git init -q -b kaggle-out && git config user.name gha && git config user.email gha@users.noreply.github.com
           git add -A && git commit -q -m "kaggle ${{ inputs.slug }} ${{ github.run_number }}" && git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" kaggle-out
