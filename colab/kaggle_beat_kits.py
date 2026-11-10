@@ -7,7 +7,7 @@ import numpy as np, librosa, soundfile as sf
 PAT = os.environ.get('PAT', '*.mp3'); MAXF = int(os.environ.get('MAXF', '120'))
 files = sorted(f for f in glob.glob('/kaggle/input/**/' + PAT, recursive=True) if 'no_vocals' not in f)[:MAXF]
 print('файлов', len(files), flush=True)
-for i in range(0, len(files), 30): subprocess.run([sys.executable, '-m', 'demucs', '-n', 'htdemucs', '-o', '/tmp/sep'] + files[i:i + 30])
+for i in range(0, len(files), 30): subprocess.run([sys.executable, '-m', 'demucs', '-n', os.environ.get('DMODEL', 'htdemucs_ft'), '-o', '/tmp/sep'] + files[i:i + 30])
 LEN = {'kick': .55, 'snare': .45, 'hat': .16}; per = collections.Counter(); idx = collections.defaultdict(list); CAP = int(os.environ.get('CAP', '2'))
 
 
@@ -24,7 +24,7 @@ def f0(x):
 
 
 for f in files:
-    b = os.path.splitext(os.path.basename(f))[0]; dd = f'/tmp/sep/htdemucs/{b}'
+    b = os.path.splitext(os.path.basename(f))[0]; dd = f"/tmp/sep/{os.environ.get('DMODEL', 'htdemucs_ft')}/{b}"
     if not os.path.exists(dd + '/drums.wav'): continue
     y, _ = librosa.load(dd + '/drums.wav', sr=SR, mono=True)
     on = librosa.onset.onset_detect(y=y, sr=SR, hop_length=512, units='time', delta=0.08, backtrack=True); cand = []
@@ -38,7 +38,11 @@ for f in files:
         nxt = on[i + 1] - t if i + 1 < len(on) else 9; prv = t - on[i - 1] if i else 9
         if nxt < LEN[c] * .85 or prv < .1: continue
         seg = y[max(0, a - int(.004 * SR)): a + int(LEN[c] * SR)].copy()
-        if len(seg) >= int(LEN[c] * SR * .9): cand.append((float(np.abs(seg).max()), c, seg))
+        if len(seg) >= int(LEN[c] * SR * .9):
+            p = int(np.argmax(np.abs(seg[:int(.05 * SR)]))); seg = seg[max(0, p - int(.002 * SR)):][:int(LEN[c] * SR)]   # старт по пику
+            tt = np.arange(len(seg)) / SR; seg = seg * np.exp(-np.maximum(0, tt - .015) / {'kick': .16, 'snare': .09, 'hat': .03}[c])   # убрать хвост/протечку
+            r = np.sqrt((seg[int(.6 * len(seg)):] ** 2).mean()) / (np.sqrt((seg ** 2).mean()) + 1e-9)
+            cand.append((float(np.abs(seg).max()) * (1 - min(r, .9)), c, seg))   # громко и чисто
     for c in LEN:
         for amp, _, seg in sorted([x for x in cand if x[1] == c], key=lambda x: -x[0])[:CAP]:
             save(seg, c, b, {'hz': round(f0(seg), 1)} if c == 'kick' else None)
