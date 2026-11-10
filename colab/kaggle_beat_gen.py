@@ -20,6 +20,14 @@ def sh(c, check=True):
     print('$', c, flush=True); return subprocess.run(c, shell=True, check=check).returncode
 
 
+COVER = [float(x) for x in os.environ.get('COVER', '').split(',') if x]   # сила референса: 0.3 — только стиль, 0.7 — близко к оригиналу
+REFS = {}
+if COVER:
+    for g in GEN:
+        rs = sorted(glob.glob(f'/kaggle/input/**/ds/{g}_*.mp3', recursive=True))[:8]; REFS[g] = []
+        for k, f in enumerate(rs[:int(os.environ.get('NSEED', '1'))]):
+            o = f'/tmp/ref_{g}_{k}.mp3'; subprocess.run(['ffmpeg', '-v', 'error', '-y', '-ss', '30', '-t', '40', '-i', f, '-b:a', '192k', o]); REFS[g].append(o)
+    print('референсы:', REFS, flush=True)
 zs = sorted(glob.glob('/kaggle/input/**/*lokr*.zip', recursive=True) + glob.glob('/kaggle/input/**/*lora*.zip', recursive=True))
 print('адаптеры:', zs, flush=True)
 if not zs: raise SystemExit('нет адаптера во входе')
@@ -47,15 +55,18 @@ G = {json.dumps(G)}; GT = {os.environ.get('GTAG') == '1'}
 for gi, g in enumerate({GEN!r}):
     cap, bpm, key = G[g]
     for sd in range({NS}):
-     for sc in {SCALES!r}:
-        print(dit.set_lora_scale(sc), flush=True)
-        p = GenerationParams(task_type='text2music', caption=((('tsbeat ' + g + ', ') if GT else 'tsbeat, ') if sc > 0 else '') + cap + ', instrumental', lyrics='[Instrumental]', bpm=bpm, keyscale=key,
+     for sc in ({COVER!r} or {SCALES!r}):
+        CV = {COVER!r}; REFS = {REFS!r}
+        if CV and not REFS.get(g, [])[sd:sd + 1]: continue
+        print(dit.set_lora_scale(1.0 if CV else sc), flush=True)
+        kw = dict(task_type='cover', src_audio=REFS[g][sd], audio_cover_strength=sc) if CV else dict(task_type='text2music')
+        p = GenerationParams(**kw, caption=((('tsbeat ' + g + ', ') if GT else 'tsbeat, ') if (sc > 0 or CV) else '') + cap + ', instrumental', lyrics='[Instrumental]', bpm=bpm, keyscale=key,
                              duration=60, vocal_language='unknown', seed=1000 + 37 * gi + 101 * sd, inference_steps=8, shift=3.0)
         r = generate_music(dit, lm, p, GenerationConfig(batch_size=1, audio_format='mp3', mp3_bitrate='192k', use_random_seed=False), save_dir='/tmp/g')
         if r.success and r.audios:
-            d = '{W}/gen_%s_%d_s%02d.mp3' % (g, sd, int(sc * 10)); shutil.copy(r.audios[0]['path'], d); print('OK', d, flush=True)
+            d = '{W}/%s_%s_%d_s%02d.mp3' % ('cov' if CV else 'gen', g, sd, int(sc * 10)); shutil.copy(r.audios[0]['path'], d); print('OK', d, flush=True)
         else: print('FAIL', g, sc, getattr(r, 'error', ''), flush=True)
 '''
 open(R + '/gen_beats.py', 'w').write(code)
 sh(f'cd {R} && MPLBACKEND=Agg {sys.executable} -m uv run python gen_beats.py', check=False)
-print('готово', sorted(os.path.basename(f) for f in glob.glob(W + '/gen_*.mp3')))
+print('готово', sorted(os.path.basename(f) for f in glob.glob(W + '/*.mp3')))
