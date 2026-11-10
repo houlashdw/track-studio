@@ -51,7 +51,7 @@ for AD in ADS:
             p = GenerationParams(task_type='lego', src_audio=f'/tmp/beats/{name}.mp3', instruction='Generate the vocals track based on the audio context:',
                                  caption='vc2, female vocal in Russian, ' + cap, lyrics=lyr, bpm=bpm, vocal_language='ru', repainting_start=0.0, repainting_end=-1, inference_steps=50, seed=101)
         else:
-            TG = os.environ.get('TAG', 'vc2'); p = GenerationParams(task_type='text2music', thinking=USE_LM, caption=TG + ', ' + cap, lyrics=lyr, bpm=bpm, duration=110 if TG == 'vc2' else 75, vocal_language='ru' if TG == 'vc2' else 'unknown', seed=11,
+            TG = os.environ.get('TAG', 'vc2'); p = GenerationParams(task_type='text2music', thinking=USE_LM, caption=TG + ', ' + cap, lyrics=lyr, bpm=bpm, duration=110 if TG == 'vc2' else 75, vocal_language='ru' if TG == 'vc2' else 'unknown', seed=11 + sum(map(ord, name)),
                                  inference_steps=8 if VAR == 'turbo' else 50, shift=3.0 if VAR == 'turbo' else 1.0)
         r = generate_music(dit, lm, p, GenerationConfig(batch_size=1, audio_format='mp3', mp3_bitrate='192k', use_random_seed=False), save_dir='/tmp/ace_gen')
         if r.success and r.audios:
@@ -90,6 +90,11 @@ if __name__ == '__main__':
         sh(f'wget -q -O /tmp/ds.enc {RAW}/annot-out/dataset.json.enc'); dec('/tmp/ds.enc', '/tmp/ds_raw.json', P)
         ds = json.load(open('/tmp/ds_raw.json'))
     ds['samples'] = [s for s in ds['samples'] if os.path.exists(f"{A}/{s['filename']}")]
+    CROP = int(os.environ.get('CROP', '0'))   # кусок из середины бита (интро пропускаем): короче тензоры — в разы быстрее эпоха
+    if CROP:
+        for s in ds['samples']:
+            f = f"{A}/{s['filename']}"; subprocess.run(['ffmpeg', '-v', 'error', '-y', '-ss', '20', '-t', str(CROP), '-i', f, '-b:a', '192k', '/tmp/crop.mp3'], check=False)
+            if os.path.getsize('/tmp/crop.mp3') > 100000: shutil.move('/tmp/crop.mp3', f)
     for s in ds['samples']:
         s['audio_path'] = f"{A}/{s['filename']}"; s['custom_tag'] = TAG; s['bpm'] = int(s.get('bpm') or 0) or None
     ds['metadata'] = {'custom_tag': TAG, 'tag_position': 'prepend', 'genre_ratio': 0}
@@ -99,7 +104,7 @@ if __name__ == '__main__':
     sh(f'{UV} -c "from acestep.model_downloader import ensure_main_model, ensure_dit_model; print(ensure_main_model()); print(ensure_dit_model(\'acestep-v15-{VARIANT}\'))"')
     CK = R + '/checkpoints'; T = R + '/al_data/tensors'; O = R + '/al_data/out'   # внутри папки ACE: тренер не пускает пути вне неё
     sh(f'{UV} -m acestep.training_v2.cli.train_fixed --preprocess --dataset-json /tmp/ds.json --audio-dir {A} --tensor-output {T} '
-       f'--checkpoint-dir {CK} --model-variant {VARIANT} --max-duration 240 --precision bf16')
+       f'--checkpoint-dir {CK} --model-variant {VARIANT} --max-duration {os.environ.get("MAXDUR", "240")} --precision bf16')
     # 3) обучение LoKr (быстрый адаптер); если bf16 на T4 не пойдёт — fp32
     base = (f'-m acestep.training_v2.cli.train_fixed --checkpoint-dir {CK} --model-variant {VARIANT} --dataset-dir {T} --output-dir {O} '
             f'--yes --plain --adapter-type {ADT} --lr {LR} --epochs {EPOCHS} --save-every {EVERY} --batch-size 1 --gradient-accumulation 4 --gradient-checkpointing')
