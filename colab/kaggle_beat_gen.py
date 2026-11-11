@@ -3,7 +3,7 @@
 import os, sys, glob, json, subprocess, shutil, zipfile, time
 R = '/tmp/ace'; W = '/kaggle/working'
 SCALES = [float(x) for x in os.environ.get('SCALES', '0,0.5,1').split(',')]
-NS = int(os.environ.get('NSEED', '1')); GEN = os.environ.get('GENRES', 'trap,drill,plugg,rage,phonk').split(',')
+NS = int(os.environ.get('NSEED', '1')); STEPS = [int(x) for x in os.environ.get('STEPS', '8').split(',')]; GEN = os.environ.get('GENRES', 'trap,drill,plugg,rage,phonk').split(',')
 G = {'trap': ('dark melodic trap beat, heavy 808, rolling hi-hats, hard kick, crisp snare', 140, 'C# minor'),
      'drill': ('UK drill beat, sliding 808 bass, syncopated hi-hats, dark piano', 142, 'F minor'),
      'plugg': ('plugg beat, airy dreamy bells and soft synth melody, smooth bouncy 808, sparse drums, triplet hi-hats, mellow half-time feel', 150, 'E major'),
@@ -26,7 +26,7 @@ if COVER:
     for g in GEN:
         rs = sorted(glob.glob(f'/kaggle/input/**/ds/{g}_*.mp3', recursive=True))[:8]; REFS[g] = []
         for k, f in enumerate(rs[:int(os.environ.get('NSEED', '1'))]):
-            o = f'/tmp/ref_{g}_{k}.mp3'; subprocess.run(['ffmpeg', '-v', 'error', '-y', '-ss', '30', '-t', '40', '-i', f, '-b:a', '192k', o]); REFS[g].append(o)
+            o = f'{W}/ref_{g}_{k}.mp3'; subprocess.run(['ffmpeg', '-v', 'error', '-y', '-ss', '30', '-t', '40', '-i', f, '-b:a', '192k', o]); REFS[g].append(o)
     print('референсы:', REFS, flush=True)
 zs = sorted(glob.glob('/kaggle/input/**/*lokr*.zip', recursive=True) + glob.glob('/kaggle/input/**/*lora*.zip', recursive=True))
 print('адаптеры:', zs, flush=True)
@@ -56,15 +56,16 @@ for gi, g in enumerate({GEN!r}):
     cap, bpm, key = G[g]
     for sd in range({NS}):
      for sc in ({COVER!r} or {SCALES!r}):
+      for st in {STEPS!r}:
         CV = {COVER!r}; REFS = {REFS!r}
         if CV and not REFS.get(g, [])[sd:sd + 1]: continue
         print(dit.set_lora_scale(1.0 if CV else sc), flush=True)
         kw = dict(task_type='cover', src_audio=REFS[g][sd], audio_cover_strength=sc) if CV else dict(task_type='text2music')
         p = GenerationParams(**kw, caption=((('tsbeat ' + g + ', ') if GT else 'tsbeat, ') if (sc > 0 or CV) else '') + cap + ', instrumental', lyrics='[Instrumental]', bpm=bpm, keyscale=key,
-                             duration=60, vocal_language='unknown', seed=1000 + 37 * gi + 101 * sd, inference_steps=8, shift=3.0)
+                             duration=60, vocal_language='unknown', seed=1000 + 37 * gi + 101 * sd, inference_steps=st, shift=3.0)
         r = generate_music(dit, lm, p, GenerationConfig(batch_size=1, audio_format='mp3', mp3_bitrate='192k', use_random_seed=False), save_dir='/tmp/g')
         if r.success and r.audios:
-            d = '{W}/%s_%s_%d_s%02d.mp3' % ('cov' if CV else 'gen', g, sd, int(sc * 10)); shutil.copy(r.audios[0]['path'], d); print('OK', d, flush=True)
+            d = '{W}/%s_%s_%d_s%02d_n%02d.mp3' % ('cov' if CV else 'gen', g, sd, int(sc * 10), st); shutil.copy(r.audios[0]['path'], d); print('OK', d, flush=True)
         else: print('FAIL', g, sc, getattr(r, 'error', ''), flush=True)
 '''
 open(R + '/gen_beats.py', 'w').write(code)
