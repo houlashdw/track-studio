@@ -560,7 +560,7 @@ short lines in English…
         <div id="cloudOpts" hidden>
           <div class="seg3 mt8" id="cloudVoiceSeg"><button type="button" data-v="0" class="on">Голос ACE (выше, аниме)</button><button type="button" data-v="0.5">Наполовину</button><button type="button" data-v="1">Голос vc2 (ниже)</button></div>
           <p class="hint" style="margin:10px 2px 0">Бит</p>
-          <div class="seg3 mt8" id="cloudBeatSeg"><button type="button" data-v="ours" class="on">Наш (из приложения)</button><button type="button" data-v="ace">ACE целиком</button></div>
+          <div class="seg3 mt8" id="cloudBeatSeg"><button type="button" data-v="ours" class="on">Наш (из приложения)</button><button type="button" data-v="ace">ACE целиком</button><button type="button" data-v="aibeat">ИИ-бит (обученный)</button></div>
           <p class="hint" style="margin:10px 2px 0">Подача</p>
           <div class="seg3 mt8" id="cloudDelSeg"><button type="button" data-v="auto" class="on">Авто</button><button type="button" data-v="soft">Нежно</button><button type="button" data-v="power">Мощно</button><button type="button" data-v="rap">Рэп-флоу</button><button type="button" data-v="atl">Atlanta</button></div>
           <p class="hint" style="margin:10px 2px 0">Язык и голос</p>
@@ -3656,7 +3656,7 @@ async function cloudMake() {
     } catch (e) { }
     if (!($('#lyrics').value || '').trim()) { msg0.textContent = 'Не вышло написать текст — впиши свой.'; return; }
   }
-  const bm = cloudGet('ts_cbeat', 'ours'); if (bm !== 'ace') return cloudOurs(key, prompt + ', ' + tags.join(', '), bm === 'oursace');
+  const bm = cloudGet('ts_cbeat', 'ours'); if (bm !== 'ace') return cloudOurs(key, prompt + ', ' + tags.join(', '), bm === 'oursace', bm === 'aibeat');
   const q = { caption: prompt + ', ' + tags.join(', '), lyrics: cloudLyrics(), bpm: bpmM ? +bpmM[1] : null,
     duration: $('#quick') && $('#quick').checked ? 60 : 150, voice: cloudVoice(), lang, seed: -1 };
   stop(); setBusy(true); const t0 = Date.now(); const msg = $('#cloudMsg');
@@ -3679,13 +3679,31 @@ async function cloudMake() {
   finally { clearInterval(tick); setBusy(false); }
 }
 /* наш бит (собирается здесь, без голоса) → сервер: ACE «lego» допевает голос под этот бит → назад только голос → кладём на НАШ бит */
-async function cloudOurs(key, caption, full) {
+async function cloudOurs(key, caption, full, aiBeat) {
   const msg = $('#cloudMsg'), vm = $('#voiceMode'), was = vm.value, t0 = Date.now();
   if (!($('#lyrics').value || '').trim()) { msg.textContent = 'Для голоса нужен текст песни.'; $('#lyrics').focus(); return; }
   vm.value = 'off'; msg.textContent = 'Собираю наш бит…';
   try { await makeFromPrompt(); } finally { vm.value = was; }
   if (!S.buffer) { msg.textContent = 'Бит не собрался.'; return; }
-  stop(); const beat = S.buffer, sr = beat.sampleRate;
+  stop(); let beat = S.buffer; const sr = beat.sampleRate;
+  if (aiBeat) {   /* бит от дообученной ACE (200 free-for-profit битов): жанр/темп/тональность — из нашего разбора описания, длина — как у нашего бита */
+    const GM = { trap: 'trap', hoodtrap: 'atlanta', drill: 'drill', plugg: 'plugg', pluggnb: 'pluggnb', rage: 'rage', phonk: 'phonk', jerk: 'jerk', lofi: 'lofi', melancore: 'trap', detroit: 'detroit' };
+    const sp = S.spec || {}, KN = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+    const kq = sp.key != null ? KN[((sp.key % 12) + 12) % 12] + ((SCALES[sp.scale] || {}).kind === 'maj' || /Maj/.test(String(sp.scale || '')) ? ' major' : ' minor') : '';
+    msg.textContent = 'ИИ делает бит…'; setBusy(true);
+    try {
+      const r0 = await fetch(CLOUD_URL + '/beat', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Key': key }, body: JSON.stringify({ genre: GM[sp.style] || 'trap', bpm: sp.bpm ? Math.round(sp.bpm) : null, key: kq, duration: Math.min(150, Math.round(beat.duration)) }) });
+      if (r0.status === 401) { cloudSet('ts_ckey', ''); throw new Error('неверный ключ сервера'); }
+      if (!r0.ok) throw new Error('сервер: ' + r0.status + ' ' + (await r0.text()).slice(0, 200));
+      const jid = (await r0.json()).id; let ab = null;
+      for (let i = 0; i < 120 && !ab; i++) { await new Promise((ok) => setTimeout(ok, 5000)); msg.textContent = 'ИИ делает бит… ' + (i + 1) * 5 + ' с'; const j = await fetch(CLOUD_URL + '/job/' + jid, { headers: { 'X-Key': key } }); if (j.status === 202) continue; if (!j.ok) throw new Error('сервер: ' + j.status + ' ' + (await j.text()).slice(0, 200)); ab = await j.arrayBuffer(); }
+      if (!ab) throw new Error('бит слишком долго');
+      let ib = await S.ctx.decodeAudioData(ab);
+      if (ib.sampleRate !== sr) { const oc = new OfflineAudioContext(2, Math.ceil(ib.duration * sr), sr), bs = oc.createBufferSource(); bs.buffer = ib; bs.connect(oc.destination); bs.start(); ib = await oc.startRendering(); }
+      beat = ib; S.buffer = ib; S.peaks = computePeaks(ib, 1600); drawWave(0);
+    } catch (e) { setBusy(false); msg.textContent = 'ИИ-бит не вышел: ' + (e && e.message || e); return; }
+    setBusy(false);
+  }
   setBusy(true); const tick = setInterval(() => { const s = Math.round((Date.now() - t0) / 1000); msg.textContent = 'Сервер поёт под наш бит… ' + s + ' с' + (s > 60 ? ' (обычно 2–5 мин; после паузы сервер ещё и просыпается)' : ''); }, 1000);
   try {
     const b64 = await new Promise((ok, no) => { const fr = new FileReader(); fr.onload = () => ok(String(fr.result).split(',')[1]); fr.onerror = no; fr.readAsDataURL(encodeMp3(beat, 160)); });
