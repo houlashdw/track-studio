@@ -2083,6 +2083,20 @@ function soundDesign(seed, spec) {
     chorus: R() < AR.ch ? { base: u(.008, .025), depth: u(.001, .006), rate: lg(.15, 1.5), ph: u(.8, 3), mix: u(.25, .6) } : null,
     sat: R() < AR.sat[0] ? lg(AR.sat[1], AR.sat[2]) : 0, crush: R() < AR.cr * (retro ? 1.3 : .4) ? { h: pk([2, 3, 4, 6]), bits: pk([6, 8, 10]), mix: u(.3, .7) } : null,
   };
+  { /* стойка эффектов на музыку бита (как плагины в DAW): фейзер, фленжер, тремоло/автопан, ринг-модулятор, автофильтр, дисторшн; слова в описании включают явно */
+    const R2 = mulberry32((seed ^ 0x2c1b3c6d) >>> 0), u2 = (a, b) => a + (b - a) * R2(), lg2 = (a, b) => a * Math.pow(b / a, R2()), pk2 = (a) => a[Math.floor(R2() * a.length)];
+    const tx = String(spec.prompt || '').toLowerCase(), M = X.mfx, bt = 60 / (spec.bpm || 120), kw = (re) => re.test(tx);
+    const noFx = /чист|clean|без эффект|no fx/.test(tx) || (typeof window !== 'undefined' && window.__noFxRack), pb = noFx ? 0 : retro ? .24 : .15, on = (re, p) => !noFx && (kw(re) || R2() < p);
+    if (on(/фейз|phaser/, pb)) M.phaser = { rate: 1 / (bt * pk2([4, 8, 16])), lo: lg2(250, 600), hi: lg2(1500, 4500), fb: u2(.3, .7), mix: u2(.3, .55) };
+    if (on(/фленж|flang/, pb * .6)) M.flanger = { base: u2(.0012, .004), depth: u2(.0008, .003), rate: 1 / (bt * pk2([8, 16])), fb: u2(.3, .7), mix: u2(.3, .5) };
+    if (on(/тремол|tremolo|автопан|auto.?pan/, pb * .6)) M.trem = { rate: 1 / (bt * pk2([.5, 1, .25])), depth: u2(.2, .5), pan: R2() < .5 };
+    if (on(/ринг|ring.?mod|модулятор|modulator/, pb * .3)) M.ring = { f: lg2(30, 400), mix: u2(.12, .3) };
+    if (on(/автофильтр|filter.?sweep|свип|wah|вау/, pb * .8)) M.afilt = { lo: lg2(400, 1200), hi: lg2(3000, 12000), per: bt * pk2([8, 16, 32]), q: u2(.6, 2) };
+    if (on(/дисторш|distort|перегруз|overdrive|fuzz|фузз/, pb * .7)) M.dist = { type: pk2(['fold', 'hard', 'fuzz', 'tube']), drive: lg2(1.5, 6), mix: u2(.25, .6) };
+    if (!noFx && kw(/биткраш|bitcrush|8.?бит|8.?bit|лоу.?бит|lo.?fi|лоуфай/) && !M.crush) M.crush = { h: pk2([2, 3, 4, 6]), bits: pk2([6, 8, 10]), mix: u2(.3, .7) };
+    if (noFx) { M.chorus = M.crush = null; M.sat = 0; }
+    X.rack = ['chorus', 'sat', 'crush', 'phaser', 'flanger', 'trem', 'ring', 'afilt', 'dist'].filter((k) => M[k]).join('+') || '—';
+  }
   X.tilt = { fc: lg(250, 2500), gl: clamp(WT * lg(.8, 1.2), .5, 2), gh: clamp(BR * lg(.7, 1.3), retro ? .3 : 1, 2.3), w: clamp(WD, .35, 1.7) };
   X.gm = lg(.6, 1.7); X.gadd = R() < .2 ? u(.5, 2.5) : 0; X.sc = lg(.6, 1.45); X.mc = retro ? lg(.6, 1.5) : lg(1, 1.5); X.bduck = u(.35, .7);
   X.lv = {}; X.sdm = {}; X.sv = {}; X.pan = {};
@@ -2667,6 +2681,21 @@ function applyMusicFx() {
   }
   if (F.sat) { const g = F.sat; for (let i = 0; i < N; i++) { L[i] = Math.tanh(L[i] * g) / g; R[i] = Math.tanh(R[i] * g) / g; } }
   if (F.crush) { const C = F.crush, q = 2 ** (C.bits - 1); let hl = 0, hr = 0; for (let i = 0; i < N; i++) { if (i % C.h === 0) { hl = Math.round(L[i] * q) / q; hr = Math.round(R[i] * q) / q; } L[i] = L[i] * (1 - C.mix) + hl * C.mix; R[i] = R[i] * (1 - C.mix) + hr * C.mix; } }
+  if (F.dist) { const D = F.dist, k = D.drive, sh = D.type === 'fold' ? (x) => Math.sin(x * k) : D.type === 'hard' ? (x) => Math.max(-1, Math.min(1, x * k)) : D.type === 'fuzz' ? (x) => Math.sign(x) * (1 - Math.exp(-Math.abs(x * k))) : (x) => x * k >= 0 ? Math.tanh(x * k) : Math.tanh(x * k * .6) / .8;
+    const nm = D.type === 'hard' ? 1 / Math.min(1, k * .3 + .2) : 1, w = D.mix * .8;   /* без скачка громкости */
+    for (let i = 0; i < N; i++) { L[i] = L[i] * (1 - D.mix) + sh(L[i]) * w / nm; R[i] = R[i] * (1 - D.mix) + sh(R[i]) * w / nm; } }
+  if (F.phaser) { const P = F.phaser, st = [0, 0, 0, 0, 0, 0, 0, 0], sr2 = [0, 0, 0, 0, 0, 0, 0, 0]; let fl = 0, fr = 0;
+    const run = (x, z, a, f) => { let y = x + f; for (let j = 0; j < 4; j++) { const o = -a * y + z[j]; z[j] = y + a * o; y = o; } return y; };
+    for (let i = 0; i < N; i++) { const m = .5 + .5 * Math.sin(TAU * P.rate * i / SR), fc = P.lo * (P.hi / P.lo) ** m, t = Math.tan(Math.PI * fc / SR), a = (t - 1) / (t + 1);
+      const yl = run(L[i], st, a, fl * P.fb), yr = run(R[i], sr2, a, fr * P.fb); fl = yl; fr = yr; L[i] = L[i] * (1 - P.mix * .5) + yl * P.mix; R[i] = R[i] * (1 - P.mix * .5) + yr * P.mix; } }
+  if (F.flanger) { const C = F.flanger, len = Math.floor(SR * .02), bl = new Float32Array(len), br = new Float32Array(len), b0 = C.base * SR, dp = C.depth * SR; let w = 0;
+    const rd = (b, d) => { let p = w - d; while (p < 0) p += len; const i0 = Math.floor(p), fr = p - i0; return b[i0 % len] * (1 - fr) + b[(i0 + 1) % len] * fr; };
+    for (let i = 0; i < N; i++) { const ph = TAU * C.rate * i / SR, dl = rd(bl, b0 + dp * Math.sin(ph)), dr = rd(br, b0 + dp * Math.sin(ph + 1.6));
+      bl[w] = L[i] + dl * C.fb; br[w] = R[i] + dr * C.fb; L[i] = L[i] * (1 - C.mix * .4) + dl * C.mix; R[i] = R[i] * (1 - C.mix * .4) + dr * C.mix; if (++w >= len) w = 0; } }
+  if (F.ring) { const G = F.ring; for (let i = 0; i < N; i++) { const m = Math.sin(TAU * G.f * i / SR); L[i] = L[i] * (1 - G.mix) + L[i] * m * G.mix * 1.4; R[i] = R[i] * (1 - G.mix) + R[i] * m * G.mix * 1.4; } }
+  if (F.afilt) { const Fq = F.afilt, ql = new BQ(), qr = new BQ();
+    for (let i = 0; i < N; i++) { if ((i & 63) === 0) { const m = .5 - .5 * Math.cos(TAU * i / SR / Fq.per); ql.lp(Fq.lo * (Fq.hi / Fq.lo) ** m, Fq.q); qr.b0 = ql.b0; qr.b1 = ql.b1; qr.b2 = ql.b2; qr.a1 = ql.a1; qr.a2 = ql.a2; } L[i] = ql.p(L[i]); R[i] = qr.p(R[i]); } }
+  if (F.trem) { const T0 = F.trem; for (let i = 0; i < N; i++) { const m = Math.sin(TAU * T0.rate * i / SR); if (T0.pan) { const p = m * T0.depth; L[i] *= 1 - Math.max(0, p); R[i] *= 1 + Math.min(0, p); } else { const g = 1 - T0.depth * (.5 + .5 * m); L[i] *= g; R[i] *= g; } } }
 }
 function applyDelay(track, spec) {
   const N = A.N, dl = Math.min(SR * 1.9, Math.round(track.stepDur * CFG.X.dl.a * SR)), dr = Math.min(SR * 1.9, Math.round(track.stepDur * CFG.X.dl.b * SR));
