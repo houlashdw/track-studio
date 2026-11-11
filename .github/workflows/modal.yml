@@ -72,6 +72,20 @@ jobs:
           curl -s -o /dev/null -w "без ключа: %{http_code}\n" -X POST "$U/generate" -H "Content-Type: application/json" -d '{}' --max-time 600
           curl -s -o /tmp/h.mp3 -w "с ключом: %{http_code}, %{size_download} байт, %{time_total} с\n" -X POST "$U/generate" -H "Content-Type: application/json" -H "X-Key: $K" -H "Origin: https://appassets.androidplatform.net" \
             -d '{"caption":"dreamy russian pop, female vocal in Russian","lyrics":"[Verse]\nГород спит, а я не сплю опять\n\n[Chorus]\nМы горим до утра","duration":30,"voice":1}' --max-time 900
+      - name: Проба ИИ-бита (/beat, как приложение)
+        if: inputs.cmd == 'beattest'
+        env: { P: '${{ secrets.KEYSTORE_PASS }}', TSK: '${{ secrets.TS_KEY }}' }
+        run: |
+          K="$TSK"; [ -n "$K" ] || K=$(printf %s "$P" | sha256sum | cut -c1-32)
+          U=https://fantasydrawingart--track-studio-ace-ace-web.us-east.modal.run; mkdir o
+          for G in phonk rage plugg trap; do
+            ID=$(curl -s -X POST "$U/beat" -H "Content-Type: application/json" -H "X-Key: $K" -d "{\"genre\":\"$G\",\"duration\":45}" --max-time 600 | python3 -c "import sys,json; print(json.load(sys.stdin)['id'])")
+            for i in $(seq 1 90); do C=$(curl -s -o /tmp/b.mp3 -w "%{http_code}" "$U/job/$ID" -H "X-Key: $K" --max-time 120); [ "$C" = 202 ] || break; sleep 8; done
+            echo "$G: код $C, $(stat -c %s /tmp/b.mp3) байт"
+            [ "$C" = 200 ] && openssl enc -aes-256-cbc -pbkdf2 -iter 200000 -salt -in /tmp/b.mp3 -out o/beat_$G.mp3.enc -pass env:P
+          done
+          cd o && git init -q -b modal-out && git config user.name gha && git config user.email gha@users.noreply.github.com
+          git add -A && git commit -q -m "beat test" && git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" modal-out
       - name: Пробы стилей
         if: inputs.cmd == 'styles'
         env: { P: '${{ secrets.KEYSTORE_PASS }}' }
