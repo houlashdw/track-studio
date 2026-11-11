@@ -114,6 +114,11 @@ class Ace:
             if not q.get('beat_b64'): raise HTTPException(status_code=400, detail='нет бита')
             return {'id': AceLego().lego.spawn(q).object_id}
 
+        @api.post('/beat')   # ИИ-бит: ACE turbo + наш адаптер tsbeat (200 free-for-profit битов); по референсу — переделка (cover)
+        async def beat(request: Request, x_key: Optional[str] = Header(default=None)):
+            if not x_key or x_key != os.environ.get('TS_KEY'): raise HTTPException(status_code=401, detail='bad key')
+            return {'id': AceBeat().beat.spawn(await request.json()).object_id}
+
         @api.get('/job/{jid}')
         def job(jid: str, x_key: Optional[str] = Header(default=None), k: Optional[str] = None):
             key = x_key or k
@@ -123,6 +128,55 @@ class Ace:
             except Exception as e: raise HTTPException(status_code=500, detail=str(e)[:300])
             return Response(content=b, media_type='audio/mpeg')
         return api
+
+
+GENRE_CAP = {'trap': 'dark melodic trap beat, heavy 808, rolling hi-hats, hard kick, crisp snare', 'drill': 'UK drill beat, sliding 808 bass, syncopated hi-hats, dark piano',
+             'plugg': 'plugg beat, airy dreamy bells and soft synth melody, smooth bouncy 808, sparse drums, triplet hi-hats, mellow half-time feel',
+             'rage': 'rage beat, hyper aggressive distorted supersaw synth lead, blown-out distorted 808, fast hi-hats, energetic, dark futuristic',
+             'phonk': 'drift phonk beat, loud cowbell melody, heavily distorted 808, memphis drum samples, aggressive', 'jerk': 'jerk beat, fast bouncy drums, synth bass, playful',
+             'pluggnb': 'pluggnb beat, smooth chords, bouncy 808, melodic', 'detroit': 'detroit trap beat, hard punchy drums, bouncy 808, piano loop',
+             'atlanta': 'Atlanta trap beat, hard 808, rolling triplet hi-hats, dark synths', 'lofi': 'lofi hip hop beat, dusty drums, warm keys, vinyl crackle'}
+
+
+@app.cls(gpu=GPU, volumes={VOL: vol}, timeout=900, scaledown_window=120)
+class AceBeat:
+    """инструментал от дообученной ACE (адаптер /adapters/beat/*); жанр → своя метка «tsbeat <жанр>»"""
+    @modal.enter()
+    def load(self):
+        import sys
+        os.makedirs(VOL + '/checkpoints', exist_ok=True)
+        if not os.path.islink(ACE + '/checkpoints'):
+            shutil.rmtree(ACE + '/checkpoints', ignore_errors=True); os.symlink(VOL + '/checkpoints', ACE + '/checkpoints')
+        os.chdir(ACE); sys.path.insert(0, ACE)
+        from acestep import gpu_config
+        gpu_config.cuda_supports_bfloat16 = lambda *a, **k: True
+        import acestep.core.generation.handler.memory_utils as _mu; _mu.cuda_supports_bfloat16 = gpu_config.cuda_supports_bfloat16
+        from acestep.model_downloader import ensure_main_model
+        from acestep.handler import AceStepHandler
+        from acestep.llm_inference import LLMHandler
+        ensure_main_model()
+        self.dit = AceStepHandler(); print(self.dit.initialize_service(project_root=ACE, config_path='acestep-v15-turbo', device='cuda', offload_to_cpu=False))
+        self.lm = LLMHandler()
+        ad = sorted(glob.glob(VOL + '/adapters/beat/*')); self.has_beat = bool(ad)
+        if ad: print(self.dit.load_lora(ad[-1]))
+        print('бит-адаптер:', ad[-1:] or 'нет')
+
+    @modal.method()
+    def beat(self, q: dict) -> bytes:
+        import base64 as b6, subprocess
+        from acestep.inference import GenerationParams, GenerationConfig, generate_music
+        g = q.get('genre', 'trap'); g = g if g in GENRE_CAP else 'trap'
+        if self.has_beat: self.dit.set_use_lora(True); self.dit.set_lora_scale(float(q.get('strength', 1.0)))
+        cap = ('tsbeat ' + g + ', ' if self.has_beat else '') + GENRE_CAP[g] + (', ' + q['caption'] if q.get('caption') else '') + ', instrumental'
+        kw = dict(task_type='text2music')
+        if q.get('ref_b64'):   # переделка референс-бита: держит его грув, звук — наш
+            open('/tmp/bref.mp3', 'wb').write(b6.b64decode(q['ref_b64'])); kw = dict(task_type='cover', src_audio='/tmp/bref.mp3', audio_cover_strength=float(q.get('ref', 0.3)))
+        seed = int(q.get('seed', -1))
+        p = GenerationParams(**kw, caption=cap, lyrics='[Instrumental]', bpm=q.get('bpm') or None, keyscale=q.get('key') or '', duration=float(q.get('duration', 90)),
+                             vocal_language='unknown', inference_steps=8, shift=3.0, seed=seed)
+        r = generate_music(self.dit, self.lm, p, GenerationConfig(batch_size=1, audio_format='mp3', mp3_bitrate='192k', use_random_seed=seed < 0), save_dir='/tmp/bt')
+        if not (r.success and r.audios): raise RuntimeError(str(getattr(r, 'error', r)))
+        return open(r.audios[0]['path'], 'rb').read()
 
 
 @app.cls(gpu=GPU, volumes={VOL: vol}, timeout=1200, scaledown_window=120)

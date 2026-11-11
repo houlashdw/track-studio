@@ -37,8 +37,21 @@ jobs:
             modal volume create ts-ace 2>/dev/null || true
             modal volume put -f ts-ace /tmp/ad "/adapters/${{ inputs.adname }}" && echo "голос загружен"
           fi
+      - name: Бит-адаптер с Kaggle → том Modal
+        if: inputs.cmd == 'beatad'
+        env: { KAGGLE_USERNAME: '${{ secrets.KAGGLE_USERNAME }}', KAGGLE_KEY: '${{ secrets.KAGGLE_KEY }}' }
+        run: |
+          pip install -q -U kaggle; case "$KAGGLE_KEY" in KGAT*) export KAGGLE_API_TOKEN="$KAGGLE_KEY";; esac
+          K="${{ inputs.adapter }}"; [ -n "$K" ] || K=emethscacute/ts-beatlora3
+          mkdir -p /tmp/ko && kaggle kernels output "$K" -p /tmp/ko --file-pattern '.*\.zip$' >/dev/null || kaggle kernels output "$K" -p /tmp/ko >/dev/null || true
+          Z=$(ls -S /tmp/ko/*.zip | head -1); echo "архив: $(basename "$Z") $(du -h "$Z" | cut -f1)"
+          mkdir -p /tmp/bz && cd /tmp/bz && unzip -q "$Z"
+          C=$(dirname "$(find /tmp/bz -name adapter_config.json | head -1)"); [ -d "$C" ] || C=/tmp/bz; ls -la "$C" | head
+          modal volume create ts-ace 2>/dev/null || true
+          modal volume rm -r ts-ace /adapters/beat 2>/dev/null || true
+          modal volume put -f ts-ace "$C" "/adapters/beat/${{ inputs.adname }}" && echo "бит-адаптер загружен"
       - name: Деплой
-        if: inputs.cmd == 'deploy' || inputs.cmd == 'deployatl' || inputs.cmd == 'legotest'
+        if: inputs.cmd == 'deploy' || inputs.cmd == 'deployatl' || inputs.cmd == 'legotest' || inputs.cmd == 'beatad'
         run: modal deploy "${{ inputs.file }}"
       - name: Запуск
         if: inputs.cmd == 'run'
