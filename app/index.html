@@ -3692,6 +3692,7 @@ async function cloudOurs(key, caption, full, aiBeat) {
     const kq = sp.key != null ? KN[((sp.key % 12) + 12) % 12] + ((SCALES[sp.scale] || {}).kind === 'maj' || /Maj/.test(String(sp.scale || '')) ? ' major' : ' minor') : '';
     msg.textContent = 'ИИ делает бит…'; setBusy(true);
     try {
+      for (let i = 0; ; i++) { try { const pr = await fetch(CLOUD_URL + '/ping'); if (pr.ok) break; } catch (e) { } if (i > 40) throw new Error('сервер не просыпается'); msg.textContent = 'Будим сервер… ' + (i + 1) * 5 + ' с'; await new Promise((ok) => setTimeout(ok, 5000)); }
       const r0 = await fetch(CLOUD_URL + '/beat', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Key': key }, body: JSON.stringify({ genre: GM[sp.style] || 'trap', bpm: sp.bpm ? Math.round(sp.bpm) : null, key: kq, duration: Math.min(150, Math.round(beat.duration)) }) });
       if (r0.status === 401) { cloudSet('ts_ckey', ''); throw new Error('неверный ключ сервера'); }
       if (!r0.ok) throw new Error('сервер: ' + r0.status + ' ' + (await r0.text()).slice(0, 200));
