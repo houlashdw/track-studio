@@ -194,22 +194,27 @@ class AceLego:
         if self.has_voice:
             self.dit.set_use_lora(voice > 0)
             if voice > 0: self.dit.set_lora_scale(voice)
-        seed = int(q.get('seed', -1))
-        p = GenerationParams(task_type='lego', src_audio='/tmp/beat.mp3', instruction='Generate the vocals track based on the audio context:',
-                             caption=('vc2, ' if voice > 0 else '') + q.get('caption', 'female vocal in Russian'), lyrics=q.get('lyrics', ''), bpm=q.get('bpm') or None,
-                             vocal_language=q.get('lang', 'ru'), repainting_start=0.0, repainting_end=-1, inference_steps=int(q.get('steps', 30)), seed=seed, reference_audio=ref)
-        r = generate_music(self.dit, self.lm, p, GenerationConfig(batch_size=1, audio_format='wav', use_random_seed=seed < 0), save_dir='/tmp/lg')
-        if not (r.success and r.audios): raise RuntimeError(str(getattr(r, 'error', r)))
-        print('lego: генерация %.0f с (шагов %s)' % (time.time() - T0, q.get('steps', 30)), flush=True)
-        if q.get('full'):   # «наш бит, сведённый ACE»: весь ответ ACE (наш бит в его звучании + голос) — склеено как у ACE
-            subprocess.run(['ffmpeg', '-v', 'error', '-y', '-i', r.audios[0]['path'], '-b:a', '192k', '/tmp/full.mp3'], check=True); return open('/tmp/full.mp3', 'rb').read()
-        x, sr = sf.read(r.audios[0]['path'], dtype='float32', always_2d=True)
-        if sr != 44100:
-            subprocess.run(['ffmpeg', '-v', 'error', '-y', '-i', r.audios[0]['path'], '-ar', '44100', '/tmp/lg44.wav'], check=True); x, sr = sf.read('/tmp/lg44.wav', dtype='float32', always_2d=True)
-        if x.shape[1] == 1: x = np.repeat(x, 2, 1)
-        with torch.no_grad():
-            st = apply_model(self.sep, torch.from_numpy(x.T.copy())[None].cuda(), shifts=1, split=True, overlap=0.25)[0]
-        v = st[self.sep.sources.index('vocals')].cpu().numpy().T; print('lego: +demucs %.0f с' % (time.time() - T0), flush=True)
+        seed0 = int(q.get('seed', -1))
+        for att in range(2):   # женский голос вышел низким (мужским) → ещё раз с другим сидом
+            seed = seed0 if att == 0 else (abs(seed0) + 7919 if seed0 >= 0 else -1)
+            p = GenerationParams(task_type='lego', src_audio='/tmp/beat.mp3', instruction='Generate the vocals track based on the audio context:',
+                                 caption=('vc2, ' if voice > 0 else '') + q.get('caption', 'female vocal in Russian'), lyrics=q.get('lyrics', ''), bpm=q.get('bpm') or None,
+                                 vocal_language=q.get('lang', 'ru'), repainting_start=0.0, repainting_end=-1, inference_steps=int(q.get('steps', 30)), seed=seed, reference_audio=ref)
+            r = generate_music(self.dit, self.lm, p, GenerationConfig(batch_size=1, audio_format='wav', use_random_seed=seed < 0), save_dir='/tmp/lg')
+            if not (r.success and r.audios): raise RuntimeError(str(getattr(r, 'error', r)))
+            print('lego: генерация %.0f с (шагов %s)' % (time.time() - T0, q.get('steps', 30)), flush=True)
+            if q.get('full'):   # «наш бит, сведённый ACE»: весь ответ ACE (наш бит в его звучании + голос) — склеено как у ACE
+                subprocess.run(['ffmpeg', '-v', 'error', '-y', '-i', r.audios[0]['path'], '-b:a', '192k', '/tmp/full.mp3'], check=True); return open('/tmp/full.mp3', 'rb').read()
+            x, sr = sf.read(r.audios[0]['path'], dtype='float32', always_2d=True)
+            if sr != 44100:
+                subprocess.run(['ffmpeg', '-v', 'error', '-y', '-i', r.audios[0]['path'], '-ar', '44100', '/tmp/lg44.wav'], check=True); x, sr = sf.read('/tmp/lg44.wav', dtype='float32', always_2d=True)
+            if x.shape[1] == 1: x = np.repeat(x, 2, 1)
+            with torch.no_grad():
+                st = apply_model(self.sep, torch.from_numpy(x.T.copy())[None].cuda(), shifts=1, split=True, overlap=0.25)[0]
+            v = st[self.sep.sources.index('vocals')].cpu().numpy().T; print('lego: +demucs %.0f с' % (time.time() - T0), flush=True)
+            if q.get('full') or q.get('sex', 'f') != 'f': break
+            f0 = vox_f0(v, sr); print('lego: высота голоса %.0f Гц (попытка %d)' % (f0, att + 1), flush=True)
+            if f0 == 0 or f0 >= 175: break
         # сдвиг ACE относительно нашего бита (огибающие атак, ±0.5 с): голос подвигаем, чтобы шёл ровно с битом
         try:
             subprocess.run(['ffmpeg', '-v', 'error', '-y', '-i', '/tmp/beat.mp3', '-ac', '1', '-ar', '44100', '/tmp/beat.wav'], check=True)
@@ -230,6 +235,21 @@ class AceLego:
         subprocess.run(['ffmpeg', '-v', 'error', '-y', '-i', '/tmp/voc.wav', '-b:a', '192k', '/tmp/voc.mp3'], check=True)
         print('lego: всего %.0f с' % (time.time() - T0), flush=True)
         return open('/tmp/voc.mp3', 'rb').read()
+
+
+def vox_f0(v, sr):
+    """медиана основного тона голоса (автокорреляция по громким кускам), 0 — не понять. Жен. пение обычно 190–500 Гц, муж. 90–170"""
+    import numpy as np
+    m = v.mean(1); n = int(.04 * sr); hop = n; fs = []
+    thr = np.percentile(np.abs(m), 90) * .3
+    for i in range(0, len(m) - n, hop * 3):
+        x = m[i:i + n]
+        if np.abs(x).mean() < thr: continue
+        x = x - x.mean(); c = np.correlate(x, x, 'full')[n - 1:]; lo, hi = int(sr / 600), int(sr / 70)
+        if c[0] <= 0: continue
+        k = lo + int(np.argmax(c[lo:hi])); r = c[k] / c[0]
+        if r > .5: fs.append(sr / k)
+    return float(np.median(fs)) if len(fs) > 10 else 0.0
 
 
 def deboxx(v, sr):

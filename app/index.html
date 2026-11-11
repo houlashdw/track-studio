@@ -3653,7 +3653,9 @@ async function cloudMake() {
   if (del === 'soft') tags.push('soft gentle intimate delivery'); if (del === 'power') tags.push('powerful belting vocal, strong chest voice');
   if (tim === 'anime' && !male) tags.push('young female anime girl voice, high-pitched, cute and bright, feminine, alt J-pop vocal style');
   if (tim === 'low') tags.push('low husky deep voice'); if (tim === 'high') tags.push('high-pitched airy breathy voice');
-  if (dirt === 'dirty') tags.push('gritty distorted saturated vocal, distorted guitars'); if (dirt === 'clean') tags.push('clean clear polished vocal, crisp diction');
+  /* перегруз-кнопка — про бит; женскому голосу «gritty distorted» не даём (замер: голос от этого грубеет и уходит в мужской) */
+  if (dirt === 'dirty' && male) tags.push('gritty distorted saturated vocal'); if (dirt === 'dirty' && !male) tags.push('edgy confident delivery'); if (dirt === 'clean') tags.push('clean clear polished vocal, crisp diction');
+  if (!male) tags.unshift('solo female vocalist, a young woman singing');
   if (!($('#lyrics').value || '').trim() && $('#voiceMode').value !== 'off') {   /* текста нет — пишет ACE по описанию */
     const msg0 = $('#cloudMsg'); msg0.textContent = 'Пишу текст песни…';
     try {
@@ -3663,8 +3665,8 @@ async function cloudMake() {
     } catch (e) { }
     if (!($('#lyrics').value || '').trim()) { msg0.textContent = 'Не вышло написать текст — впиши свой.'; return; }
   }
-  const bm = cloudGet('ts_cbeat', 'ours'); if (bm !== 'ace') return cloudOurs(key, prompt + ', ' + tags.join(', '), bm === 'oursace', bm === 'aibeat');
-  const q = { caption: prompt + ', ' + tags.join(', '), lyrics: cloudLyrics(), bpm: bpmM ? +bpmM[1] : null,
+  const bm = cloudGet('ts_cbeat', 'ours'); if (bm !== 'ace') return cloudOurs(key, tags.join(', ') + ', ' + prompt, bm === 'oursace', bm === 'aibeat');   /* голос — в начале описания: ACE слушает начало сильнее */
+  const q = { caption: tags.join(', ') + ', ' + prompt, lyrics: cloudLyrics(), bpm: bpmM ? +bpmM[1] : null,
     duration: $('#quick') && $('#quick').checked ? 60 : 150, voice: cloudVoice(), lang, seed: -1 };
   stop(); setBusy(true); const t0 = Date.now(); const msg = $('#cloudMsg');
   const tick = setInterval(() => { const s = Math.round((Date.now() - t0) / 1000); msg.textContent = 'Сервер делает трек… ' + s + ' с' + (s > 40 ? ' (первый запуск после паузы ~3–4 мин: сервер просыпается)' : ''); }, 1000);
@@ -3717,7 +3719,7 @@ async function cloudOurs(key, caption, full, aiBeat) {
     const b64 = await new Promise((ok, no) => { const fr = new FileReader(); fr.onload = () => ok(String(fr.result).split(',')[1]); fr.onerror = no; fr.readAsDataURL(encodeMp3(beat, 160)); });
     for (let i = 0; ; i++) { try { const pr = await fetch(CLOUD_URL + '/ping'); if (pr.ok) break; } catch (e) { } if (i > 24) throw new Error('сервер не просыпается'); await new Promise((ok) => setTimeout(ok, 5000)); }
     const bpm = S.spec && S.spec.bpm ? Math.round(S.spec.bpm) : null;
-    const r = await fetch(CLOUD_URL + '/lego', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Key': key }, body: JSON.stringify({ ref_b64: cloudGet('ts_vref', '') || undefined, beat_b64: b64, caption, lyrics: cloudLyrics(), bpm, voice: cloudVoice(), lang: cloudGet('ts_clang', 'ru'), full: !!full, seed: -1 }) });
+    const r = await fetch(CLOUD_URL + '/lego', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Key': key }, body: JSON.stringify({ sex: cloudGet('ts_csex', 'f'), ref_b64: cloudGet('ts_vref', '') || undefined, beat_b64: b64, caption, lyrics: cloudLyrics(), bpm, voice: cloudVoice(), lang: cloudGet('ts_clang', 'ru'), full: !!full, seed: -1 }) });
     if (r.status === 401) { cloudSet('ts_ckey', ''); throw new Error('неверный ключ сервера'); }
     if (!r.ok) throw new Error('сервер: ' + r.status + ' ' + (await r.text()).slice(0, 200));
     const id = (await r.json()).id; let vb = null;
