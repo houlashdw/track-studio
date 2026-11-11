@@ -225,10 +225,41 @@ class AceLego:
             elif lag < 0: v = np.concatenate([np.zeros((-lag, 2), np.float32), v[:lag]])
             self.last_lag = lag / 44.1
         except Exception as e: print('сдвиг не вышел', e, flush=True)
+        if q.get('deq', True): v = deboxx(v, sr)
         sf.write('/tmp/voc.wav', v, sr)
         subprocess.run(['ffmpeg', '-v', 'error', '-y', '-i', '/tmp/voc.wav', '-b:a', '192k', '/tmp/voc.mp3'], check=True)
         print('lego: всего %.0f с' % (time.time() - T0), flush=True)
         return open('/tmp/voc.mp3', 'rb').read()
+
+
+def deboxx(v, sr):
+    """голос из lego выходит «в бутылке»: верх (2–8 кГц) на 20–35 дБ ниже середины. Подтягиваем полосы к обычному наклону вокала
+    (адаптивно по измерению, +0…+12 дБ, плавная кривая), чуть убираем коробочную середину 300–700 Гц."""
+    import numpy as np
+    m = v.mean(1); n = 1 << 13; hop = n // 4
+    if len(m) < n * 2: return v
+    fr = np.fft.rfftfreq(n, 1 / sr); win = np.hanning(n)
+    fr_e = np.array([np.abs(np.fft.rfft(m[i:i + n] * win)) ** 2 for i in range(0, len(m) - n, hop * 4)])
+    loud = fr_e.sum(1) > np.percentile(fr_e.sum(1), 60); P = fr_e[loud].mean(0) + 1e-12
+    band = lambda a, b: 10 * np.log10(P[(fr >= a) & (fr < b)].mean())
+    ref = band(200, 1000)
+    tgt = [(1500, 1000, 2000, -7), (3000, 2000, 4000, -12), (6000, 4000, 8000, -18), (10000, 8000, 12000, -23), (14000, 12000, 16000, -30)]
+    pts = [(20, 0.0), (250, 0.0)]; boxy = band(300, 700) - ref
+    pts.append((500, -min(3.0, max(0.0, boxy + 1))))   # середина толще остального — срезаем до 3 дБ
+    for c, a, b, t in tgt: pts.append((c, float(np.clip(t - (band(a, b) - ref), 0, 12))))
+    pts.append((sr / 2, pts[-1][1]))
+    xs = np.log10([p[0] for p in pts]); ys = [p[1] for p in pts]
+    g = 10 ** (np.interp(np.log10(np.maximum(fr, 20)), xs, ys) / 20)
+    print('деEQ (дБ):', ', '.join('%d Гц %+.1f' % (p[0], p[1]) for p in pts[2:-1]), flush=True)
+    out = np.zeros_like(v); wsum = np.zeros(len(v))
+    for i in range(0, len(v) - n, hop):
+        w2 = win
+        for ch in range(v.shape[1]): out[i:i + n, ch] += np.fft.irfft(np.fft.rfft(v[i:i + n, ch] * w2) * g, n) * w2
+        wsum[i:i + n] += w2 * w2
+    out /= np.maximum(wsum, 1e-3)[:, None]
+    pk = np.abs(out).max(); pv = np.abs(v).max()
+    return (out * (pv / pk if pk > pv else 1)).astype('float32')
+
 
 web_image = modal.Image.debian_slim(python_version='3.11').pip_install('fastapi[standard]')
 
