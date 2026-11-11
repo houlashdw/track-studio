@@ -25,7 +25,8 @@ app = modal.App('track-studio-ace', image=image)
 VOL = '/vol'
 
 
-GPU = os.environ.get('TS_GPU', 'T4')   # L4 на этом аккаунте не стартовал (303 по таймауту) — T4
+GPU = os.environ.get('TS_GPU', 'T4')
+GPU_LEGO = os.environ.get('TS_GPU_LEGO', 'L40S')   # lego (base, 30 шагов) на T4 шёл минуты; L40S в разы быстрее и по цене за трек не дороже   # L4 на этом аккаунте не стартовал (303 по таймауту) — T4
 
 
 @app.cls(gpu=GPU, volumes={VOL: vol}, secrets=[modal.Secret.from_name('ts-key')], timeout=900, scaledown_window=120)
@@ -79,55 +80,12 @@ class Ace:
         return self._write(q.get('caption', ''), q.get('lang', 'ru'))
 
     @modal.method()
+    def warm(self): return True
+
+    @modal.method()
     def generate(self, q: dict) -> bytes:
         return self._gen(q)
 
-    @modal.asgi_app()
-    def web(self):
-        from fastapi import FastAPI, Request
-        from fastapi.middleware.cors import CORSMiddleware
-        api = FastAPI(docs_url=None, redoc_url=None)
-        # приложение открывается с https://appassets.androidplatform.net — нужен CORS (ключ всё равно обязателен)
-        api.add_middleware(CORSMiddleware, allow_origins=['*'], allow_methods=['POST', 'GET', 'OPTIONS'], allow_headers=['*'])
-
-        @api.get('/ping')
-        def ping(): return {'ok': True, 'voice': self.has_voice}
-
-        @api.post('/generate')
-        async def gen(request: Request, x_key: Optional[str] = Header(default=None)):
-            if not x_key or x_key != os.environ.get('TS_KEY'): raise HTTPException(status_code=401, detail='bad key')
-            q = await request.json()
-            try: b = self._gen(q)
-            except Exception as e: raise HTTPException(status_code=500, detail=str(e)[:300])
-            return Response(content=b, media_type='audio/mpeg')
-        @api.post('/lyrics')
-        async def lyrics(request: Request, x_key: Optional[str] = Header(default=None)):
-            if not x_key or x_key != os.environ.get('TS_KEY'): raise HTTPException(status_code=401, detail='bad key')
-            q = await request.json()
-            try: return self._write(q.get('caption', ''), q.get('lang', 'ru'))
-            except Exception as e: raise HTTPException(status_code=500, detail=str(e)[:300])
-
-        @api.post('/lego')   # долго (минуты) → задание; приложение спрашивает /job/<id>
-        async def lego(request: Request, x_key: Optional[str] = Header(default=None)):
-            if not x_key or x_key != os.environ.get('TS_KEY'): raise HTTPException(status_code=401, detail='bad key')
-            q = await request.json()
-            if not q.get('beat_b64'): raise HTTPException(status_code=400, detail='нет бита')
-            return {'id': AceLego().lego.spawn(q).object_id}
-
-        @api.post('/beat')   # ИИ-бит: ACE turbo + наш адаптер tsbeat (200 free-for-profit битов); по референсу — переделка (cover)
-        async def beat(request: Request, x_key: Optional[str] = Header(default=None)):
-            if not x_key or x_key != os.environ.get('TS_KEY'): raise HTTPException(status_code=401, detail='bad key')
-            return {'id': AceBeat().beat.spawn(await request.json()).object_id}
-
-        @api.get('/job/{jid}')
-        def job(jid: str, x_key: Optional[str] = Header(default=None), k: Optional[str] = None):
-            key = x_key or k
-            if not key or key != os.environ.get('TS_KEY'): raise HTTPException(status_code=401, detail='bad key')
-            try: b = modal.FunctionCall.from_id(jid).get(timeout=0)
-            except TimeoutError: return Response(status_code=202, content=b'{"state":"running"}', media_type='application/json')
-            except Exception as e: raise HTTPException(status_code=500, detail=str(e)[:300])
-            return Response(content=b, media_type='audio/mpeg')
-        return api
 
 
 GENRE_CAP = {'trap': 'dark melodic trap beat, heavy 808, rolling hi-hats, hard kick, crisp snare', 'drill': 'UK drill beat, sliding 808 bass, syncopated hi-hats, dark piano',
@@ -162,6 +120,9 @@ class AceBeat:
         print('бит-адаптер:', ad[-1:] or 'нет')
 
     @modal.method()
+    def warm(self): return True
+
+    @modal.method()
     def beat(self, q: dict) -> bytes:
         import base64 as b6, subprocess
         from acestep.inference import GenerationParams, GenerationConfig, generate_music
@@ -179,7 +140,7 @@ class AceBeat:
         return open(r.audios[0]['path'], 'rb').read()
 
 
-@app.cls(gpu=GPU, volumes={VOL: vol}, timeout=1200, scaledown_window=120)
+@app.cls(gpu=GPU_LEGO, volumes={VOL: vol}, timeout=1200, scaledown_window=300)
 class AceLego:
     """наш бит (из приложения) → ACE-Step «lego» допевает вокал (полная модель base) → Demucs вырезает только голос → приложение кладёт его на свой бит"""
     @modal.enter()
@@ -219,11 +180,14 @@ class AceLego:
         return out
 
     @modal.method()
+    def warm(self): return True
+
+    @modal.method()
     def lego(self, q: dict) -> bytes:
         import subprocess, numpy as np, torch, soundfile as sf
         from acestep.inference import GenerationParams, GenerationConfig, generate_music
         from demucs.apply import apply_model
-        open('/tmp/beat.mp3', 'wb').write(base64.b64decode(q['beat_b64']))
+        T0 = time.time(); open('/tmp/beat.mp3', 'wb').write(base64.b64decode(q['beat_b64']))
         ref = None   # референс тембра: только наш же ACE-голос (понравившийся прошлый вокал), не запись реального человека
         if q.get('ref_b64'): open('/tmp/vref.mp3', 'wb').write(base64.b64decode(q['ref_b64'])); ref = '/tmp/vref.mp3'
         voice = float(q.get('voice', 1.0)) if self.has_voice else 0.0
@@ -236,6 +200,7 @@ class AceLego:
                              vocal_language=q.get('lang', 'ru'), repainting_start=0.0, repainting_end=-1, inference_steps=int(q.get('steps', 30)), seed=seed, reference_audio=ref)
         r = generate_music(self.dit, self.lm, p, GenerationConfig(batch_size=1, audio_format='wav', use_random_seed=seed < 0), save_dir='/tmp/lg')
         if not (r.success and r.audios): raise RuntimeError(str(getattr(r, 'error', r)))
+        print('lego: генерация %.0f с (шагов %s)' % (time.time() - T0, q.get('steps', 30)), flush=True)
         if q.get('full'):   # «наш бит, сведённый ACE»: весь ответ ACE (наш бит в его звучании + голос) — склеено как у ACE
             subprocess.run(['ffmpeg', '-v', 'error', '-y', '-i', r.audios[0]['path'], '-b:a', '192k', '/tmp/full.mp3'], check=True); return open('/tmp/full.mp3', 'rb').read()
         x, sr = sf.read(r.audios[0]['path'], dtype='float32', always_2d=True)
@@ -244,7 +209,7 @@ class AceLego:
         if x.shape[1] == 1: x = np.repeat(x, 2, 1)
         with torch.no_grad():
             st = apply_model(self.sep, torch.from_numpy(x.T.copy())[None].cuda(), shifts=1, split=True, overlap=0.25)[0]
-        v = st[self.sep.sources.index('vocals')].cpu().numpy().T
+        v = st[self.sep.sources.index('vocals')].cpu().numpy().T; print('lego: +demucs %.0f с' % (time.time() - T0), flush=True)
         # сдвиг ACE относительно нашего бита (огибающие атак, ±0.5 с): голос подвигаем, чтобы шёл ровно с битом
         try:
             subprocess.run(['ffmpeg', '-v', 'error', '-y', '-i', '/tmp/beat.mp3', '-ac', '1', '-ar', '44100', '/tmp/beat.wav'], check=True)
@@ -262,7 +227,65 @@ class AceLego:
         except Exception as e: print('сдвиг не вышел', e, flush=True)
         sf.write('/tmp/voc.wav', v, sr)
         subprocess.run(['ffmpeg', '-v', 'error', '-y', '-i', '/tmp/voc.wav', '-b:a', '192k', '/tmp/voc.mp3'], check=True)
+        print('lego: всего %.0f с' % (time.time() - T0), flush=True)
         return open('/tmp/voc.mp3', 'rb').read()
+
+web_image = modal.Image.debian_slim(python_version='3.11').pip_install('fastapi[standard]')
+
+
+@app.function(image=web_image, cpu=0.25, memory=256, secrets=[modal.Secret.from_name('ts-key')], scaledown_window=300)
+@modal.asgi_app(label='track-studio-ace-ace-web')
+def web():
+    """лёгкий веб без GPU: принимает запросы сразу (раньше веб жил в GPU-классе и сам ждал загрузки модели — лишний холодный старт)"""
+    from fastapi import FastAPI, Request
+    from fastapi.middleware.cors import CORSMiddleware
+    api = FastAPI(docs_url=None, redoc_url=None)
+    api.add_middleware(CORSMiddleware, allow_origins=['*'], allow_methods=['POST', 'GET', 'OPTIONS'], allow_headers=['*'])
+    ok = lambda k: bool(k) and k == os.environ.get('TS_KEY')
+
+    @api.get('/ping')
+    def ping(warm: Optional[str] = None):   # warm=lego|beat|ace — заранее будим нужный GPU, пока человек пишет текст
+        try:
+            for w in (warm or '').split(','):
+                if w == 'lego': AceLego().warm.spawn()
+                elif w == 'beat': AceBeat().warm.spawn()
+                elif w == 'ace': Ace().warm.spawn()
+        except Exception as e: print('warm', e)
+        return {'ok': True, 'voice': True}
+
+    @api.post('/generate')
+    async def gen(request: Request, x_key: Optional[str] = Header(default=None)):
+        if not ok(x_key): raise HTTPException(status_code=401, detail='bad key')
+        try: b = await Ace().generate.remote.aio(await request.json())
+        except Exception as e: raise HTTPException(status_code=500, detail=str(e)[:300])
+        return Response(content=b, media_type='audio/mpeg')
+
+    @api.post('/lyrics')
+    async def lyrics(request: Request, x_key: Optional[str] = Header(default=None)):
+        if not ok(x_key): raise HTTPException(status_code=401, detail='bad key')
+        try: return await Ace().write.remote.aio(await request.json())
+        except Exception as e: raise HTTPException(status_code=500, detail=str(e)[:300])
+
+    @api.post('/lego')   # долго → задание; приложение спрашивает /job/<id>
+    async def lego(request: Request, x_key: Optional[str] = Header(default=None)):
+        if not ok(x_key): raise HTTPException(status_code=401, detail='bad key')
+        q = await request.json()
+        if not q.get('beat_b64'): raise HTTPException(status_code=400, detail='нет бита')
+        return {'id': (await AceLego().lego.spawn.aio(q)).object_id}
+
+    @api.post('/beat')
+    async def beat(request: Request, x_key: Optional[str] = Header(default=None)):
+        if not ok(x_key): raise HTTPException(status_code=401, detail='bad key')
+        return {'id': (await AceBeat().beat.spawn.aio(await request.json())).object_id}
+
+    @api.get('/job/{jid}')
+    def job(jid: str, x_key: Optional[str] = Header(default=None), k: Optional[str] = None):
+        if not ok(x_key or k): raise HTTPException(status_code=401, detail='bad key')
+        try: b = modal.FunctionCall.from_id(jid).get(timeout=0)
+        except TimeoutError: return Response(status_code=202, content=b'{"state":"running"}', media_type='application/json')
+        except Exception as e: raise HTTPException(status_code=500, detail=str(e)[:300])
+        return Response(content=b, media_type='audio/mpeg')
+    return api
 
 
 @app.local_entrypoint()
