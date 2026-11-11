@@ -79,7 +79,8 @@ jobs:
           K="$TSK"; [ -n "$K" ] || K=$(printf %s "$P" | sha256sum | cut -c1-32)
           U=https://fantasydrawingart--track-studio-ace-ace-web.us-east.modal.run; mkdir o
           for G in phonk rage plugg trap; do
-            ID=$(curl -s -X POST "$U/beat" -H "Content-Type: application/json" -H "X-Key: $K" -d "{\"genre\":\"$G\",\"duration\":45}" --max-time 600 | python3 -c "import sys,json; print(json.load(sys.stdin)['id'])")
+            curl -s -o /tmp/r.json -w "beat POST: %{http_code}\n" -X POST "$U/beat" -H "Content-Type: application/json" -H "X-Key: $K" -d "{\"genre\":\"$G\",\"duration\":45}" --max-time 600; head -c 300 /tmp/r.json; echo
+            ID=$(python3 -c "import json; print(json.load(open('/tmp/r.json'))['id'])") || continue
             for i in $(seq 1 90); do C=$(curl -s -o /tmp/b.mp3 -w "%{http_code}" "$U/job/$ID" -H "X-Key: $K" --max-time 120); [ "$C" = 202 ] || break; sleep 8; done
             echo "$G: код $C, $(stat -c %s /tmp/b.mp3) байт"
             [ "$C" = 200 ] && openssl enc -aes-256-cbc -pbkdf2 -iter 200000 -salt -in /tmp/b.mp3 -out o/beat_$G.mp3.enc -pass env:P
