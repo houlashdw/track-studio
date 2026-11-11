@@ -3714,7 +3714,7 @@ async function cloudOurs(key, caption, full, aiBeat) {
     } catch (e) { setBusy(false); msg.textContent = 'ИИ-бит не вышел: ' + (e && e.message || e); return; }
     setBusy(false);
   }
-  setBusy(true); const tick = setInterval(() => { const s = Math.round((Date.now() - t0) / 1000); msg.textContent = 'Сервер поёт под наш бит… ' + s + ' с' + (s > 60 ? ' (обычно 2–5 мин; после паузы сервер ещё и просыпается)' : ''); }, 1000);
+  setBusy(true); const tick = setInterval(() => { const s = Math.round((Date.now() - t0) / 1000); msg.textContent = 'Сервер поёт под наш бит… ' + s + ' с' + (s > 30 ? ' (прогретый сервер — ~15–30 с; если он спал — ещё просыпается)' : ''); }, 1000);
   try {
     const b64 = await new Promise((ok, no) => { const fr = new FileReader(); fr.onload = () => ok(String(fr.result).split(',')[1]); fr.onerror = no; fr.readAsDataURL(encodeMp3(beat, 160)); });
     for (let i = 0; ; i++) { try { const pr = await fetch(CLOUD_URL + '/ping'); if (pr.ok) break; } catch (e) { } if (i > 24) throw new Error('сервер не просыпается'); await new Promise((ok) => setTimeout(ok, 5000)); }

@@ -140,10 +140,11 @@ class AceBeat:
         return open(r.audios[0]['path'], 'rb').read()
 
 
-@app.cls(gpu=GPU_LEGO, volumes={VOL: vol}, timeout=1200, scaledown_window=300)
+@app.cls(gpu=GPU_LEGO, volumes={VOL: vol}, timeout=1200, scaledown_window=300,
+         enable_memory_snapshot=True, experimental_options={'enable_gpu_snapshot': True})   # снимок памяти с загруженной моделью: холодный старт секунды, а не минуты
 class AceLego:
     """наш бит (из приложения) → ACE-Step «lego» допевает вокал (полная модель base) → Demucs вырезает только голос → приложение кладёт его на свой бит"""
-    @modal.enter()
+    @modal.enter(snap=True)
     def load(self):
         import sys, torch
         os.makedirs(VOL + '/checkpoints', exist_ok=True); os.environ['TORCH_HOME'] = VOL + '/torch'
