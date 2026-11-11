@@ -41,7 +41,7 @@ jobs:
         if: inputs.cmd == 'beatad'
         env: { KAGGLE_USERNAME: '${{ secrets.KAGGLE_USERNAME }}', KAGGLE_KEY: '${{ secrets.KAGGLE_KEY }}' }
         run: |
-          pip install -q -U kaggle; case "$KAGGLE_KEY" in KGAT*) export KAGGLE_API_TOKEN="$KAGGLE_KEY";; esac
+          pip install -q -U kaggle six; case "$KAGGLE_KEY" in KGAT*) export KAGGLE_API_TOKEN="$KAGGLE_KEY";; esac
           K="${{ inputs.adapter }}"; [ -n "$K" ] || K=emethscacute/ts-beatlora3
           mkdir -p /tmp/ko && kaggle kernels output "$K" -p /tmp/ko --file-pattern '.*\.zip$' >/dev/null || kaggle kernels output "$K" -p /tmp/ko >/dev/null || true
           Z=$(ls -S /tmp/ko/*.zip | head -1); echo "архив: $(basename "$Z") $(du -h "$Z" | cut -f1)"
