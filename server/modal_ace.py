@@ -170,6 +170,8 @@ class AceLego:
         from acestep.inference import GenerationParams, GenerationConfig, generate_music
         from demucs.apply import apply_model
         open('/tmp/beat.mp3', 'wb').write(base64.b64decode(q['beat_b64']))
+        ref = None   # референс тембра: только наш же ACE-голос (понравившийся прошлый вокал), не запись реального человека
+        if q.get('ref_b64'): open('/tmp/vref.mp3', 'wb').write(base64.b64decode(q['ref_b64'])); ref = '/tmp/vref.mp3'
         voice = float(q.get('voice', 1.0)) if self.has_voice else 0.0
         if self.has_voice:
             self.dit.set_use_lora(voice > 0)
@@ -177,7 +179,7 @@ class AceLego:
         seed = int(q.get('seed', -1))
         p = GenerationParams(task_type='lego', src_audio='/tmp/beat.mp3', instruction='Generate the vocals track based on the audio context:',
                              caption=('vc2, ' if voice > 0 else '') + q.get('caption', 'female vocal in Russian'), lyrics=q.get('lyrics', ''), bpm=q.get('bpm') or None,
-                             vocal_language=q.get('lang', 'ru'), repainting_start=0.0, repainting_end=-1, inference_steps=int(q.get('steps', 30)), seed=seed)
+                             vocal_language=q.get('lang', 'ru'), repainting_start=0.0, repainting_end=-1, inference_steps=int(q.get('steps', 30)), seed=seed, reference_audio=ref)
         r = generate_music(self.dit, self.lm, p, GenerationConfig(batch_size=1, audio_format='wav', use_random_seed=seed < 0), save_dir='/tmp/lg')
         if not (r.success and r.audios): raise RuntimeError(str(getattr(r, 'error', r)))
         if q.get('full'):   # «наш бит, сведённый ACE»: весь ответ ACE (наш бит в его звучании + голос) — склеено как у ACE
