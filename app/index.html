@@ -570,7 +570,7 @@ short lines in English…
           <div class="seg3 mt8" id="cloudTimSeg"><button type="button" data-v="anime" class="on">Аниме</button><button type="button" data-v="auto">Авто</button><button type="button" data-v="low">Ниже, с хрипотцой</button><button type="button" data-v="high">Выше, воздушно</button></div>
           <p class="hint" id="cloudMsg" style="margin:8px 2px 0" aria-live="polite"></p>
           <audio id="cloudAudio" controls hidden style="width:100%;margin-top:8px"></audio>
-          <div class="scroller acts2" id="cloudActs" hidden><button type="button" class="ghost" id="cloudSave">Сохранить mp3</button><button type="button" class="ghost" id="cloudKey">Ключ сервера</button></div>
+          <div class="scroller acts2" id="cloudActs" hidden><button type="button" class="ghost" id="cloudSave">Сохранить mp3</button><button type="button" class="ghost" id="cloudKey">Ключ сервера</button><button type="button" class="ghost" id="cloudVref" hidden>Запомнить этот голос</button><button type="button" class="ghost" id="cloudVforget" hidden>Забыть голос</button></div>
         </div>
       </div>
       <label class="chk sm" style="margin:8px 2px 0;display:flex"><input type="checkbox" id="quick" checked data-testid="quick"><span>Быстрая проба — трек ~45 с (вдвое быстрее; сними для полной песни)</span></label>
@@ -3615,6 +3615,16 @@ function cloudInit() {
   }
   $('#cloudKey').onclick = cloudAskKey;
   $('#cloudSave').onclick = () => { if (CLOUD.blob) saveBlob('ace_' + Date.now() + '.mp3', CLOUD.blob); };
+  /* референс тембра: самый громкий кусок ~20 с из понравившегося голоса ACE → следующие треки поются в этом же тембре */
+  const vfShow = () => { const f = $('#cloudVforget'); if (f) f.hidden = !cloudGet('ts_vref', ''); }; vfShow();
+  $('#cloudVref').onclick = async () => {
+    const v = CLOUD.vox; if (!v) return; const sr = v.sampleRate, x = v.getChannelData(0), W = Math.min(x.length, 20 * sr), H = sr; let best = 0, be = -1;
+    for (let s0 = 0; s0 + W <= x.length; s0 += H) { let e = 0; for (let i = s0; i < s0 + W; i += 32) e += x[i] * x[i]; if (e > be) { be = e; best = s0; } }
+    const b = S.ctx.createBuffer(v.numberOfChannels, W, sr); for (let c = 0; c < v.numberOfChannels; c++) b.getChannelData(c).set(v.getChannelData(c).subarray(best, best + W));
+    const b64 = await new Promise((ok, no) => { const fr = new FileReader(); fr.onload = () => ok(String(fr.result).split(',')[1]); fr.onerror = no; fr.readAsDataURL(encodeMp3(b, 96)); });
+    cloudSet('ts_vref', b64); $('#cloudVref').textContent = 'Голос запомнен ✓'; vfShow(); $('#cloudMsg').textContent = 'Следующие треки будут петься этим тембром.';
+  };
+  $('#cloudVforget').onclick = () => { cloudSet('ts_vref', ''); vfShow(); $('#cloudMsg').textContent = 'Запомненный голос сброшен.'; };
 }
 function cloudVoice() { return cloudGet('ts_csex', 'f') === 'm' ? 0 : CLOUD.voice; }   /* vc2 — женский голос: для мужского дообучение не включаем */
 function cloudLyrics() {
@@ -3679,7 +3689,7 @@ async function cloudOurs(key, caption, full) {
     const b64 = await new Promise((ok, no) => { const fr = new FileReader(); fr.onload = () => ok(String(fr.result).split(',')[1]); fr.onerror = no; fr.readAsDataURL(encodeMp3(beat, 160)); });
     for (let i = 0; ; i++) { try { const pr = await fetch(CLOUD_URL + '/ping'); if (pr.ok) break; } catch (e) { } if (i > 24) throw new Error('сервер не просыпается'); await new Promise((ok) => setTimeout(ok, 5000)); }
     const bpm = S.spec && S.spec.bpm ? Math.round(S.spec.bpm) : null;
-    const r = await fetch(CLOUD_URL + '/lego', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Key': key }, body: JSON.stringify({ beat_b64: b64, caption, lyrics: cloudLyrics(), bpm, voice: cloudVoice(), lang: cloudGet('ts_clang', 'ru'), full: !!full, seed: -1 }) });
+    const r = await fetch(CLOUD_URL + '/lego', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Key': key }, body: JSON.stringify({ ref_b64: cloudGet('ts_vref', '') || undefined, beat_b64: b64, caption, lyrics: cloudLyrics(), bpm, voice: cloudVoice(), lang: cloudGet('ts_clang', 'ru'), full: !!full, seed: -1 }) });
     if (r.status === 401) { cloudSet('ts_ckey', ''); throw new Error('неверный ключ сервера'); }
     if (!r.ok) throw new Error('сервер: ' + r.status + ' ' + (await r.text()).slice(0, 200));
     const id = (await r.json()).id; let vb = null;
@@ -3697,6 +3707,7 @@ async function cloudOurs(key, caption, full) {
       msg.textContent = 'Готово за ' + Math.round((Date.now() - t0) / 1000) + ' с: наш бит, сведённый ACE, + голос.'; return;
     }
     let voc = await S.ctx.decodeAudioData(vb);
+    CLOUD.vox = voc; { const vb2 = $('#cloudVref'); if (vb2) { vb2.hidden = false; vb2.textContent = cloudGet('ts_vref', '') ? 'Заменить запомненный голос' : 'Запомнить этот голос'; } }
     if (voc.sampleRate !== sr) { const oc = new OfflineAudioContext(2, Math.ceil(voc.duration * sr), sr), bs = oc.createBufferSource(); bs.buffer = voc; bs.connect(oc.destination); bs.start(); voc = await oc.startRendering(); }
     msg.textContent = 'Свожу голос с битом (наши эффекты)…';
     /* голос ACE — через НАШУ вокальную цепочку, как у своих голосов: тон под бит, плейт и дилей в темп жанра, «ride» по громкости бита */
