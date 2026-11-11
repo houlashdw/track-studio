@@ -3603,11 +3603,18 @@ function cloudIsOn() { const c = $('#cloudOn'); return !!(c && c.checked); }
 function cloudAskKey() { const k = window.prompt('Ключ сервера (один раз, хранится только на этом телефоне):', cloudGet('ts_ckey', '')); if (k != null) cloudSet('ts_ckey', k.trim()); return cloudGet('ts_ckey', ''); }
 function simpleSet(v) { cloudSet('ts_simple', v ? '1' : '0'); document.body.classList.toggle('simple', v); $('#simpleBtn').textContent = v ? 'Все настройки (старый режим)' : 'Простой режим (только облако)';
   if (v) { const on = $('#cloudOn'); if (on && !on.checked) { on.checked = true; on.onchange && on.onchange(); } if ($('#voiceMode').value === 'off') $('#voiceMode').value = 'sing'; } }
+let cloudWarmAt = 0;
+function cloudWarm() {   /* будим GPU заранее, пока человек пишет текст: к нажатию «Создать» сервер уже загружен */
+  if (cloudGet('ts_cloud', '0') !== '1' || Date.now() - cloudWarmAt < 240000) return; cloudWarmAt = Date.now();
+  const bm = cloudGet('ts_cbeat', 'ours'), w = bm === 'ace' ? 'ace' : bm === 'aibeat' ? 'lego,beat,ace' : 'lego,ace';
+  fetch(CLOUD_URL + '/ping?warm=' + w).catch(() => { });
+}
 function cloudInit() {
   const on = $('#cloudOn'); if (!on) return;
+  setTimeout(() => { ['#prompt', '#lyrics', '#make'].forEach((id) => { const el = $(id); if (el) { el.addEventListener('focus', cloudWarm); el.addEventListener('input', cloudWarm); el.addEventListener('pointerdown', cloudWarm); } }); cloudWarm(); }, 0);
   setTimeout(() => { simpleSet(cloudGet('ts_simple', '1') === '1'); $('#simpleBtn').onclick = () => simpleSet(!document.body.classList.contains('simple')); }, 0);
   on.checked = cloudGet('ts_cloud', '0') === '1'; CLOUD.voice = parseFloat(cloudGet('ts_cvoice', '0'));
-  const sync = () => { $('#cloudOpts').hidden = !on.checked; cloudSet('ts_cloud', on.checked ? '1' : '0'); $('#make').textContent = on.checked ? 'Создать в облаке' : 'Создать трек'; };
+  const sync = () => { $('#cloudOpts').hidden = !on.checked; cloudSet('ts_cloud', on.checked ? '1' : '0'); if (on.checked) cloudWarm(); $('#make').textContent = on.checked ? 'Создать в облаке' : 'Создать трек'; };
   on.onchange = sync; sync();
   $('#cloudVoiceSeg').querySelectorAll('button').forEach((b) => { b.classList.toggle('on', parseFloat(b.dataset.v) === CLOUD.voice);
     b.onclick = () => { CLOUD.voice = parseFloat(b.dataset.v); cloudSet('ts_cvoice', b.dataset.v); $('#cloudVoiceSeg').querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b)); }; });
