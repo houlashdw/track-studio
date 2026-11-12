@@ -7,12 +7,17 @@ Q = {'trap': 'free for profit dark trap beat', 'drill': 'free for profit drill t
      'rage': 'free for profit rage type beat', 'phonk': 'free for profit phonk beat', 'jerk': 'free for profit jerk type beat',
      'pluggnb': 'free for profit pluggnb type beat', 'detroit': 'free for profit detroit type beat', 'hyperpop': 'free for profit hyperpop type beat',
      'lofi': 'free for profit lofi hip hop beat', 'atlanta': 'free for profit atlanta trap type beat', 'rnb': 'free for profit rnb type beat'}
+QX = {'rage': ['free opium type beat', 'free ken carson type beat', 'free destroy lonely type beat', 'free playboi carti rage type beat'],
+      'phonk': ['free drift phonk beat', 'free memphis phonk type beat', 'free brazilian phonk beat', 'free phonk type beat 2025'],
+      'plugg': ['free plugg beat', 'free summrs type beat', 'free autumn plugg type beat', 'free pluggnb type beat']}
 meta = json.load(open(OUT + '/meta.json')) if os.path.exists(OUT + '/meta.json') else {}
 for g in GEN:
-    q = Q.get(g, f'free for profit {g} type beat')
-    r = subprocess.run(['yt-dlp', '--flat-playlist', '-J', f'ytsearch{N * 3}:{q}'], capture_output=True, text=True)
-    if r.returncode: print('⚠ поиск', g, r.stderr[-400:], flush=True); continue
-    ents = json.loads(r.stdout).get('entries', []); got = 0
+    ents = []
+    for q in [Q.get(g, f'free for profit {g} type beat')] + QX.get(g, []):   # несколько запросов на жанр — больше разных битов
+        r = subprocess.run(['yt-dlp', '--flat-playlist', '-J', f'ytsearch{N * 2}:{q}'], capture_output=True, text=True)
+        if r.returncode: print('⚠ поиск', g, q, r.stderr[-300:], flush=True); continue
+        ents += json.loads(r.stdout).get('entries', [])
+    got = 0
     for e in ents:
         if got >= N: break
         t = (e.get('title') or ''); d = e.get('duration') or 0; vid = e.get('id')
