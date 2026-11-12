@@ -40,14 +40,15 @@ local function addfx(tr, nm)
 end
 local function eq(tr, bands)   -- bands: {{тип, частота, дБ, ширина}}; ReaEQ по умолчанию: 4 полосы (low shelf, band, band, high shelf)
   local fx = addfx(tr, 'ReaEQ (Cockos)'); if not fx then return end
+  local SUF = {'low shelf', 'band 2', 'band 3', 'high shelf 4'}
   for i, b in ipairs(bands) do
-    setv(tr, fx, i .. '-Freq', b[2]); setv(tr, fx, i .. '-Gain', b[3]); if b[4] then setv(tr, fx, i .. '-BW', b[4]) end
+    setv(tr, fx, 'freq-' .. SUF[i], b[2]); setv(tr, fx, 'gain-' .. SUF[i], b[3]); if b[4] then setv(tr, fx, 'bw-' .. SUF[i], b[4]) end
   end
 end
 local function comp(tr, th, ratio, att, rel, aux)
   local fx = addfx(tr, 'ReaComp (Cockos)'); if not fx then return end
-  setv(tr, fx, 'Thresh', th); setv(tr, fx, 'Ratio', ratio); setv(tr, fx, 'Attack', att); setv(tr, fx, 'Release', rel)
-  if aux then setenum(tr, fx, 'Detector input', 'aux') end
+  setv(tr, fx, 'Threshold', th); setv(tr, fx, 'Ratio', ratio); setv(tr, fx, 'Attack', att); setv(tr, fx, 'Release', rel)
+  if aux then setenum(tr, fx, 'AudIn', 'aux') end
   return fx
 end
 
@@ -90,8 +91,8 @@ for _, t in ipairs(P.tracks) do
         local fx = addfx(tr, 'ReaSamplOmatic5000 (Cockos)')
         if fx then
           reaper.TrackFX_SetNamedConfigParm(tr, fx, 'FILE0', z.file); reaper.TrackFX_SetNamedConfigParm(tr, fx, 'DONE', '')
-          setenum(tr, fx, 'Mode', 'semitone'); setv(tr, fx, 'Note range start', z.lo); setv(tr, fx, 'Note range end', z.hi)
-          setv(tr, fx, 'Pitch for start', z.lo - z.root); setv(tr, fx, 'Obey note-offs', 1); setv(tr, fx, 'Release', 250)
+          setv(tr, fx, 'Note range start', z.lo); setv(tr, fx, 'Note range end', z.hi)   -- высота идёт по клавишам: начало зоны → (lo−корень), конец → (hi−корень)
+          setv(tr, fx, 'Pitch for start note', z.lo - z.root); setv(tr, fx, 'Pitch for end note', z.hi - z.root); setv(tr, fx, 'Obey note-offs', 1); setv(tr, fx, 'Release', 250)
           setv(tr, fx, 'Volume', t.ig or 0)
         end
       end
@@ -122,7 +123,7 @@ for _, nm in ipairs({'808', 'melody'}) do
     local s = reaper.CreateTrackSend(tracks.kick, dst); reaper.SetTrackSendInfo_Value(tracks.kick, 0, s, 'I_DSTCHAN', 2); reaper.SetTrackSendInfo_Value(tracks.kick, 0, s, 'D_VOL', 1)
   end
 end
-if fxd then local q = 60 / P.bpm; setv(dly, fxd, 'Length (time)', q * 750); setv(dly, fxd, 'Feedback', -12) end
+if fxd then local q = 60 / P.bpm; setv(dly, fxd, '1: Length (time)', q * 750); setv(dly, fxd, '1: Feedback', -12) end
 
 -- мастер: EQ → многополосный ReaXcomp → склейка ReaComp → ReaLimit
 local M = reaper.GetMasterTrack(0)
