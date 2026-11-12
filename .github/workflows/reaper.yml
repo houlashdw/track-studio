@@ -1,0 +1,38 @@
+name: reaper
+# проба: Reaper (Linux) без экрана рендерит дорожки через свои плагины
+on:
+  workflow_dispatch:
+    inputs:
+      fx: { default: '*=JS: Saturation|JS: Bit crusher (with dither)|ReaEQ (Cockos)' }
+permissions:
+  contents: write
+jobs:
+  r:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Reaper
+        run: |
+          sudo apt-get -qq update && sudo apt-get -qq install -y xvfb ffmpeg libgtk-3-0 libasound2t64 >/dev/null || sudo apt-get -qq install -y xvfb ffmpeg libgtk-3-0 libasound2 >/dev/null
+          U=$(curl -sL https://www.reaper.fm/download.php | grep -oE 'files/[0-9.x]+/reaper[0-9a-z_]+_linux_x86_64\.tar\.xz' | head -1); echo "архив: $U"
+          curl -sL "https://www.reaper.fm/$U" -o /tmp/r.tar.xz && mkdir -p /tmp/rp && tar xf /tmp/r.tar.xz -C /tmp/rp
+          D=$(dirname "$(find /tmp/rp -name install-reaper.sh | head -1)"); sudo "$D/install-reaper.sh" --install /opt --integrate-sys-desktop --quiet || true
+          ls /opt/REAPER | head; ls /opt/REAPER/InstallData/Effects 2>/dev/null | head -40
+      - name: Рендер
+        env: { TS_FX: '${{ inputs.fx }}' }
+        run: |
+          mkdir -p /tmp/rin /tmp/rout
+          git fetch -q origin vprep-in:vi && git show vi:beats/ballad.mp3 > /tmp/b.mp3 && ffmpeg -v error -y -i /tmp/b.mp3 -t 20 /tmp/rin/beat.wav
+          mkdir -p ~/.config/REAPER && printf '[REAPER]\nsplashwnd=0\nverchk=0\nlicensed_ok=0\n' > ~/.config/REAPER/reaper.ini
+          export TS_IN=/tmp/rin TS_OUT=/tmp/rout
+          timeout 180 xvfb-run -a /opt/REAPER/reaper -nosplash -newinst server/reaper/render.lua || echo "код $?"
+          cat /tmp/rout/log.txt || true; ls -la /tmp/rout
+          [ -f /tmp/rout/mix.wav ] && ffmpeg -v error -y -i /tmp/rout/mix.wav -b:a 192k /tmp/rout/mix.mp3 && echo "РЕНДЕР ОК"
+      - name: Выгрузка
+        if: always()
+        env: { P: '${{ secrets.KEYSTORE_PASS }}' }
+        run: |
+          mkdir o; for f in /tmp/rout/*.mp3; do [ -f "$f" ] && openssl enc -aes-256-cbc -pbkdf2 -iter 200000 -salt -in "$f" -out "o/$(basename $f).enc" -pass env:P; done; cp /tmp/rout/log.txt o/ 2>/dev/null || true
+          cd o && git init -q -b reaper-out && git config user.name gha && git config user.email gha@users.noreply.github.com
+          git add -A && git commit -q -m reaper && git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" reaper-out
