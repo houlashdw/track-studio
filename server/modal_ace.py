@@ -184,6 +184,18 @@ class AceLego:
     def warm(self): return True
 
     @modal.method()
+    def t2m(self, q: dict) -> bytes:
+        """инструментал БАЗОВОЙ моделью (без адаптеров, больше шагов) — сравнить «жужжание» с turbo"""
+        from acestep.inference import GenerationParams, GenerationConfig, generate_music
+        try: self.dit.set_use_lora(False)
+        except Exception: pass
+        p = GenerationParams(task_type='text2music', caption=q['caption'], lyrics='[Instrumental]', bpm=q.get('bpm'), keyscale=q.get('key', ''), duration=float(q.get('duration', 45)),
+                             vocal_language='unknown', inference_steps=int(q.get('steps', 50)), shift=float(q.get('shift', 1.0)), seed=int(q.get('seed', 7)))
+        r = generate_music(self.dit, self.lm, p, GenerationConfig(batch_size=1, audio_format='mp3', mp3_bitrate='192k', use_random_seed=False), save_dir='/tmp/t2m')
+        if not (r.success and r.audios): raise RuntimeError(str(getattr(r, 'error', r)))
+        return open(r.audios[0]['path'], 'rb').read()
+
+    @modal.method()
     def lego(self, q: dict) -> bytes:
         import subprocess, numpy as np, torch, soundfile as sf
         from acestep.inference import GenerationParams, GenerationConfig, generate_music
@@ -417,3 +429,16 @@ def hybrid_src(outdir: str = 'hy', genres: str = 'trap,phonk,plugg', seed: int =
         for n, v in st.items(): open(f'{outdir}/{g}_{n}.mp3', 'wb').write(v)
         meta[g] = {'bpm': HY_BPM.get(g, 140), 'key': HY_KEY.get(g, '')}; print(g, '%.0f с' % (time.time() - t0), flush=True)
     json.dump(meta, open(f'{outdir}/meta.json', 'w'))
+
+
+@app.local_entrypoint()
+def buzz_ab(outdir: str = 'bz', seed: int = 7):
+    """одно и то же описание: turbo+наш адаптер (8 шагов) против базовой модели (50 шагов) — где меньше «жужжания»"""
+    os.makedirs(outdir, exist_ok=True); ab, lg = AceBeat(), AceLego()
+    for g in ('trap', 'plugg'):
+        q = {'genre': g, 'bpm': HY_BPM[g], 'key': HY_KEY[g], 'duration': 45, 'seed': seed}
+        open(f'{outdir}/{g}_turbo_lora.mp3', 'wb').write(ab.beat.remote(q))
+        cap = GENRE_CAP[g] + ', instrumental'
+        for st in (32, 60):
+            open(f'{outdir}/{g}_base_{st}.mp3', 'wb').write(lg.t2m.remote({'caption': cap, 'bpm': HY_BPM[g], 'key': HY_KEY[g], 'duration': 45, 'seed': seed, 'steps': st}))
+        print(g, 'готово', flush=True)
