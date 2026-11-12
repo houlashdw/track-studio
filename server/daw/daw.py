@@ -233,7 +233,7 @@ def rpp(P, smp, lib, out_wav):
 
 if __name__ == '__main__' and '--hybrid' in sys.argv:
     pass
-elif __name__ == '__main__':
+elif __name__ == '__main__' and '--reaper' not in sys.argv:
     ap = argparse.ArgumentParser()
     ap.add_argument('--genre', default='trap'); ap.add_argument('--seed', type=int, default=1); ap.add_argument('--smp', default='app/smp')
     ap.add_argument('--jsfx', required=True); ap.add_argument('--bin', default='jsfx_render'); ap.add_argument('--out'); ap.add_argument('--rpp'); ap.add_argument('--rppwav'); ap.add_argument('--rpplib', help='путь к JSFX внутри Effects Reaper (относительный)')
@@ -348,3 +348,88 @@ def main_hybrid():
 
 if __name__ == '__main__' and '--hybrid' in sys.argv:
     main_hybrid()
+
+
+# ---------- Reaper-сборщик: проект → Lua-таблица → build.lua внутри Reaper (родные плагины Cockos, RS5K с мелодическими сэмплами) ----------
+VCSL = {   # CC0 (Versilian Community Sample Library): папка, шаблон, нужные корни
+    'glock': 'Idiophones/Struck Idiophones/Glockenspiel', 'marimba': 'Idiophones/Struck Idiophones/Marimba', 'kalimba': 'Idiophones/Plucked Idiophones/Kalimba, Tanzania',
+    'chimes': 'Idiophones/Struck Idiophones/Hand Chimes', 'cowbell': 'Idiophones/Struck Idiophones/Cowbells', 'upright': 'Chordophones/Zithers/Upright Piano, Knight/Sustains',
+    'grand': 'Chordophones/Zithers/Grand Piano, Kawai/Sustains', 'fmpiano': 'Electrophones/TX81Z/FM Piano', 'harp': 'Chordophones/Composite Chordophones/Concert Harp',
+}
+INST = {'trap': ('glock', 'upright'), 'drill': ('grand', 'harp'), 'plugg': ('kalimba', 'fmpiano'), 'rage': ('synth', 'fmpiano'), 'phonk': ('cowbell', 'fmpiano'), 'detroit': ('upright', 'chimes')}
+NOTE = {'C': 0, 'C#': 1, 'D': 2, 'D#': 3, 'E': 4, 'F': 5, 'F#': 6, 'G': 7, 'G#': 8, 'A': 9, 'A#': 10, 'B': 11}
+
+
+def vcsl_zones(root, inst, lo=48, hi=96, n=4):
+    """мульти-сэмпл: до n сэмплов с корнями в диапазоне, у каждого своя зона клавиш"""
+    import re, glob
+    d = os.path.join(root, VCSL[inst]); fs = sorted(glob.glob(d + '/*.wav')); cand = {}
+    for f in fs:
+        b = os.path.basename(f)
+        if any(x in b.lower() for x in ('soft', '_vl1', 'muted', 'rel')) and inst not in ('cowbell',): continue
+        m = re.search(r'(?<![A-Za-z])([A-G]#?)(-?\d)(?=[_.])', b)
+        if inst == 'cowbell': cand.setdefault(72, f); continue
+        if m:
+            mi = 12 * (int(m.group(2)) + 1) + NOTE[m.group(1)]
+            if lo - 12 <= mi <= hi + 12: cand.setdefault(mi, f)
+    ks = sorted(cand)
+    if len(ks) > n: ks = [ks[round(i * (len(ks) - 1) / (n - 1))] for i in range(n)]
+    zs = []
+    for i, k in enumerate(ks):
+        a = 0 if i == 0 else (ks[i - 1] + k) // 2 + 1; b = 127 if i == len(ks) - 1 else (k + ks[i + 1]) // 2
+        zs.append(dict(file=cand[k], root=k, lo=a, hi=b))
+    return zs
+
+
+def to_lua(v):
+    if isinstance(v, dict): return '{' + ','.join('[%s]=%s' % (to_lua(k), to_lua(x)) for k, x in v.items()) + '}'
+    if isinstance(v, (list, tuple)): return '{' + ','.join(to_lua(x) for x in v) + '}'
+    if isinstance(v, bool): return 'true' if v else 'false'
+    if isinstance(v, (int, float)): return repr(float(v)) if isinstance(v, float) else str(v)
+    if v is None: return 'nil'
+    return '"' + str(v).replace('\\', '\\\\').replace('"', '\\"') + '"'
+
+
+def reaper_project(P, smp, vcsl_root, out_wav):
+    g = P['genre']; lead, keys = INST.get(g, ('glock', 'upright'))
+    tr = []
+    for name in ['kick', 'snare', 'clap', 'hat', 'ohat', 'perc', '808']:
+        ev = P['tracks'].get(name) or []; k = P['kit'].get(name)
+        if not ev or not k: continue
+        path = os.path.abspath(os.path.join(smp, k['f'])); items = []
+        for e in ev:
+            rate = 1.0; d = sf.info(path).duration
+            if name == '808' and k.get('hz'): rate = 440 * 2 ** ((e['m'] - 69) / 12) / k['hz']; d = min(d / rate, e['d'] + .05)
+            elif name == 'perc' and e.get('m'): rate = 2 ** ((e['m'] - 72) / 12); d = d / rate
+            items.append(dict(t=e['t'], d=d, v=e.get('v', 1.0), rate=rate))
+        tr.append(dict(name=name, kind='audio', file=path, items=items, lvl=P['lvl'][name], pan=P['pan'].get(name, 0)))
+    for name, inst in (('melody', lead), ('pad', keys)):
+        ev = P['tracks'].get(name) or []
+        if not ev: continue
+        notes = []
+        for e in ev:
+            for m in e.get('ms', [e.get('m')]): notes.append(dict(t=e['t'], d=e['d'], m=int(m), v=int(110 * e.get('v', .8))))
+        zones = [] if inst == 'synth' else vcsl_zones(vcsl_root, inst)
+        tr.append(dict(name=name, kind='midi', inst=inst, zones=zones, notes=notes, lvl=P['lvl'][name] + (2 if name == 'pad' else 0), pan=0))
+    def arms(f):   # громкость звучащей части сэмпла
+        x, _ = sf.read(f, dtype='float32', always_2d=True); x = x.mean(1); a = np.abs(x) > np.abs(x).max() * .05
+        return float(np.sqrt((x[a] ** 2).mean())) if a.any() else 1.0
+    for t in tr:   # фейдер дорожки: RMS звука в целевую громкость (как в своём движке), с поправкой на перекрытие нот
+        r = arms(t['file']) if t['kind'] == 'audio' else (np.mean([arms(z['file']) for z in t['zones']]) if t.get('zones') else .25)
+        poly = 1.6 if t['name'] == 'pad' else 1.0
+        t['vol'] = float(np.clip(t['lvl'] - 20 * np.log10(r * poly + 1e-9), -40, 18))
+    return dict(genre=g, bpm=P['bpm'], total=P['total'], out=out_wav, tracks=tr,
+                drive={'rage': .7, 'phonk': .6}.get(g, .3), loud={'rage': -7, 'phonk': -7, 'drill': -8}.get(g, -9))
+
+
+def main_reaper():
+    ap = argparse.ArgumentParser(); ap.add_argument('--reaper', required=True); ap.add_argument('--genre', default='trap'); ap.add_argument('--seed', type=int, default=3)
+    ap.add_argument('--smp', default='app/smp'); ap.add_argument('--vcsl', required=True); ap.add_argument('--wav', required=True)
+    a = ap.parse_args(); P = build(a.genre, a.seed, a.smp)
+    Rp = reaper_project(P, a.smp, a.vcsl, a.wav)
+    open(a.reaper, 'w').write('return ' + to_lua(Rp) + '\n')
+    print('проект Reaper (Lua): %s %d bpm, дорожек %d, мелодия %s, пэд %s' % (a.genre, P['bpm'], len(Rp['tracks']), *INST.get(a.genre, ('?', '?'))), [ (t['name'], len(t.get('zones', []))) for t in Rp['tracks'] if t['kind'] == 'midi'])
+
+
+if __name__ == '__main__' and '--reaper' in sys.argv:
+    main_reaper()

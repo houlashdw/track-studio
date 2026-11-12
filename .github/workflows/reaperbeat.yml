@@ -1,0 +1,48 @@
+name: reaperbeat
+# бит целиком в Reaper: сборщик (дорожки, клипы, MIDI, RS5K с CC0-сэмплами VCSL), сведение и мастеринг родными плагинами Cockos
+on:
+  workflow_dispatch:
+    inputs:
+      genres: { default: 'trap phonk plugg' }
+      seed: { default: '3' }
+permissions:
+  contents: write
+jobs:
+  r:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - name: Reaper и сэмплы
+        run: |
+          sudo apt-get -qq update && (sudo apt-get -qq install -y xvfb ffmpeg libgtk-3-0 libasound2t64 >/dev/null || sudo apt-get -qq install -y xvfb ffmpeg libgtk-3-0 libasound2 >/dev/null)
+          pip install -q numpy soundfile
+          U=$(curl -sL https://www.reaper.fm/download.php | grep -oE 'files/[0-9.x]+/reaper[0-9a-z_]+_linux_x86_64\.tar\.xz' | head -1); echo "архив: $U"
+          curl -sL "https://www.reaper.fm/$U" -o /tmp/r.tar.xz && mkdir -p /tmp/rp && tar xf /tmp/r.tar.xz -C /tmp/rp
+          D=$(dirname "$(find /tmp/rp -name install-reaper.sh | head -1)"); sudo "$D/install-reaper.sh" --install /opt --quiet || true
+          mkdir -p ~/.config/REAPER && printf '[REAPER]\nsplashwnd=0\nverchk=0\n' > ~/.config/REAPER/reaper.ini
+          git clone -q --depth 1 --filter=blob:none --sparse https://github.com/sgossner/VCSL ~/vcsl && cd ~/vcsl && git sparse-checkout set "Idiophones/Struck Idiophones/Glockenspiel" "Idiophones/Struck Idiophones/Marimba" "Idiophones/Plucked Idiophones/Kalimba, Tanzania" "Idiophones/Struck Idiophones/Hand Chimes" "Idiophones/Struck Idiophones/Cowbells" "Chordophones/Zithers/Upright Piano, Knight/Sustains" "Chordophones/Zithers/Grand Piano, Kawai/Sustains" "Electrophones/TX81Z/FM Piano" "Chordophones/Composite Chordophones/Concert Harp" && du -sh ~/vcsl
+      - name: Сборка и рендер в Reaper (2 прохода: громкость мастера по замеру)
+        run: |
+          mkdir -p /tmp/out
+          for g in ${{ inputs.genres }}; do
+            python3 server/daw/daw.py --reaper /tmp/out/$g.lua --genre $g --seed ${{ inputs.seed }} --smp app/smp --vcsl ~/vcsl --wav /tmp/out/rb_$g.wav
+            MG=0
+            for pass in 1 2; do
+              rm -f /tmp/out/rb_$g.wav; t0=$(date +%s)
+              TS_PROJ=/tmp/out/$g.lua TS_LOG=/tmp/out/$g.log TS_MGAIN=$MG timeout 240 xvfb-run -a /opt/REAPER/reaper -nosplash -newinst server/reaper/build.lua >/dev/null 2>&1 || true
+              [ -f /tmp/out/rb_$g.wav ] || { echo "нет рендера $g"; tail -20 /tmp/out/$g.log; break; }
+              I=$(ffmpeg -hide_banner -i /tmp/out/rb_$g.wav -af ebur128 -f null - 2>&1 | grep -A1 "Integrated loudness" | grep -oE "[-0-9.]+ LUFS" | tail -1 | cut -d' ' -f1)
+              echo "$g проход $pass: $(( $(date +%s) - t0 )) с, громкость $I LUFS"
+              MG=$(python3 -c "print(round(-(-9 - float('$I')), 1))" 2>/dev/null || echo 0)   # порог лимитера ниже на разницу до -9 LUFS
+            done
+            grep -E "НЕТ|не найден|нет параметра|РЕНДЕР" /tmp/out/$g.log | sort | uniq -c | head -20
+          done
+          cd /tmp/out && for f in rb_*.wav; do ffmpeg -v error -y -i $f -b:a 192k ${f%.wav}.mp3; done; ls -la
+      - name: Выгрузка
+        if: always()
+        env: { P: '${{ secrets.KEYSTORE_PASS }}' }
+        run: |
+          mkdir o; for f in /tmp/out/*.mp3; do [ -f "$f" ] && openssl enc -aes-256-cbc -pbkdf2 -iter 200000 -salt -in "$f" -out "o/$(basename $f).enc" -pass env:P; done; cp /tmp/out/*.log /tmp/out/*.rpp o/ 2>/dev/null || true
+          cd o && git init -q -b reaperbeat-out && git config user.name gha && git config user.email gha@users.noreply.github.com
+          git add -A && git commit -q -m rb && git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" reaperbeat-out
