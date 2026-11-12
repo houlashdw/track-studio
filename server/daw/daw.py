@@ -412,7 +412,7 @@ def reaper_project(P, smp, vcsl_root, out_wav):
         zones = [] if inst == 'synth' else vcsl_zones(vcsl_root, inst)
         tr.append(dict(name=name, kind='midi', inst=inst, zones=zones, notes=notes, lvl=P['lvl'][name] + (2 if name == 'pad' else 0), pan=0))
     def arms(f):   # громкость звучащей части сэмпла
-        x, _ = sf.read(f, dtype='float32', always_2d=True); x = x.mean(1); a = np.abs(x) > np.abs(x).max() * .05
+        x, sr0 = sf.read(f, dtype='float32', always_2d=True); x = x.mean(1)[:int(.35 * sr0)]; a = np.abs(x) > np.abs(x).max() * .05   # первые 350 мс: у колоколов длинный тихий хвост, по нему громкость завышалась
         return float(np.sqrt((x[a] ** 2).mean())) if a.any() else 1.0
     for t in tr:   # фейдер дорожки: RMS звука в целевую громкость (как в своём движке), с поправкой на перекрытие нот
         r = arms(t['file']) if t['kind'] == 'audio' else (np.mean([arms(z['file']) for z in t['zones']]) if t.get('zones') else .25)

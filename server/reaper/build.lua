@@ -29,7 +29,8 @@ end
 local function setenum(tr, fx, name, text)
   local i = pidx(tr, fx, name); if not i then L('  нет параметра', name); return end
   for k = 0, 100 do local x = k / 100; local _, s = reaper.TrackFX_FormatParamValueNormalized(tr, fx, i, x, ''); if s:lower():find(text:lower(), 1, true) then reaper.TrackFX_SetParamNormalized(tr, fx, i, x); L('  ', name, '=', s); return end end
-  L('  вариант не найден', name, text)
+  local opts = {} for k = 0, 20 do local _, s = reaper.TrackFX_FormatParamValueNormalized(tr, fx, i, k / 20, ''); opts[#opts + 1] = s end
+  L('  вариант не найден', name, text, 'есть:', table.concat(opts, ' / '))
 end
 local function addfx(tr, nm)
   local fx = reaper.TrackFX_AddByName(tr, nm, false, -1)
@@ -48,7 +49,7 @@ end
 local function comp(tr, th, ratio, att, rel, aux)
   local fx = addfx(tr, 'ReaComp (Cockos)'); if not fx then return end
   setv(tr, fx, 'Threshold', th); setv(tr, fx, 'Ratio', ratio); setv(tr, fx, 'Attack', att); setv(tr, fx, 'Release', rel)
-  if aux then setenum(tr, fx, 'AudIn', 'aux') end
+  if aux then setenum(tr, fx, 'SignIn', 'aux'); setenum(tr, fx, 'AudIn', 'main') end
   return fx
 end
 
