@@ -76,7 +76,7 @@ jobs:
           curl -s -o /tmp/h.mp3 -w "с ключом: %{http_code}, %{size_download} байт, %{time_total} с\n" -X POST "$U/generate" -H "Content-Type: application/json" -H "X-Key: $K" -H "Origin: https://appassets.androidplatform.net" \
             -d '{"caption":"dreamy russian pop, female vocal in Russian","lyrics":"[Verse]\nГород спит, а я не сплю опять\n\n[Chorus]\nМы горим до утра","duration":30,"voice":1}' --max-time 900
       - name: Обучение на Modal (данные с Kaggle → том → L40S)
-        if: inputs.cmd == 'train'
+        if: inputs.cmd == 'train' || inputs.cmd == 'trainget'
         env: { KAGGLE_USERNAME: '${{ secrets.KAGGLE_USERNAME }}', KAGGLE_KEY: '${{ secrets.KAGGLE_KEY }}', P: '${{ secrets.KEYSTORE_PASS }}' }
         run: |
           pip install -q -U kaggle six; case "$KAGGLE_KEY" in KGAT*) export KAGGLE_API_TOKEN="$KAGGLE_KEY";; esac
@@ -87,9 +87,8 @@ jobs:
             D=$(dirname "$(find /tmp/kin -name dataset.json | head -1)"); echo "данные: $(ls "$D" | wc -l) файлов, $(du -sh "$D" | cut -f1)"
             modal volume put -f ts-ace "$D" "/data/$N"
           fi
-          modal run server/modal_train.py --src "$N" --out "$O" --env "${{ inputs.tenv }}" > /tmp/tr.log 2>&1 || true; grep -av "%|\|it/s\|B/s" /tmp/tr.log | grep -av "^\s*$" | tail -150
-          mkdir -p /tmp/to o && modal volume get ts-ace "/train/$O" /tmp/to
-          for f in $(find /tmp/to -name "*.mp3"); do openssl enc -aes-256-cbc -pbkdf2 -iter 200000 -salt -in "$f" -out "o/$(basename $f).enc" -pass env:P; done; ls o
+          touch /tmp/tr.log; [ "${{ inputs.cmd }}" = trainget ] || modal run server/modal_train.py --src "$N" --out "$O" --env "${{ inputs.tenv }}" > /tmp/tr.log 2>&1 || true; grep -av "%|\|it/s\|B/s" /tmp/tr.log | grep -av "^\s*$" | tail -150
+          mkdir -p /tmp/to && modal volume get ts-ace "/train/$O" /tmp/to && bash tools/enc_out.sh /tmp/to o
           cd o && git init -q -b modal-out && git config user.name gha && git config user.email gha@users.noreply.github.com
           git add -A && git commit -q -m train && git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" modal-out
       - name: Своя точка входа (ep:<имя>) → mp3 в modal-out
