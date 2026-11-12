@@ -1,0 +1,5 @@
+beat + JS: Saturation -> 0
+beat + JS: Bit crusher (with dither) -> -1
+beat + ReaEQ (Cockos) -> 1
+дорожек: 1
+рендер готов
