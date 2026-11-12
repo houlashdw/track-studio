@@ -99,7 +99,7 @@ def proc(src: str, out: str, items: list):
         sd = f"/tmp/sep/htdemucs/{s['filename'].replace('.mp3', '')}"
         try: r = analyze(s, sd, OUT); res += r; print(s['filename'], [(x['id'], round(x['bpm']), x['key'] + x['mode'][:3], len(x['steps']['k']), len(x['b808'])) for x in r], flush=True)
         except Exception as e: print('⚠', s['filename'], repr(e)[:200], flush=True)
-    vol.commit(); return res
+    vol.commit(); return json.loads(json.dumps(res, default=float))
 
 
 @app.function(volumes={VOL: vol})
