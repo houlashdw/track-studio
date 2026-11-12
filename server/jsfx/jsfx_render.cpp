@@ -13,9 +13,14 @@ static void logr(intptr_t, ysfx_log_level lv, const char *m) { if (lv != ysfx_lo
 int main(int argc, char **argv) {
     if (argc < 5) { fprintf(stderr, "usage: jsfx_render <sr> <in.f32> <out.f32> <fx spec>...\n"); return 2; }
     double sr = atof(argv[1]);
-    FILE *f = fopen(argv[2], "rb"); if (!f) { perror("in"); return 1; }
-    fseek(f, 0, SEEK_END); long n = ftell(f) / (sizeof(float) * 2); fseek(f, 0, SEEK_SET);
-    std::vector<float> buf(n * 2); if (fread(buf.data(), sizeof(float), n * 2, f) != (size_t)(n * 2)) { fprintf(stderr, "short read\n"); return 1; } fclose(f);
+    long n = 0; std::vector<float> buf;
+    if (getenv("JSFX_LEN")) { n = atol(getenv("JSFX_LEN")); buf.assign(n * 2, 0.f); }   // инструмент: вход — тишина нужной длины
+    else { FILE *f = fopen(argv[2], "rb"); if (!f) { perror("in"); return 1; }
+        fseek(f, 0, SEEK_END); n = ftell(f) / (sizeof(float) * 2); fseek(f, 0, SEEK_SET);
+        buf.resize(n * 2); if (fread(buf.data(), sizeof(float), n * 2, f) != (size_t)(n * 2)) { fprintf(stderr, "short read\n"); return 1; } fclose(f); }
+    struct Ev { long fr; uint8_t d[3]; }; std::vector<Ev> evs;   // MIDI для первого эффекта в цепочке (синт)
+    if (getenv("JSFX_MIDI")) { FILE *m = fopen(getenv("JSFX_MIDI"), "r"); long fr; int a, b, c; while (m && fscanf(m, "%ld %d %d %d", &fr, &a, &b, &c) == 4) evs.push_back({fr, {(uint8_t)a, (uint8_t)b, (uint8_t)c}}); if (m) fclose(m); }
+    size_t ei = 0;
     const uint32_t B = 512;
     for (int a = 4; a < argc; ++a) {
         std::string spec = argv[a], path = spec, sl; size_t at = spec.find('@');
@@ -23,7 +28,7 @@ int main(int argc, char **argv) {
         ysfx_config_t *cfg = ysfx_config_new(); ysfx_set_log_reporter(cfg, &logr); ysfx_register_builtin_audio_formats(cfg); ysfx_guess_file_roots(cfg, path.c_str());
         ysfx_t *fx = ysfx_new(cfg); ysfx_config_free(cfg);
         if (!ysfx_load_file(fx, path.c_str(), 0) || !ysfx_compile(fx, ysfx_compile_no_gfx)) { fprintf(stderr, "не загрузился: %s\n", path.c_str()); ysfx_free(fx); continue; }
-        ysfx_set_sample_rate(fx, sr); ysfx_set_block_size(fx, B); ysfx_init(fx);
+        ysfx_set_sample_rate(fx, sr); ysfx_set_block_size(fx, B); ysfx_set_midi_capacity(fx, 4096, true); ysfx_init(fx);
         // слайдеры: "2=-6,4=0.5"
         size_t p = 0;
         while (p < sl.size()) {
@@ -36,13 +41,14 @@ int main(int argc, char **argv) {
         std::vector<std::vector<float>> I(ni, std::vector<float>(B)), O(no, std::vector<float>(B));
         std::vector<const float *> ip(ni); std::vector<float *> op(no);
         for (uint32_t c = 0; c < ni; ++c) ip[c] = I[c].data(); for (uint32_t c = 0; c < no; ++c) op[c] = O[c].data();
-        ysfx_time_info_t ti{}; ti.tempo = 120; ti.playback_state = ysfx_playback_playing; ti.time_signature[0] = 4; ti.time_signature[1] = 4;
+        ysfx_time_info_t ti{}; ti.tempo = getenv("JSFX_BPM") ? atof(getenv("JSFX_BPM")) : 120; ti.playback_state = ysfx_playback_playing; ti.time_signature[0] = 4; ti.time_signature[1] = 4;
         double pdc = ysfx_get_pdc_delay(fx); long lat = (long)(pdc > 0 ? pdc : 0), total = n + lat, w = 0;
         std::vector<float> out(n * 2, 0.f);
         for (long s = 0; s < total; s += B) {
             uint32_t k = (uint32_t)((total - s) < (long)B ? (total - s) : B);
             for (uint32_t i = 0; i < k; ++i) { long j = s + i; float L = j < n ? buf[j * 2] : 0.f, R = j < n ? buf[j * 2 + 1] : 0.f; I[0][i] = L; I[1][i] = R; for (uint32_t c = 2; c < ni; ++c) I[c][i] = 0; }
             ti.time_position = s / sr; ti.beat_position = ti.time_position * ti.tempo / 60.0; ysfx_set_time_info(fx, &ti);
+            if (a == 4) while (ei < evs.size() && evs[ei].fr < s + (long)k) { ysfx_midi_event_t me{}; me.bus = 0; me.offset = (uint32_t)(evs[ei].fr > s ? evs[ei].fr - s : 0); me.size = 3; me.data = evs[ei].d; ysfx_send_midi(fx, &me); ++ei; }
             ysfx_process_float(fx, ip.data(), op.data(), ni, no, k);
             for (uint32_t i = 0; i < k; ++i) { long j = s + i - lat; if (j >= 0 && j < n) { out[j * 2] = O[0][i]; out[j * 2 + 1] = O[1][i]; } }
             w += k;

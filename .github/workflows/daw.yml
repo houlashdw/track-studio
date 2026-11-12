@@ -1,0 +1,47 @@
+name: daw
+# бит «как в DAW» из одного проекта: A) свой движок (ysfx/JSFX), B) настоящий Reaper (.rpp → рендер) — для сравнения
+on:
+  workflow_dispatch:
+    inputs:
+      genres: { default: 'trap phonk plugg' }
+      seed: { default: '3' }
+permissions:
+  contents: write
+jobs:
+  d:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - name: Зависимости, JSFX, ysfx
+        run: |
+          sudo apt-get -qq update && (sudo apt-get -qq install -y xvfb ffmpeg libgtk-3-0 libasound2t64 cmake >/dev/null || sudo apt-get -qq install -y xvfb ffmpeg libgtk-3-0 libasound2 cmake >/dev/null)
+          pip install -q numpy soundfile
+          mkdir -p ~/jsfx && cd ~/jsfx && for r in ReaTeam/JSFX JoepVanlier/JSFX chkhld/jsfx geraintluff/jsfx; do git clone -q --depth 1 https://github.com/$r $(echo $r | tr / _); done
+          cd ~ && git clone -q --depth 1 https://github.com/JoepVanlier/ysfx && cd ysfx && git submodule update -q --init --depth 1 thirdparty/dr_libs
+          cp $GITHUB_WORKSPACE/server/jsfx/jsfx_render.cpp tools/ && sed -i 's|add_executable(ysfx_tool|add_executable(jsfx_render "tools/jsfx_render.cpp")\ntarget_link_libraries(jsfx_render PRIVATE ysfx::ysfx)\nadd_executable(ysfx_tool|' cmake.tools.txt
+          cmake -S . -B b -DYSFX_PLUGIN=OFF -DYSFX_GFX=OFF -DYSFX_TOOLS=ON -DCMAKE_BUILD_TYPE=Release -DYSFX_SKIP_CHECKSUM=ON >/dev/null && cmake --build b -j4 --target jsfx_render >/dev/null && ls -la b/jsfx_render
+      - name: Reaper
+        run: |
+          U=$(curl -sL https://www.reaper.fm/download.php | grep -oE 'files/[0-9.x]+/reaper[0-9a-z_]+_linux_x86_64\.tar\.xz' | head -1); echo "архив: $U"
+          curl -sL "https://www.reaper.fm/$U" -o /tmp/r.tar.xz && mkdir -p /tmp/rp && tar xf /tmp/r.tar.xz -C /tmp/rp
+          D=$(dirname "$(find /tmp/rp -name install-reaper.sh | head -1)"); sudo "$D/install-reaper.sh" --install /opt --quiet || true
+          mkdir -p ~/.config/REAPER/Effects && cp -r ~/jsfx ~/.config/REAPER/Effects/tsjsfx
+          printf '[REAPER]\nsplashwnd=0\nverchk=0\n' > ~/.config/REAPER/reaper.ini
+      - name: Проекты и рендер
+        run: |
+          mkdir -p /tmp/out
+          for g in ${{ inputs.genres }}; do
+            t0=$(date +%s); python3 server/daw/daw.py --genre $g --seed ${{ inputs.seed }} --smp app/smp --jsfx ~/jsfx --bin ~/ysfx/b/jsfx_render --out /tmp/out/own_$g.wav --rpp /tmp/out/$g.rpp --rppwav /tmp/out/reaper_$g.wav --rpplib tsjsfx 2>&1 | tail -3
+            echo "свой движок $g: $(( $(date +%s) - t0 )) с"
+            t0=$(date +%s); timeout 300 xvfb-run -a /opt/REAPER/reaper -nosplash -renderproject /tmp/out/$g.rpp >/tmp/out/reaper_$g.log 2>&1 || echo "reaper код $?"
+            echo "Reaper $g: $(( $(date +%s) - t0 )) с, $(ls -la /tmp/out/reaper_$g.wav 2>/dev/null | awk '{print $5}') байт"
+          done
+          cd /tmp/out && for f in *.wav; do ffmpeg -v error -y -i $f -b:a 192k ${f%.wav}.mp3; done; ls -la
+      - name: Выгрузка
+        if: always()
+        env: { P: '${{ secrets.KEYSTORE_PASS }}' }
+        run: |
+          mkdir o; for f in /tmp/out/*.mp3; do [ -f "$f" ] && openssl enc -aes-256-cbc -pbkdf2 -iter 200000 -salt -in "$f" -out "o/$(basename $f).enc" -pass env:P; done; cp /tmp/out/*.rpp /tmp/out/*.log o/ 2>/dev/null || true
+          cd o && git init -q -b daw-out && git config user.name gha && git config user.email gha@users.noreply.github.com
+          git add -A && git commit -q -m daw && git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" daw-out
