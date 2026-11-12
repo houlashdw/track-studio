@@ -252,9 +252,7 @@ def analyze_ai(hy, g, bpm0):
     import librosa
     dr, _ = librosa.load(f'{hy}/{g}_drums.mp3', sr=22050); bs, _ = librosa.load(f'{hy}/{g}_bass.mp3', sr=22050)
     tempo = float(librosa.feature.tempo(y=dr, sr=22050, start_bpm=bpm0)[0])
-    for c in (tempo, tempo * 2, tempo / 2, tempo * 1.5, tempo / 1.5):
-        if abs(c - bpm0) / bpm0 < .04: tempo = c; break
-    else: tempo = bpm0
+    tempo = bpm0   # ACE держит заданный темп точно (замер), а оценка librosa гуляет на 1–2 % — за минуту это уже полсекунды расхождения
     # сдвиг: низ барабанов (кики) против сетки долей — фаза с наибольшим совпадением
     S = np.abs(librosa.stft(dr, n_fft=1024, hop_length=256)); fr = librosa.fft_frequencies(sr=22050, n_fft=1024)
     lo = S[fr < 150].sum(0); on = np.maximum(np.diff(lo, prepend=lo[0]), 0); hop = 256 / 22050
@@ -263,6 +261,10 @@ def analyze_ai(hy, g, bpm0):
         idx = ((ph + np.arange(0, len(on) * hop - ph, beat)) / hop).astype(int); idx = idx[idx < len(on)]
         sc = on[idx].sum()
         if sc > best: best, off = sc, ph
+    idx = ((off + np.arange(0, len(on) * hop - off, beat / 4)) / hop).astype(int); idx = idx[idx < len(on)]
+    strong = on > np.percentile(on, 97); near = np.zeros(len(on), bool)
+    for d in range(-5, 6): near[np.clip(idx + d, 0, len(on) - 1)] = True
+    print('  попадание ударов ИИ в нашу сетку 1/16 (±30 мс): %.0f %%' % (100 * (strong & near).sum() / max(1, strong.sum())), flush=True)
     # корни баса по тактам
     bar = beat * 4; nb = int(len(bs) / 22050 // bar); roots = []
     f0, vo, _ = librosa.pyin(bs, fmin=30, fmax=200, sr=22050, frame_length=4096, hop_length=1024)
