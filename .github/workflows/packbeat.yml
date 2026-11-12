@@ -1,0 +1,51 @@
+name: packbeat
+# бит в Reaper из пака скачанных битов (server/modal_pack.py → том ts-ace /pack/<pack>): петля мелодии + наши киты по грувам + 808 по басу, мастер
+on:
+  workflow_dispatch:
+    inputs:
+      genres: { default: 'trap rage plugg phonk drill' }
+      seeds: { default: '1' }
+      pack: { default: 'pack1' }
+permissions:
+  contents: write
+jobs:
+  r:
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    env: { MODAL_TOKEN_ID: '${{ secrets.MODAL_TOKEN_ID }}', MODAL_TOKEN_SECRET: '${{ secrets.MODAL_TOKEN_SECRET }}' }
+    steps:
+      - uses: actions/checkout@v4
+      - name: Reaper и пак
+        run: |
+          sudo apt-get -qq update && (sudo apt-get -qq install -y xvfb ffmpeg libgtk-3-0 libasound2t64 >/dev/null || sudo apt-get -qq install -y xvfb ffmpeg libgtk-3-0 libasound2 >/dev/null)
+          pip install -q numpy soundfile modal
+          U=$(curl -sL https://www.reaper.fm/download.php | grep -oE 'files/[0-9.x]+/reaper[0-9a-z_]+_linux_x86_64\.tar\.xz' | head -1); echo "архив: $U"
+          curl -sL "https://www.reaper.fm/$U" -o /tmp/r.tar.xz && mkdir -p /tmp/rp && tar xf /tmp/r.tar.xz -C /tmp/rp
+          D=$(dirname "$(find /tmp/rp -name install-reaper.sh | head -1)"); sudo "$D/install-reaper.sh" --install /opt --quiet || true
+          mkdir -p ~/.config/REAPER && printf '[REAPER]\nsplashwnd=0\nverchk=0\n' > ~/.config/REAPER/reaper.ini
+          mkdir -p /tmp/pk && modal volume get ts-ace "/pack/${{ inputs.pack }}" /tmp/pk >/dev/null
+          P=$(dirname "$(find /tmp/pk -name pack.json | head -1)"); echo "PK=$P" >> $GITHUB_ENV; echo "пак: $(ls $P | wc -l) файлов, $(du -sh $P | cut -f1)"
+      - name: Сборка и рендер в Reaper — 2 прохода, громкость по замеру
+        run: |
+          mkdir -p /tmp/out
+          for g in ${{ inputs.genres }}; do for s in ${{ inputs.seeds }}; do
+            n=${g}_$s; python3 server/daw/pack.py --pack "$PK" --genre $g --seed $s --smp app/smp --wav /tmp/out/pk_$n.wav --lua /tmp/out/$n.lua || continue
+            MG=0
+            for pass in 1 2; do
+              rm -f /tmp/out/pk_$n.wav /tmp/out/$n.log; t0=$(date +%s)
+              (TS_PROJ=/tmp/out/$n.lua TS_LOG=/tmp/out/$n.log TS_MGAIN=$MG timeout 240 xvfb-run -a /opt/REAPER/reaper -nosplash -newinst server/reaper/build.lua >/dev/null 2>&1 &)
+              for i in $(seq 1 230); do grep -q "РЕНДЕР ГОТОВ" /tmp/out/$n.log 2>/dev/null && break; sleep 1; done; sleep 1; pkill -f /opt/REAPER/reaper || true; pkill Xvfb || true; sleep 1
+              [ -f /tmp/out/pk_$n.wav ] || { echo "нет рендера $n"; tail -20 /tmp/out/$n.log; break; }
+              I=$(ffmpeg -hide_banner -i /tmp/out/pk_$n.wav -af ebur128 -f null - 2>&1 | grep -A1 "Integrated loudness" | grep -oE "[-0-9.]+ LUFS" | tail -1 | cut -d' ' -f1)
+              echo "$n проход $pass: $(( $(date +%s) - t0 )) с, громкость $I LUFS"
+              MG=$(python3 -c "print(round($MG + float('$I') + 9, 1))" 2>/dev/null || echo 0)
+            done
+            grep -E "НЕТ|не найден|нет параметра" /tmp/out/$n.log | sort | uniq -c | head
+          done; done
+          cd /tmp/out && for f in pk_*.wav; do ffmpeg -v error -y -i $f -b:a 192k ${f%.wav}.mp3; done; ls
+      - name: Выгрузка (шифр открытым ключом)
+        if: always()
+        run: |
+          bash tools/enc_out.sh /tmp/out o; cp /tmp/out/*.log o/ 2>/dev/null || true
+          cd o && git init -q -b packbeat-out && git config user.name gha && git config user.email gha@users.noreply.github.com
+          git add -A && git commit -q -m pk && git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" packbeat-out

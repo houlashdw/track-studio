@@ -73,9 +73,12 @@ for _, t in ipairs(P.tracks) do
     local src = reaper.PCM_Source_CreateFromFile(t.file)
     for _, it in ipairs(t.items) do
       local item = reaper.AddMediaItemToTrack(tr); reaper.SetMediaItemInfo_Value(item, 'D_POSITION', it.t); reaper.SetMediaItemInfo_Value(item, 'D_LENGTH', it.d)
-      reaper.SetMediaItemInfo_Value(item, 'D_FADEOUTLEN', 0.015); reaper.SetMediaItemInfo_Value(item, 'D_FADEINLEN', t.name == '808' and 0.025 or 0.001)   -- 808 мягко входит после щелчка кика (вместо сайдчейна)
+      reaper.SetMediaItemInfo_Value(item, 'D_FADEOUTLEN', it.fo or 0.015); reaper.SetMediaItemInfo_Value(item, 'D_FADEINLEN', it.fi or (t.name == '808' and 0.025 or 0.001))   -- 808 мягко входит после щелчка кика (вместо сайдчейна)
+      if it.loop then reaper.SetMediaItemInfo_Value(item, 'B_LOOPSRC', 1) else reaper.SetMediaItemInfo_Value(item, 'B_LOOPSRC', 0) end
       local tk = reaper.AddTakeToMediaItem(item); reaper.SetMediaItemTake_Source(tk, src)
-      reaper.SetMediaItemTakeInfo_Value(tk, 'D_PLAYRATE', it.rate); reaper.SetMediaItemTakeInfo_Value(tk, 'B_PPITCH', 0); reaper.SetMediaItemTakeInfo_Value(tk, 'D_VOL', it.v * db(t.ig or 0))
+      reaper.SetMediaItemTakeInfo_Value(tk, 'D_PLAYRATE', it.rate); reaper.SetMediaItemTakeInfo_Value(tk, 'B_PPITCH', it.pp and 1 or 0); reaper.SetMediaItemTakeInfo_Value(tk, 'D_VOL', it.v * db(t.ig or 0))
+      if it.off then reaper.SetMediaItemTakeInfo_Value(tk, 'D_STARTOFFS', it.off) end
+      if it.pitch then reaper.SetMediaItemTakeInfo_Value(tk, 'D_PITCH', it.pitch) end
     end
   else
     local item = reaper.CreateNewMIDIItemInProj(tr, 0, P.total, false); local tk = reaper.GetActiveTake(item)
@@ -108,6 +111,12 @@ for _, t in ipairs(P.tracks) do
     eq(tr, {{0, 35, 2}, {0, 250, -3, 1.5}, {0, 1200, 1, 1}, {0, 6000, -6}})
     local sat = addfx(tr, 'JS: Saturation'); if sat then setv(tr, sat, 'Amount', P.drive * 100) end
     comp(tr, -20, 4, 1, 120)
+  elseif nm == 'mel' then   -- петля мелодии из пака: низ освобождаем под 808, чуть плотнее
+    eq(tr, {{0, 140, -10}, {0, 350, -2, 1.5}, {0, 3000, 0.5, 1}, {0, 10000, 0}}); comp(tr, -20, 2, 15, 150)
+  elseif nm == 'bassloop' then
+    eq(tr, {{0, 35, 1}, {0, 250, -2, 1.5}, {0, 1200, 0, 1}, {0, 5000, -6}})
+    local sat = addfx(tr, 'JS: Saturation'); if sat then setv(tr, sat, 'Amount', P.drive * 60) end
+    comp(tr, -20, 3, 3, 120)
   elseif nm == 'melody' or nm == 'pad' then
     local bright = (t.inst == 'glock' or t.inst == 'chimes' or t.inst == 'cowbell') and -7 or -2   -- колокола очень звонкие: верх приглушаем
     eq(tr, {{0, 180, -8}, {0, 600, -2, 1.5}, {0, 3000, bright / 3, 1}, {0, 6500, bright}}); comp(tr, -18, 2.5, 10, 150)
@@ -115,7 +124,7 @@ for _, t in ipairs(P.tracks) do
   end
   -- посылы
   local function send(dst, dbv) local s = reaper.CreateTrackSend(tr, dst); reaper.SetTrackSendInfo_Value(tr, 0, s, 'D_VOL', db(dbv)) end
-  if nm == 'melody' then send(rev, -10); send(dly, -14) elseif nm == 'pad' then send(rev, -8) elseif nm == 'clap' or nm == 'snare' then send(rev, -18) end
+  if nm == 'mel' then send(rev, -16) elseif nm == 'melody' then send(rev, -10); send(dly, -14) elseif nm == 'pad' then send(rev, -8) elseif nm == 'clap' or nm == 'snare' then send(rev, -18) end
 end
 if fxd then local q = 60 / P.bpm; setv(dly, fxd, '1: Length (time)', q * 750); setv(dly, fxd, '1: Feedback', -12) end
 
