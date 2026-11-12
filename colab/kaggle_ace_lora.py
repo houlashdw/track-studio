@@ -6,8 +6,10 @@
 Итог в Output: lora_*.mp3 (пробные песни) + vc2_lokr.zip.enc (дообученная часть, зашифрована)."""
 import os, sys, subprocess, json, time, glob, shutil
 
-WORK = '/kaggle/working' if os.path.isdir('/kaggle/working') else os.path.abspath('al_out')
-R = '/tmp/ace'; RAW = 'https://raw.githubusercontent.com/houlashdw/track-studio'
+WORK = os.environ.get('WORK') or ('/kaggle/working' if os.path.isdir('/kaggle/working') else os.path.abspath('al_out'))
+SYSPY = os.environ.get('SYSPY') == '1'   # Modal: ACE уже стоит в системном python (/ace), без uv
+INP = os.environ.get('INP', '/kaggle/input')
+R = '/ace' if SYSPY else '/tmp/ace'; RAW = 'https://raw.githubusercontent.com/houlashdw/track-studio'
 EPOCHS = os.environ.get('EPOCHS', '300'); EVERY = os.environ.get('EVERY', '50'); LR = os.environ.get('LR', '0.03'); ADT = os.environ.get('ADT', 'lokr')
 VARIANT = os.environ.get('VARIANT', 'turbo'); GEN_TASK = os.environ.get('GEN_TASK', 'text2music')
 GEN_LM = os.environ.get('GEN_LM', '0') == '1'; ALLCK = os.environ.get('ALLCK', '0') == '1'; TLIM = int(os.environ.get('TLIM', str(5 * 3600)))
@@ -62,7 +64,7 @@ for AD in ADS:
 if __name__ == '__main__':
     t0 = time.time(); os.makedirs(WORK, exist_ok=True)
     KIN = None   # закрытый датасет Kaggle — пароль не нужен
-    for dp, dn, fn in os.walk('/kaggle/input'):
+    for dp, dn, fn in os.walk(INP):
         print('input:', dp, fn[:12], flush=True)
         if 'dataset.json' in fn and not KIN: KIN = os.path.join(dp, 'dataset.json')
     P = os.environ.get('P')
@@ -72,13 +74,15 @@ if __name__ == '__main__':
         except Exception: pass
     if not P and not KIN: raise SystemExit('нет данных: ни датасета Kaggle, ни пароля (Add-ons → Secrets → KEYSTORE_PASS)')
     sh('nvidia-smi --query-gpu=name,memory.total --format=csv || true')
-    if not os.path.isdir(R): sh(f'git clone -q --depth 1 https://github.com/ACE-Step/ACE-Step-1.5.git {R}')
-    sh(f'{sys.executable} -m pip install -q uv')
-    for _i in range(6):
-        if sh(f'cd {R} && {sys.executable} -m uv sync -q', check=False) == 0: break
-        print('uv sync не прошёл, повтор', _i, flush=True); time.sleep(30)
-    os.environ['UV_NO_SYNC'] = '1'; os.environ['UV_FROZEN'] = '1'   # не перерешать зависимости при каждом uv run (GitHub 504)
-    UV = f'cd {R} && MPLBACKEND=Agg {sys.executable} -m uv run python'
+    PY = sys.executable if SYSPY else f'{sys.executable} -m uv run python'
+    if not SYSPY:
+        if not os.path.isdir(R): sh(f'git clone -q --depth 1 https://github.com/ACE-Step/ACE-Step-1.5.git {R}')
+        sh(f'{sys.executable} -m pip install -q uv')
+        for _i in range(6):
+            if sh(f'cd {R} && {sys.executable} -m uv sync -q', check=False) == 0: break
+            print('uv sync не прошёл, повтор', _i, flush=True); time.sleep(30)
+        os.environ['UV_NO_SYNC'] = '1'; os.environ['UV_FROZEN'] = '1'   # не перерешать зависимости при каждом uv run (GitHub 504)
+    UV = f'cd {R} && MPLBACKEND=Agg {PY}'
     # 1) данные: 10 треков vc2 + разметка Gemini (текст с метками частей, описание, bpm, тональность)
     A = R + '/al_data/audio'; os.makedirs(A, exist_ok=True)
     if KIN:
@@ -120,10 +124,10 @@ if __name__ == '__main__':
     # 3) обучение LoKr (быстрый адаптер); если bf16 на T4 не пойдёт — fp32
     base = (f'-m acestep.training_v2.cli.train_fixed --checkpoint-dir {CK} --model-variant {VARIANT} --dataset-dir {T} --output-dir {O} '
             f'--yes --plain --adapter-type {ADT} --lr {LR} --epochs {EPOCHS} --save-every {EVERY} --batch-size 1 --gradient-accumulation 4 --gradient-checkpointing')
-    rc = sh(f'cd {R} && MPLBACKEND=Agg timeout {TLIM} {sys.executable} -m uv run python {base} --precision bf16', check=False)
+    rc = sh(f'cd {R} && MPLBACKEND=Agg timeout {TLIM} {PY} {base} --precision bf16', check=False)
     if rc not in (0, 124) and not glob.glob(O + '/checkpoints/*'):
         print('⚠ bf16 не пошёл, пробую fp32', flush=True); shutil.rmtree(O, ignore_errors=True)
-        sh(f'cd {R} && MPLBACKEND=Agg timeout {TLIM} {sys.executable} -m uv run python {base} --precision fp32', check=False)
+        sh(f'cd {R} && MPLBACKEND=Agg timeout {TLIM} {PY} {base} --precision fp32', check=False)
     cands = [d for d in [O + '/final'] + sorted(glob.glob(O + '/checkpoints/epoch_*'), key=lambda d: int(d.split('epoch_')[1].split('_')[0]), reverse=True)
              if glob.glob(d + '/*.safetensors')]
     print('адаптеры:', cands[:4], flush=True)
@@ -132,7 +136,7 @@ if __name__ == '__main__':
     for d in (cands if ALLCK else cands[:1]):   # выход ноутбука закрытый; в GitHub он уходит зашифрованным
         shutil.make_archive(WORK + '/' + TAG + '_' + ADT + '_' + os.path.basename(d).split('_loss')[0], 'zip', d)
     # 4) пробные песни с дообученной моделью (те же 4 текста, что в пробе базовой модели)
-    sh(f'wget -q -O /tmp/kace.py {RAW}/main/colab/kaggle_ace.py')
+    sh(f'wget -q -O /tmp/kace.py {RAW}/main/colab/kaggle_ace.py || curl -sL -o /tmp/kace.py {RAW}/main/colab/kaggle_ace.py')
     import importlib.util
     sp = importlib.util.spec_from_file_location('kace', '/tmp/kace.py'); k = importlib.util.module_from_spec(sp); sp.loader.exec_module(k)
     SONGS = k.SONGS
@@ -147,5 +151,5 @@ if __name__ == '__main__':
     if GEN_TASK == 'lego':
         os.makedirs('/tmp/beats', exist_ok=True)
         for n in ['ballad', 'trap', 'dance']: sh(f'wget -q -O /tmp/beats/{n}.mp3 {RAW}/vprep-in/beats/{n}.mp3', check=False)
-    sh(f'cd {R} && MPLBACKEND=Agg VARIANT={VARIANT} GEN_TASK={GEN_TASK} GEN_LM={int(GEN_LM)} GEN_SONGS={os.environ.get("GEN_SONGS", "")} {sys.executable} -m uv run python gen_lora.py {WORK} {",".join(ads)}', check=False)
+    sh(f'cd {R} && MPLBACKEND=Agg VARIANT={VARIANT} GEN_TASK={GEN_TASK} GEN_LM={int(GEN_LM)} GEN_SONGS={os.environ.get("GEN_SONGS", "")} {PY} gen_lora.py {WORK} {",".join(ads)}', check=False)
     print('готово за %.0f мин → Output: lora_*.mp3 и vc2_lokr.zip.enc (адаптер: %s)' % ((time.time() - t0) / 60, os.path.basename(AD)))
