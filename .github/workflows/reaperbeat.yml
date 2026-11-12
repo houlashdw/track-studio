@@ -22,7 +22,7 @@ jobs:
           D=$(dirname "$(find /tmp/rp -name install-reaper.sh | head -1)"); sudo "$D/install-reaper.sh" --install /opt --quiet || true
           mkdir -p ~/.config/REAPER && printf '[REAPER]\nsplashwnd=0\nverchk=0\n' > ~/.config/REAPER/reaper.ini
           git clone -q --depth 1 --filter=blob:none --sparse https://github.com/sgossner/VCSL ~/vcsl && cd ~/vcsl && git sparse-checkout set "Idiophones/Struck Idiophones/Glockenspiel" "Idiophones/Struck Idiophones/Marimba" "Idiophones/Plucked Idiophones/Kalimba, Tanzania" "Idiophones/Struck Idiophones/Hand Chimes" "Idiophones/Struck Idiophones/Cowbells" "Chordophones/Zithers/Upright Piano, Knight/Sustains" "Chordophones/Zithers/Grand Piano, Kawai/Sustains" "Electrophones/TX81Z/FM Piano" "Chordophones/Composite Chordophones/Concert Harp" && du -sh ~/vcsl
-      - name: Сборка и рендер в Reaper (2 прохода: громкость мастера по замеру)
+      - name: Сборка и рендер в Reaper — 2 прохода, громкость мастера по замеру
         run: |
           mkdir -p /tmp/out
           for g in ${{ inputs.genres }}; do
