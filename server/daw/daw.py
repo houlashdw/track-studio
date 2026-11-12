@@ -169,7 +169,7 @@ def render_own(P, smp, lib, binp):
             buf = jsfx(binp, lib, buf, P['fx'].get(name, []), bpm)[:N]
         m = np.abs(buf).max(1); act = m > m.max() * .05   # громкость по звучащим местам (RMS), а не по пику: 808 тянется и иначе задавит всё
         if act.any():
-            r = np.sqrt((buf[act] ** 2).mean()); buf = buf * (10 ** (P['lvl'][name] / 20) / (r + 1e-9))
+            r = np.sqrt((buf[act] ** 2).mean()); gn = 10 ** (P['lvl'][name] / 20) / (r + 1e-9); buf = buf * gn; P.setdefault('gain', {})[name] = float(gn)
         stems[name] = buf
     # сайдчейн: 808 и мелодия уступают кику
     if 'kick' in stems:
@@ -181,7 +181,7 @@ def render_own(P, smp, lib, binp):
             if nm in stems: stems[nm] *= (1 - dep * env)[:, None]
     mix = sum(stems.values())
     mix = jsfx(binp, lib, mix.astype('float32'), P['fx']['master'], bpm)[:N]
-    pk = np.abs(mix).max(); mix = mix / pk * 0.89 if pk > 0 else mix
+    pk = np.abs(mix).max(); P['mgain'] = float(0.89 / pk) if pk > 0 else 1.0; mix = mix * P['mgain']
     return mix, stems
 
 
@@ -200,10 +200,11 @@ def rpp(P, smp, lib, out_wav):
           'RENDER_FILE "%s"' % out_wav, 'RENDER_PATTERN ""', 'RENDER_FMT 0 2 %d' % SR, 'RENDER_1X 0', 'RENDER_RANGE 1 0 0 18 1000', 'RENDER_RESAMPLE 3 0 1',
           'RENDER_ADDTOPROJ 0', 'RENDER_STEMS 0', 'RENDER_DITHER 0',
           '<RENDER_CFG', 'ZXZhdxgAAQ==', '>']
+    L += ['MASTER_VOLUME %g 0 -1 -1 1' % P.get('mgain', 1.0)]
     L += ['<MASTERFXLIST'] + fxchain(P['fx']['master'])[1:-1] + ['>'] if P['fx']['master'] else []
     for name, ev in P['tracks'].items():
         if not ev: continue
-        vol = P['vol'][name]; pan = P['pan'].get(name, 0)
+        vol = P.get('gain', {}).get(name, P['vol'][name]); pan = P['pan'].get(name, 0)   # громкость дорожки — та же, что выставил свой движок по RMS
         L += ['<TRACK', 'NAME %s' % name, 'VOLPAN %g %g -1 -1 1' % (vol, pan)]
         if name in ('melody', 'pad'):
             L += fxchain(P['fx'].get(name, []), inst=P['syn'] if name == 'melody' else 'padsynth')
@@ -224,7 +225,7 @@ def rpp(P, smp, lib, out_wav):
                 if name == '808' and k.get('hz'): rate = 440 * 2 ** ((e['m'] - 69) / 12) / k['hz']; d = min(ln / rate, e['d'] + .05)
                 elif name == 'perc' and e.get('m'): rate = 2 ** ((e['m'] - 72) / 12); d = ln / rate
                 L += ['<ITEM', 'POSITION %.6f' % e['t'], 'LENGTH %.6f' % d, 'FADEOUT 1 0.02 0', 'VOLPAN %g 0 1 -1' % e.get('v', 1.0),
-                      'PLAYRATE %.6f 0 0 -1 0 0.0025' % rate, '<SOURCE WAVE', 'FILE "%s"' % path, '>', '>']
+                      'PLAYRATE %.6f 0 0 -1 0 0.0025' % rate, '<SOURCE ' + {'.ogg': 'VORBIS', '.mp3': 'MP3', '.flac': 'FLAC'}.get(os.path.splitext(path)[1].lower(), 'WAVE'), 'FILE "%s"' % path, '>', '>']
         L += ['>']
     L += ['>']
     return '\n'.join(L)
