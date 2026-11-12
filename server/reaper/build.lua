@@ -73,7 +73,7 @@ for _, t in ipairs(P.tracks) do
     local src = reaper.PCM_Source_CreateFromFile(t.file)
     for _, it in ipairs(t.items) do
       local item = reaper.AddMediaItemToTrack(tr); reaper.SetMediaItemInfo_Value(item, 'D_POSITION', it.t); reaper.SetMediaItemInfo_Value(item, 'D_LENGTH', it.d)
-      reaper.SetMediaItemInfo_Value(item, 'D_FADEOUTLEN', 0.015); reaper.SetMediaItemInfo_Value(item, 'D_FADEINLEN', 0.001)
+      reaper.SetMediaItemInfo_Value(item, 'D_FADEOUTLEN', 0.015); reaper.SetMediaItemInfo_Value(item, 'D_FADEINLEN', t.name == '808' and 0.025 or 0.001)   -- 808 мягко входит после щелчка кика (вместо сайдчейна)
       local tk = reaper.AddTakeToMediaItem(item); reaper.SetMediaItemTake_Source(tk, src)
       reaper.SetMediaItemTakeInfo_Value(tk, 'D_PLAYRATE', it.rate); reaper.SetMediaItemTakeInfo_Value(tk, 'B_PPITCH', 0); reaper.SetMediaItemTakeInfo_Value(tk, 'D_VOL', it.v * db(t.ig or 0))
     end
@@ -107,22 +107,15 @@ for _, t in ipairs(P.tracks) do
   elseif nm == '808' then
     eq(tr, {{0, 35, 2}, {0, 250, -3, 1.5}, {0, 1200, 1, 1}, {0, 6000, -6}})
     local sat = addfx(tr, 'JS: Saturation'); if sat then setv(tr, sat, 'Amount', P.drive * 100) end
-    comp(tr, -20, 4, 1, 120, true)   -- сайдчейн от кика (канал 3/4)
+    comp(tr, -20, 4, 1, 120)
   elseif nm == 'melody' or nm == 'pad' then
-    eq(tr, {{0, 180, -8}, {0, 600, -2, 1.5}, {0, 3000, 1, 1}, {0, 9000, -2}}); comp(tr, -18, 2.5, 10, 150, nm == 'melody')
+    local bright = (t.inst == 'glock' or t.inst == 'chimes' or t.inst == 'cowbell') and -7 or -2   -- колокола очень звонкие: верх приглушаем
+    eq(tr, {{0, 180, -8}, {0, 600, -2, 1.5}, {0, 3000, bright / 3, 1}, {0, 6500, bright}}); comp(tr, -18, 2.5, 10, 150)
     if nm == 'pad' then local ch = addfx(tr, 'JS: Chorus'); end
   end
   -- посылы
   local function send(dst, dbv) local s = reaper.CreateTrackSend(tr, dst); reaper.SetTrackSendInfo_Value(tr, 0, s, 'D_VOL', db(dbv)) end
   if nm == 'melody' then send(rev, -10); send(dly, -14) elseif nm == 'pad' then send(rev, -8) elseif nm == 'clap' or nm == 'snare' then send(rev, -18) end
-end
--- сайдчейн: кик → 808 и мелодия в каналы 3/4
-for _, nm in ipairs({'808', 'melody'}) do
-  local dst = tracks[nm]
-  if dst and tracks.kick then
-    reaper.SetMediaTrackInfo_Value(dst, 'I_NCHAN', 4)
-    local s = reaper.CreateTrackSend(tracks.kick, dst); reaper.SetTrackSendInfo_Value(tracks.kick, 0, s, 'I_DSTCHAN', 2); reaper.SetTrackSendInfo_Value(tracks.kick, 0, s, 'D_VOL', 1)
-  end
 end
 if fxd then local q = 60 / P.bpm; setv(dly, fxd, '1: Length (time)', q * 750); setv(dly, fxd, '1: Feedback', -12) end
 
