@@ -91,6 +91,9 @@ jobs:
           mkdir -p /tmp/to && modal volume get ts-ace "/train/$O" /tmp/to && bash tools/enc_out.sh /tmp/to o
           cd o && git init -q -b modal-out && git config user.name gha && git config user.email gha@users.noreply.github.com
           git add -A && git commit -q -m train && git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" modal-out
+      - name: Пак из битов (demucs → петли + разметка)
+        if: inputs.cmd == 'pack'
+        run: modal run server/modal_pack.py ${{ inputs.tenv }} > /tmp/pk.log 2>&1 || true; grep -av "%|\|it/s" /tmp/pk.log | grep -av "^\s*$" | tail -100
       - name: Своя точка входа (ep:<имя>) → mp3 в modal-out
         if: startsWith(inputs.cmd, 'ep:')
         env: { P: '${{ secrets.KEYSTORE_PASS }}' }
