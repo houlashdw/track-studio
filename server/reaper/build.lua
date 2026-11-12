@@ -113,6 +113,8 @@ for _, t in ipairs(P.tracks) do
     comp(tr, -20, 4, 1, 120)
   elseif nm == 'mel' then   -- петля мелодии из пака: низ освобождаем под 808, чуть плотнее
     eq(tr, {{0, 140, -10}, {0, 350, -2, 1.5}, {0, 3000, 0.5, 1}, {0, 10000, 0}}); comp(tr, -20, 2, 15, 150)
+  elseif nm == 'drumloop' then   -- живые барабаны: панч и воздух, чуть склеить
+    eq(tr, {{0, 60, 1.5}, {0, 400, -2, 1.5}, {0, 4000, 1, 1}, {0, 11000, 1.5}}); comp(tr, -16, 2.5, 8, 90)
   elseif nm == 'bassloop' then
     eq(tr, {{0, 35, 1}, {0, 250, -2, 1.5}, {0, 1200, 0, 1}, {0, 5000, -6}})
     local sat = addfx(tr, 'JS: Saturation'); if sat then setv(tr, sat, 'Amount', P.drive * 60) end

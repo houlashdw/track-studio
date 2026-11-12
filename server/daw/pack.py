@@ -8,7 +8,7 @@ import soundfile as sf
 sys.path.insert(0, os.path.dirname(__file__))
 from daw import to_lua
 
-LVL = {'kick': -13, 'snare': -17, 'hat': -25, 'ohat': -28, '808': -16, 'mel': -19, 'bassloop': -17}   # дБ RMS там, где звучит
+LVL = {'drumloop': -14, 'kick': -13, 'snare': -17, 'hat': -25, 'ohat': -28, '808': -16, 'mel': -19, 'bassloop': -17}   # дБ RMS там, где звучит
 NEAR = {'atlanta': 'trap', 'detroit': 'trap', 'pluggnb': 'plugg', 'jerk': 'plugg'}
 KITS = {'rage': ['tsairage', 'hard', 'supreme'], 'phonk': ['tsaiphonk', 'hard', 'tsk'], 'plugg': ['tsaiplugg', 'aplus', 'supreme'],
         'drill': ['hard', 'tsk', 'trap'], 'trap': ['hard', 'supreme', 'aplus', 'trap'], 'lofi': ['aplus', 'trippy', 'trap']}
@@ -35,7 +35,7 @@ def pick_kit(smp, genre, R):
     return out
 
 
-def build(pack_dir, genre, seed, smp, out_wav):
+def build(pack_dir, genre, seed, smp, out_wav, drums='loop'):
     R = random.Random(seed); P = json.load(open(os.path.join(pack_dir, 'pack.json')))
     L = [x for x in P if x['genre'] == genre] or [x for x in P if x['genre'] == NEAR.get(genre, 'trap')]
     L = [x for x in L if len(x['steps']['k']) >= 6 and len(x['b808']) >= 4] or L
@@ -51,24 +51,39 @@ def build(pack_dir, genre, seed, smp, out_wav):
     mel = os.path.abspath(os.path.join(pack_dir, A['files']['mel'])); loops = []
     k8 = kit.get('808'); hz8 = (k8 or {}).get('hz') or 44.0; d8 = sf.info(f('808')).duration if k8 else 0
     use_bassloop = genre == 'drill' or not k8   # скольжения drill нотами не повторить — берём живой бас из бита
+    # разметка ударов: чистка (снейр мог не найтись, кик — поймать лишнее)
+    K = [x for x in A['steps']['k']]; SN = [x for x in A['steps']['s']]
+    if len(SN) < 6: SN = [[16 * b + q, .9] for b in range(8) for q in ([4, 12] if genre == 'lofi' else [8])]
+    sset = {i for i, _ in SN}; K = [x for x in K if x[0] not in sset]
+    if len(K) > 36: th = sorted((v for _, v in K), reverse=True)[35]; K = [x for x in K if x[1] >= th or x[0] % 16 == 0]
+    # 808: в режиме живых барабанов B ритм 808 берём у B (совпадёт с его киком), а высоту — из баса A (гармония мелодии)
+    pa = [None] * 128
+    for i, ln, m in sorted(A['b808']):
+        for j in range(i, 128): pa[j] = m
+    first = sorted(A['b808'])[0][2] if A['b808'] else 36; pa = [m if m is not None else first for m in pa]
+    N808 = [[i, ln, pa[i]] for i, ln, m in B['b808']] if drums == 'loop' and B is not A and len(B['b808']) >= 4 else A['b808']
+    drumloop = os.path.abspath(os.path.join(pack_dir, B['files']['drums'])); rateB = bpm / B['bpm']; dl = []
     bar0 = 0
     for sec, nb in FORM:
         t0 = bar0 * BAR
         # мелодия: интро/аутро — первые 4 такта петли, остальное — петля целиком
         loops.append(dict(t=t0, d=nb * BAR, v=.7 if sec in ('intro', 'outro') else (.85 if sec == 'verse' else 1.0), rate=rate, pp=True, fi=.005 if sec != 'intro' else 1.5 * BAR,
                           fo=2 * BAR if sec == 'outro' else .01, loop=True))
+        if sec in ('hook', 'verse') and drums == 'loop':   # живые барабаны из бита B (стем), растянуты в сетку
+            dl.append(dict(t=t0, d=nb * BAR, v=1.0 if sec == 'hook' else .9, rate=rateB, pp=True, fi=.003, fo=.02, loop=True))
         if sec in ('hook', 'verse'):
             for b in range(nb):
                 lb = b % 8; tb = t0 + b * BAR; last = b == nb - 1
-                for i, v in A['steps']['k']:
-                    if i // 16 == lb and not (last and i % 16 >= 12): hit('kick', tb + (i % 16) * S16, v)
-                for i, v in A['steps']['s']:
-                    if i // 16 == lb: hit('snare', tb + (i % 16) * S16, v)
-                H = (B if sec == 'verse' else A)['steps']['h']
-                for i, v in H:
-                    if i // 32 == lb: hit('hat', tb + (i % 32) * S16 / 2, .55 + .45 * v)
+                if drums == 'kit':
+                    for i, v in K:
+                        if i // 16 == lb and not (last and i % 16 >= 12): hit('kick', tb + (i % 16) * S16, v)
+                    for i, v in SN:
+                        if i // 16 == lb: hit('snare', tb + (i % 16) * S16, v)
+                    H = (B if sec == 'verse' else A)['steps']['h']
+                    for i, v in H:
+                        if i // 32 == lb: hit('hat', tb + (i % 32) * S16 / 2, .55 + .45 * v)
                 if not use_bassloop:
-                    for i, ln, m in A['b808']:
+                    for i, ln, m in N808:
                         if i // 16 != lb: continue
                         while m > 47: m -= 12
                         while m < 28: m += 12
@@ -83,20 +98,21 @@ def build(pack_dir, genre, seed, smp, out_wav):
         if name in tr and name in kit:
             tracks.append(dict(name=name, kind='audio', file=f(name), items=tr[name], lvl=LVL[name], pan={'hat': .12, 'ohat': -.15}.get(name, 0)))
     tracks.append(dict(name='mel', kind='audio', file=mel, items=loops, lvl=LVL['mel'], pan=0))
+    if dl: tracks.append(dict(name='drumloop', kind='audio', file=drumloop, items=dl, lvl=LVL['drumloop'], pan=0))
     if use_bassloop:
         bl = os.path.abspath(os.path.join(pack_dir, A['files']['bass'])); bi = [dict(x, v=1.0, fi=.005, fo=.01) for x in loops[1:-1]]
         tracks.append(dict(name='bassloop', kind='audio', file=bl, items=bi, lvl=LVL['bassloop'], pan=0))
     for t in tracks:   # фейдер: RMS звучащей части → целевая громкость
-        r = arms(t['file'], None if t['name'] in ('mel', 'bassloop') else .35)
+        r = arms(t['file'], None if t['name'] in ('mel', 'bassloop', 'drumloop') else .35)
         t['vol'] = float(np.clip(t['lvl'] - 20 * np.log10(r + 1e-9), -40, 18))
-    info = dict(A=A['id'], B=B['id'], bpm=bpm, key=A['key'] + ' ' + A['mode'], kit={c: kit[c]['f'] for c in kit}, bassloop=use_bassloop)
+    info = dict(drums=drums, A=A['id'], B=B['id'], bpm=bpm, key=A['key'] + ' ' + A['mode'], kit={c: kit[c]['f'] for c in kit}, bassloop=use_bassloop)
     return dict(genre=genre, bpm=bpm, total=total, out=out_wav, tracks=tracks, info=info,
                 drive={'rage': .7, 'phonk': .6}.get(genre, .3), loud={'rage': -7, 'phonk': -7, 'drill': -8}.get(genre, -9))
 
 
 if __name__ == '__main__':
     ap = argparse.ArgumentParser(); ap.add_argument('--pack', required=True); ap.add_argument('--genre', default='trap'); ap.add_argument('--seed', type=int, default=3)
-    ap.add_argument('--smp', default='app/smp'); ap.add_argument('--wav', required=True); ap.add_argument('--lua', required=True)
-    a = ap.parse_args(); Rp = build(a.pack, a.genre, a.seed, a.smp, a.wav)
+    ap.add_argument('--smp', default='app/smp'); ap.add_argument('--wav', required=True); ap.add_argument('--lua', required=True); ap.add_argument('--drums', default='loop')
+    a = ap.parse_args(); Rp = build(a.pack, a.genre, a.seed, a.smp, a.wav, a.drums)
     open(a.lua, 'w').write('return ' + to_lua(Rp) + '\n')
     print('пак → Reaper:', a.genre, json.dumps(Rp['info'], ensure_ascii=False), 'дорожки:', [(t['name'], len(t['items'])) for t in Rp['tracks']])

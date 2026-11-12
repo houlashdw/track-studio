@@ -6,6 +6,7 @@ on:
       genres: { default: 'trap rage plugg phonk drill' }
       seeds: { default: '1' }
       pack: { default: 'pack1' }
+      drums: { description: 'loop — живые барабаны из битов, kit — наши киты по разметке', default: 'loop kit' }
 permissions:
   contents: write
 jobs:
@@ -28,8 +29,8 @@ jobs:
       - name: Сборка и рендер в Reaper — 2 прохода, громкость по замеру
         run: |
           mkdir -p /tmp/out
-          for g in ${{ inputs.genres }}; do for s in ${{ inputs.seeds }}; do
-            n=${g}_$s; python3 server/daw/pack.py --pack "$PK" --genre $g --seed $s --smp app/smp --wav /tmp/out/pk_$n.wav --lua /tmp/out/$n.lua || continue
+          for g in ${{ inputs.genres }}; do for s in ${{ inputs.seeds }}; do for dm in ${{ inputs.drums }}; do
+            n=${g}_${s}_$dm; python3 server/daw/pack.py --pack "$PK" --genre $g --seed $s --drums $dm --smp app/smp --wav /tmp/out/pk_$n.wav --lua /tmp/out/$n.lua || continue
             MG=0
             for pass in 1 2; do
               rm -f /tmp/out/pk_$n.wav /tmp/out/$n.log; t0=$(date +%s)
@@ -41,7 +42,7 @@ jobs:
               MG=$(python3 -c "print(round($MG + float('$I') + 9, 1))" 2>/dev/null || echo 0)
             done
             grep -E "НЕТ|не найден|нет параметра" /tmp/out/$n.log | sort | uniq -c | head
-          done; done
+          done; done; done
           cd /tmp/out && for f in pk_*.wav; do ffmpeg -v error -y -i $f -b:a 192k ${f%.wav}.mp3; done; ls
       - name: Выгрузка (шифр открытым ключом)
         if: always()
