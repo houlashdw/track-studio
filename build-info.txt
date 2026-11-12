@@ -1,0 +1,24 @@
+V2 Signer: certificate DN: CN=Track Studio
+V2 Signer: certificate SHA-256 digest: 7f1835e8b9802e52f295bcd5eb7b0c77147ab9c7ab5a321360876ea369c3bb85
+V2 Signer: certificate SHA-1 digest: c0326133682ed677b29c77790cb1929c4c7b28e6
+V2 Signer: certificate MD5 digest: 01b3b12bc66b52cade837b6f7db16c95
+package: name='com.trackstudio.app' versionCode='120' versionName='1.120' platformBuildVersionName='14' platformBuildVersionCode='34' compileSdkVersion='34' compileSdkVersionCodename='14'
+minSdkVersion:'26'
+targetSdkVersion:'34'
+uses-permission: name='android.permission.INTERNET'
+application-label:'Трек Студия'
+application-icon-160:'res/BW.xml'
+application-icon-320:'res/BW.xml'
+application-icon-640:'res/BW.xml'
+application-icon-65534:'res/BW.xml'
+application: label='Трек Студия' icon='res/BW.xml'
+launchable-activity: name='com.trackstudio.app.MainActivity'  label='' icon=''
+feature-group: label=''
+  uses-feature: name='android.hardware.faketouch'
+  uses-implied-feature: name='android.hardware.faketouch' reason='default feature for all apps'
+  uses-feature: name='android.hardware.screen.portrait'
+  uses-implied-feature: name='android.hardware.screen.portrait' reason='one or more activities have specified a portrait orientation'
+main
+supports-screens: 'small' 'normal' 'large' 'xlarge'
+supports-any-density: 'true'
+locales: '--_--'

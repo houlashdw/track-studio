@@ -1,0 +1,33 @@
+{
+ "steps": [
+  {
+   "name": "env",
+   "value": {
+    "href": "https://appassets.androidplatform.net/index.html",
+    "secure": true,
+    "caches": "object",
+    "idb": "object",
+    "ua": "Mozilla/5.0 (Linux; Android 15; sdk_gphone64_x86_64 Build/AE3A.240806.043; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/124.0.6367.219 Mobile Safari/537.36 TrackStudioApp/1",
+    "bridge": "object",
+    "platform": "android 35",
+    "sw": false,
+    "title": "Трек Студия",
+    "analyze": "function",
+    "installHidden": true,
+    "inApp": true,
+    "w": 379,
+    "h": 702,
+    "dpr": 1
+   },
+   "t": 0.1
+  },
+  {
+   "name": "understood",
+   "value": "Понял: Хардстайл · 150 bpm · рэп ~4,4 слога/с в такт",
+   "t": 1.1
+  }
+ ],
+ "console": [
+  "0 log error: Failed to load resource: the server responded with a status of 404 (Not Found) https://appassets.androidplatform.net/favicon.ico"
+ ]
+}

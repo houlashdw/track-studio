@@ -1,0 +1,49 @@
+env {"href": "https://appassets.androidplatform.net/index.html", "secure": true, "caches": "object", "idb": "object", "ua": "Mozilla/5.0 (Linux; Android 15; sdk_gphone64_x86_64 Build/AE3A.240806.043; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/124.0.6367.219 Mobile Safari/537.36 TrackStudioApp/1", "bridge": "object", "platform": "android 35", "sw": false, "title": "Трек Студия", "analyze": "function", "installHidden": true, "inApp": true, "w": 379, "h": 702, "dpr": 1}
+understood "Понял: Хардстайл · 150 bpm · рэп ~4,4 слога/с в такт"
+Traceback (most recent call last):
+  File "/home/runner/.local/lib/python3.14/site-packages/websocket/_socket.py", line 127, in recv
+    bytes_ = _recv()
+  File "/home/runner/.local/lib/python3.14/site-packages/websocket/_socket.py", line 99, in _recv
+    return sock.recv(bufsize)
+           ~~~~~~~~~^^^^^^^^^
+TimeoutError: timed out
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/runner/work/track-studio/track-studio/ci/devtools_test.py", line 121, in <module>
+    started = start_build("""(()=>{ document.querySelector('#modeSeg button[data-v="off"]').click();
+              ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+      const p=document.querySelector('#prompt'); p.value='jumpstyle 145 bpm, энергично'; p.dispatchEvent(new Event('input')); return 1; })()""")
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/track-studio/track-studio/ci/devtools_test.py", line 87, in start_build
+    ev("(()=>{ document.querySelector('#player').dataset.ready=''; document.querySelector('#make').click(); return 1; })()")
+    ~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/track-studio/track-studio/ci/devtools_test.py", line 68, in ev
+    m = call('Runtime.evaluate', {'expression': expr, 'awaitPromise': True, 'returnByValue': True})
+  File "/home/runner/work/track-studio/track-studio/ci/devtools_test.py", line 50, in call
+    m = json.loads(ws.recv())
+                   ~~~~~~~^^
+  File "/home/runner/.local/lib/python3.14/site-packages/websocket/_core.py", line 429, in recv
+    opcode, data = self.recv_data()
+                   ~~~~~~~~~~~~~~^^
+  File "/home/runner/.local/lib/python3.14/site-packages/websocket/_core.py", line 457, in recv_data
+    opcode, frame = self.recv_data_frame(control_frame)
+                    ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^
+  File "/home/runner/.local/lib/python3.14/site-packages/websocket/_core.py", line 478, in recv_data_frame
+    frame = self.recv_frame()
+  File "/home/runner/.local/lib/python3.14/site-packages/websocket/_core.py", line 515, in recv_frame
+    return self.frame_buffer.recv_frame()
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/home/runner/.local/lib/python3.14/site-packages/websocket/_abnf.py", line 377, in recv_frame
+    self.recv_header()
+    ~~~~~~~~~~~~~~~~^^
+  File "/home/runner/.local/lib/python3.14/site-packages/websocket/_abnf.py", line 331, in recv_header
+    header = self.recv_strict(2)
+  File "/home/runner/.local/lib/python3.14/site-packages/websocket/_abnf.py", line 420, in recv_strict
+    bytes_ = self.recv(min(16384, shortage))
+  File "/home/runner/.local/lib/python3.14/site-packages/websocket/_core.py", line 645, in _recv
+    return recv(self.sock, bufsize)
+  File "/home/runner/.local/lib/python3.14/site-packages/websocket/_socket.py", line 129, in recv
+    raise WebSocketTimeoutException("Connection timed out")
+websocket._exceptions.WebSocketTimeoutException: Connection timed out
