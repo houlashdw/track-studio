@@ -231,7 +231,9 @@ def rpp(P, smp, lib, out_wav):
     return '\n'.join(L)
 
 
-if __name__ == '__main__':
+if __name__ == '__main__' and '--hybrid' in sys.argv:
+    pass
+elif __name__ == '__main__':
     ap = argparse.ArgumentParser()
     ap.add_argument('--genre', default='trap'); ap.add_argument('--seed', type=int, default=1); ap.add_argument('--smp', default='app/smp')
     ap.add_argument('--jsfx', required=True); ap.add_argument('--bin', default='jsfx_render'); ap.add_argument('--out'); ap.add_argument('--rpp'); ap.add_argument('--rppwav'); ap.add_argument('--rpplib', help='путь к JSFX внутри Effects Reaper (относительный)')
@@ -242,3 +244,105 @@ if __name__ == '__main__':
         mix, st = render_own(P, a.smp, a.jsfx, a.bin); sf.write(a.out, mix, SR); print('свой движок →', a.out)
     if a.rpp:
         open(a.rpp, 'w').write(rpp(P, a.smp, a.rpplib if a.rpplib is not None else a.jsfx, a.rppwav or a.rpp.replace('.rpp', '.wav'))); print('проект Reaper →', a.rpp)
+
+
+# ---------- гибрид: мелодия от ИИ + наши ударные/808 по её сетке и нотам ----------
+def analyze_ai(hy, g, bpm0):
+    """темп, сдвиг сетки (где первая доля) и корень баса по тактам — из дорожек ИИ-бита"""
+    import librosa
+    dr, _ = librosa.load(f'{hy}/{g}_drums.mp3', sr=22050); bs, _ = librosa.load(f'{hy}/{g}_bass.mp3', sr=22050)
+    tempo = float(librosa.feature.tempo(y=dr, sr=22050, start_bpm=bpm0)[0])
+    for c in (tempo, tempo * 2, tempo / 2, tempo * 1.5, tempo / 1.5):
+        if abs(c - bpm0) / bpm0 < .04: tempo = c; break
+    else: tempo = bpm0
+    # сдвиг: низ барабанов (кики) против сетки долей — фаза с наибольшим совпадением
+    S = np.abs(librosa.stft(dr, n_fft=1024, hop_length=256)); fr = librosa.fft_frequencies(sr=22050, n_fft=1024)
+    lo = S[fr < 150].sum(0); on = np.maximum(np.diff(lo, prepend=lo[0]), 0); hop = 256 / 22050
+    beat = 60 / tempo; best, off = -1, 0.0
+    for ph in np.arange(0, beat, .005):
+        idx = ((ph + np.arange(0, len(on) * hop - ph, beat)) / hop).astype(int); idx = idx[idx < len(on)]
+        sc = on[idx].sum()
+        if sc > best: best, off = sc, ph
+    # корни баса по тактам
+    bar = beat * 4; nb = int(len(bs) / 22050 // bar); roots = []
+    f0, vo, _ = librosa.pyin(bs, fmin=30, fmax=200, sr=22050, frame_length=4096, hop_length=1024)
+    t = np.arange(len(f0)) * 1024 / 22050
+    for b in range(nb):
+        m = (t >= off + b * bar) & (t < off + (b + 1) * bar) & vo
+        roots.append(int(round(np.median(librosa.hz_to_midi(f0[m])))) if m.sum() > 3 else None)
+    return tempo, off, roots
+
+
+def build_hybrid(genre, seed, smp, hy):
+    import librosa
+    R = random.Random(seed); g = G[genre]; meta = json.load(open(f'{hy}/meta.json'))[genre]
+    tempo, off, roots = analyze_ai(hy, genre, meta['bpm'])
+    step = 60 / tempo / 4; bar = step * 16; nb = len(roots)
+    last = None
+    for i in range(nb):   # дыры в басе — держим предыдущий корень
+        if roots[i] is None: roots[i] = last
+        last = roots[i]
+    kroot = next((r for r in roots if r), 36)
+    src, kit = load_kit(smp, genre, R)
+    T = {n: [] for n in ['kick', 'snare', 'clap', 'hat', 'ohat', 'perc', '808', 'ai_melody']}
+    T['ai_melody'].append(dict(t=0.0, f=f'{hy}/{genre}_other.mp3'))
+    for b in range(nb):
+        t0 = off + b * bar
+        role = 'intro' if b < 2 else 'outro' if b >= nb - 1 else 'hook'
+        k, sn, hats = pat(g['drums'], R, b, role)
+        for s in k: T['kick'].append(dict(t=t0 + s * step, v=1.0))
+        for s in sn: T['snare'].append(dict(t=t0 + s * step, v=1.0)); T['clap'].append(dict(t=t0 + s * step, v=.7))
+        for s, div in hats:
+            for r in range(div): T['hat'].append(dict(t=t0 + (s + r / div) * step, v=.8 - .15 * (r > 0) + .1 * (s % 4 == 0)))
+        if b % 4 == 3 and role == 'hook': T['ohat'].append(dict(t=t0 + 14 * step, v=.6))
+        rt = roots[b] or kroot
+        while rt > 40: rt -= 12
+        while rt < 28: rt += 12
+        if role != 'intro':
+            for i, s in enumerate(k):
+                nxt = k[i + 1] if i + 1 < len(k) else 16
+                T['808'].append(dict(t=t0 + s * step, d=max(2, nxt - s) * step * .95, m=rt, gl=False))
+    total = librosa.get_duration(path=f'{hy}/{genre}_other.mp3') + 1.0
+    FX = {'kick': [('bus_comp', {2: -10, 3: 2, 4: 3, 5: 1})], 'snare': [('tanh_sat', {1: 3, 2: -1})], 'clap': [('hadamverb', {})], 'hat': [],
+          '808': [('tanh_sat', {1: {'rage': 14, 'phonk': 12}.get(genre, 6), 2: -2, 8: 2})] + ([('megagrit', {1: 8, 8: .25, 9: .6})] if genre == 'phonk' else []),
+          'ai_melody': [('bus_comp', {2: -14, 3: 1, 4: 3, 5: 3})],
+          'master': [('bus_comp', {2: -8, 3: 1, 4: 3, 5: 6}), ('tanh_sat', {1: 2, 2: -0.8})]}
+    LVL = {'kick': -13, 'snare': -17, 'clap': -24, 'hat': -25, 'ohat': -28, 'perc': -25, '808': -16, 'ai_melody': -18}
+    return dict(genre=genre, seed=seed, bpm=tempo, key=0, scale=g['sc'], kit_src=src, kit=kit, tracks=T, fx=FX, vol={k: 1 for k in LVL}, pan={'hat': .15, 'ohat': -.2},
+                lvl=LVL, syn='js3osc', total=total, bars=nb, off=off, roots=roots)
+
+
+def render_hybrid(P, smp, lib, binp):
+    """как render_own, но мелодия — готовая дорожка ИИ (верх чуть приглушаем: там живёт «жужжание»)"""
+    ev = P['tracks'].pop('ai_melody'); N = int(P['total'] * SR)
+    x, sr = sf.read(ev[0]['f'], dtype='float32', always_2d=True)
+    if sr != SR: x = np.stack([np.interp(np.linspace(0, len(x) - 1, int(len(x) * SR / sr)), np.arange(len(x)), x[:, c]) for c in range(2)], 1).astype('float32')
+    m = np.zeros((N, 2), 'float32'); n = min(N, len(x)); m[:n] = x[:n, :2] if x.shape[1] > 1 else np.repeat(x[:n], 2, 1)
+    Fm = np.fft.rfft(m, axis=0); fq = np.fft.rfftfreq(N, 1 / SR); Fm *= (1 - 0.35 * np.clip((fq - 7000) / 5000, 0, 1))[:, None]; m = np.fft.irfft(Fm, N, axis=0).astype('float32')
+    m = jsfx(binp, lib, m, P['fx']['ai_melody'], P['bpm'])[:N]
+    a = np.abs(m).max(1) > np.abs(m).max() * .05; m *= 10 ** (P['lvl']['ai_melody'] / 20) / (np.sqrt((m[a] ** 2).mean()) + 1e-9)
+    P['fx'] = {k: v for k, v in P['fx'].items() if k != 'ai_melody'}
+    Q = dict(P, fx=dict(P['fx'], master=[])); mix, stems = render_own(Q, smp, lib, binp)   # барабаны+808 без мастера
+    mix = mix / Q.get('mgain', 1.0)   # вернуть уровень до нормализации
+    # сайдчейн мелодии от кика
+    if 'kick' in stems:
+        e = np.abs(stems['kick']).max(1); env = np.zeros(N, 'float32'); acc = 0.0; rl = math.exp(-1 / (.12 * SR))
+        for i in range(0, N, 32): acc = max(e[i:i + 32].max(), acc * rl ** 32); env[i:i + 32] = acc
+        m *= (1 - .2 * env / (env.max() + 1e-9))[:, None]
+    tot = mix[:N] + m
+    tot = jsfx(binp, lib, tot.astype('float32'), P['fx']['master'], P['bpm'])[:N]
+    pk = np.abs(tot).max(); return tot / pk * .89 if pk > 0 else tot
+
+
+def main_hybrid():
+    ap = argparse.ArgumentParser(); ap.add_argument('--hybrid', required=True); ap.add_argument('--genres', default='trap,phonk,plugg'); ap.add_argument('--seed', type=int, default=3)
+    ap.add_argument('--smp', default='app/smp'); ap.add_argument('--jsfx', required=True); ap.add_argument('--bin', default='jsfx_render'); ap.add_argument('--outdir', default='.')
+    a = ap.parse_args()
+    for g in a.genres.split(','):
+        P = build_hybrid(g, a.seed, a.smp, a.hybrid)
+        print('гибрид %s: темп %.1f, сдвиг %.3f с, корни %s, кит %s' % (g, P['bpm'], P['off'], P['roots'][:8], P['kit_src']), flush=True)
+        sf.write(f'{a.outdir}/hybrid_{g}.wav', render_hybrid(P, a.smp, a.jsfx, a.bin), SR)
+
+
+if __name__ == '__main__' and '--hybrid' in sys.argv:
+    main_hybrid()

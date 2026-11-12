@@ -5,12 +5,14 @@ on:
     inputs:
       genres: { default: 'trap phonk plugg' }
       seed: { default: '3' }
+      mode: { description: 'ab (свой движок vs Reaper) / hybrid (мелодия ИИ + наши ударные)', default: 'ab' }
 permissions:
   contents: write
 jobs:
   d:
     runs-on: ubuntu-latest
     timeout-minutes: 40
+    env: { MODAL_TOKEN_ID: '${{ secrets.MODAL_TOKEN_ID }}', MODAL_TOKEN_SECRET: '${{ secrets.MODAL_TOKEN_SECRET }}' }
     steps:
       - uses: actions/checkout@v4
       - name: Зависимости, JSFX, ysfx
@@ -22,13 +24,24 @@ jobs:
           cp $GITHUB_WORKSPACE/server/jsfx/jsfx_render.cpp tools/ && sed -i 's|add_executable(ysfx_tool|add_executable(jsfx_render "tools/jsfx_render.cpp")\ntarget_link_libraries(jsfx_render PRIVATE ysfx::ysfx)\nadd_executable(ysfx_tool|' cmake.tools.txt
           cmake -S . -B b -DYSFX_PLUGIN=OFF -DYSFX_GFX=OFF -DYSFX_TOOLS=ON -DCMAKE_BUILD_TYPE=Release -DYSFX_SKIP_CHECKSUM=ON >/dev/null && cmake --build b -j4 --target jsfx_render >/dev/null && ls -la b/jsfx_render
       - name: Reaper
+        if: inputs.mode == 'ab'
         run: |
           U=$(curl -sL https://www.reaper.fm/download.php | grep -oE 'files/[0-9.x]+/reaper[0-9a-z_]+_linux_x86_64\.tar\.xz' | head -1); echo "архив: $U"
           curl -sL "https://www.reaper.fm/$U" -o /tmp/r.tar.xz && mkdir -p /tmp/rp && tar xf /tmp/r.tar.xz -C /tmp/rp
           D=$(dirname "$(find /tmp/rp -name install-reaper.sh | head -1)"); sudo "$D/install-reaper.sh" --install /opt --quiet || true
           mkdir -p ~/.config/REAPER/Effects && cp -r ~/jsfx ~/.config/REAPER/Effects/tsjsfx
           printf '[REAPER]\nsplashwnd=0\nverchk=0\n' > ~/.config/REAPER/reaper.ini
+      - name: Гибрид — мелодия ИИ + наши ударные/808
+        if: inputs.mode == 'hybrid'
+        run: |
+          pip install -q -U modal fastapi librosa
+          G=$(echo "${{ inputs.genres }}" | tr ' ' ','); mkdir -p /tmp/hy /tmp/out
+          modal run server/modal_ace.py::hybrid_src --outdir /tmp/hy --genres "$G" --seed 5 2>&1 | grep -vE "^\s*$" | tail -8
+          python3 server/daw/daw.py --hybrid /tmp/hy --genres "$G" --seed ${{ inputs.seed }} --smp app/smp --jsfx ~/jsfx --bin ~/ysfx/b/jsfx_render --outdir /tmp/out 2>&1 | tail -6
+          for g in $(echo $G | tr , ' '); do cp /tmp/hy/${g}_full.mp3 /tmp/out/ai_full_$g.mp3; done
+          cd /tmp/out && for f in *.wav; do ffmpeg -v error -y -i $f -b:a 192k ${f%.wav}.mp3; done; ls -la
       - name: Проекты и рендер
+        if: inputs.mode == 'ab'
         run: |
           mkdir -p /tmp/out
           for g in ${{ inputs.genres }}; do

@@ -399,3 +399,21 @@ def instr(outdir: str = 'instr_out', per: int = 4):
             for n, v in st.items(): open(f'{outdir}/{g}_{k}_{n}.mp3', 'wb').write(v)
             meta[f'{g}_{k}'] = {'genre': g, 'bpm': bpm, 'caption': cap}; print(g, k, '%.0f с' % (time.time() - t0), flush=True)
     json.dump(meta, open(f'{outdir}/meta.json', 'w'), indent=1)
+
+
+HY_BPM = {'trap': 140, 'drill': 142, 'plugg': 150, 'rage': 160, 'phonk': 130, 'detroit': 100}
+HY_KEY = {'trap': 'C# minor', 'drill': 'F minor', 'plugg': 'E major', 'rage': 'G minor', 'phonk': 'A minor', 'detroit': 'B minor'}
+
+
+@app.local_entrypoint()
+def hybrid_src(outdir: str = 'hy', genres: str = 'trap,phonk,plugg', seed: int = 5):
+    """гибрид: ИИ-бит (дообученная ACE) → Demucs → берём мелодию (other) + бас/барабаны как ориентир сетки и нот"""
+    os.makedirs(outdir, exist_ok=True); ab, lg = AceBeat(), AceLego(); meta = {}
+    for g in genres.split(','):
+        t0 = time.time()
+        b = ab.beat.remote({'genre': g, 'bpm': HY_BPM.get(g, 140), 'key': HY_KEY.get(g, ''), 'duration': 60, 'seed': seed})
+        st = lg.stems.remote(b)
+        open(f'{outdir}/{g}_full.mp3', 'wb').write(b)
+        for n, v in st.items(): open(f'{outdir}/{g}_{n}.mp3', 'wb').write(v)
+        meta[g] = {'bpm': HY_BPM.get(g, 140), 'key': HY_KEY.get(g, '')}; print(g, '%.0f с' % (time.time() - t0), flush=True)
+    json.dump(meta, open(f'{outdir}/meta.json', 'w'))
