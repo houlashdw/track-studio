@@ -20,28 +20,37 @@ def analyze(s, sd, OUT, nloops=2):
     mono = lambda x: x.mean(1); R = 22050; rs = lambda x: librosa.resample(mono(x), orig_sr=SR, target_sr=R)
     yd, yb, ym = rs(dr), rs(ba), rs(mel); y = yd + yb + ym
     g = s['genre']; lo, hi = (70, 105) if g == 'lofi' else (105, 180)
-    # 1) сетка: биты из DAW — темп постоянный → период и фаза линейной регрессией по найденным долям
-    _, bt = librosa.beat.beat_track(y=y, sr=R, start_bpm=s.get('bpm') or 140, tightness=300, units='time')
-    if len(bt) < 16: return []
-    k = np.arange(len(bt)); T, t0 = np.polyfit(k, bt, 1)
-    for _ in range(2):   # отбросить выбросы и уточнить
-        r = bt - (t0 + T * k); ok = np.abs(r) < .25 * T
-        if ok.sum() > 8: T, t0 = np.polyfit(k[ok], bt[ok], 1)
-    while 60 / T < lo: T /= 2
-    while 60 / T > hi: T *= 2
-    t0 = t0 % T; bpm = 60 / T
+    # 1) сетка: бит сделан в DAW — темп постоянный. Ищем темп, чья сетка 1/16 лучше всего ловит удары (векторная сила фаз)
+    oe = librosa.onset.onset_strength(y=yd, sr=R, hop_length=256); fo = librosa.onset.onset_detect(onset_envelope=oe, sr=R, hop_length=256)
+    if len(fo) < 40: return []
+    on = librosa.frames_to_time(fo, sr=R, hop_length=256); w = oe[fo]
+    def vs(bs):
+        st = 15 / bs[:, None]; z = (w * np.exp(2j * np.pi * on[None, :] / st)).sum(1) / w.sum(); return z
+    bs = np.arange(lo, hi, .02); z = vs(bs); b0 = bs[np.abs(z).argmax()]
+    bs = np.arange(b0 - .03, b0 + .03, .001); z = vs(bs); k = np.abs(z).argmax(); bpm = float(bs[k]); fit = float(np.abs(z[k]))
+    st = 15 / bpm; T = 4 * st; t0 = (np.angle(z[k]) / (2 * np.pi) * st) % st
     # 2) огибающие ударов по полосам (стем барабанов)
     H = 128; S = np.abs(librosa.stft(yd, n_fft=1024, hop_length=H)) ** 2; fr = librosa.fft_frequencies(sr=R, n_fft=1024)
     def env(a, b):
         e = np.log1p(1e4 * S[(fr >= a) & (fr < b)].mean(0)); o = np.maximum(0, np.diff(e, prepend=e[0])); return o
-    E = {'k': env(30, 120), 's': env(180, 1500) + .5 * env(2000, 5000), 'h': env(7000, 11000)}
+    E = {'k': env(30, 120), 's': np.sqrt(env(200, 1000) * env(1500, 5000)), 'h': env(7000, 11000)}   # снейр/клэп: и тело, и треск одновременно
     tt = lambda t: int(round(t * R / H))
+    EN = {nm: e / (np.percentile(e[e > 0], 99.5) + 1e-9) for nm, e in E.items()}
+    PK = {nm: librosa.util.peak_pick(e, pre_max=4, post_max=4, pre_avg=12, post_avg=12, delta=.08, wait=3) for nm, e in EN.items()}
+    LAT = {}   # задержка пиков огибающей относительно сетки (своя у каждой полосы) — медиана смещения от ближайшей 1/16
+    for nm in PK:
+        tp = PK[nm][EN[nm][PK[nm]] > .3] * H / R; r = (tp - t0) / st; dv = (r - np.round(r)) * st
+        LAT[nm] = float(np.median(dv)) if len(dv) > 8 else 0.0
     def at(e, t, w): a, b = max(0, tt(t - w)), tt(t + w) + 1; return float(e[a:b].max()) if b > a and a < len(e) else 0.0
-    nb = int((len(y) / R - t0) / T)
-    if nb < 40: return []
-    # фаза такта: кик на 1-й доле, снейр на 3-й (халфтайм) или на 2/4
-    ph = max(range(4), key=lambda p: sum(at(E['k'], t0 + (p + 4 * j) * T, .03) + at(E['s'], t0 + (p + 2 + 4 * j) * T, .03) for j in range(nb // 4 - 1)))
-    bars = (nb - ph) // 4
+    # начало такта: одна из 16 шестнадцатых — кик на «раз», снейр на 3-й доле (халфтайм) или на 2 и 4
+    nbar = int((len(y) / R - t0) / (4 * T)) - 1
+    if nbar < 10: return []
+    def bscore(q):
+        a = lambda j, o: t0 + (q + 16 * j + o) * st
+        return sum(at(E['k'], a(j, 0), .03) + max(at(E['s'], a(j, 8), .03), .5 * (at(E['s'], a(j, 4), .03) + at(E['s'], a(j, 12), .03))) for j in range(nbar))
+    q = max(range(16), key=bscore); t0 = t0 + q * st; ph = 0
+    nb = int((len(y) / R - t0) / T); bars = nb // 4
+    if bars < 10: return []
     mrms = lambda a, b, x: float(np.sqrt((x[int(a * R):int(b * R)] ** 2).mean() + 1e-12))
     C = librosa.feature.chroma_cqt(y=ym, sr=R, hop_length=512); ct = lambda t: min(C.shape[1] - 1, int(t * R / 512))
     cand = []
@@ -57,11 +66,16 @@ def analyze(s, sd, OUT, nloops=2):
     for li, (sc, j, a, b) in enumerate(pick):
         # барабаны: 128 шагов по 1/16, хэт 256 по 1/32
         st = {}
-        for nm, n, w in (('k', 128, .025), ('s', 128, .025), ('h', 256, .012)):
-            d = 32 * T / n; v = np.array([at(E[nm], a + i * d, w) for i in range(n)]); p = np.percentile(v, 98) + 1e-9; v = v / p
-            pk = [i for i in range(n) if v[i] > (.35 if nm != 'h' else .3) and v[i] >= v[max(0, i - 1)] and v[i] >= v[min(n - 1, i + 1)]]
-            if nm == 'h': pk = [i for i in pk if i % 2 == 0 or v[i] > .55]   # 1/32 вне сетки 1/16 — только явные роллы
-            st[nm] = [[i, round(float(min(1, max(.3, v[i]))), 2)] for i in pk]
+        for nm, n in (('k', 128), ('s', 128), ('h', 256)):
+            d = 32 * T / n; e = EN[nm]; best = {}
+            for f_ in PK[nm]:   # пики огибающей → ближайший шаг сетки (если удар не дальше трети шага)
+                t = f_ * H / R - a - LAT[nm]; i = int(round(t / d))
+                if 0 <= i < n and abs(t - i * d) < .4 * d and e[f_] > (.3 if nm != 'h' else .2): best[i] = max(best.get(i, 0), float(e[f_]))
+            if nm == 'h': best = {i: v for i, v in best.items() if i % 2 == 0 or v > .5}   # 1/32 вне сетки 1/16 — только явные роллы
+            cap = {'k': 6 * 8, 's': 3 * 8}.get(nm)   # больше 6 киков / 3 снейров на такт — ловится лишнее
+            if cap and len(best) > cap: th = sorted(best.values(), reverse=True)[cap - 1]; best = {i: v for i, v in best.items() if v >= th}
+            st[nm] = [[i, round(min(1.0, max(.3, v)), 2)] for i, v in sorted(best.items())]
+        ks = {i for i, _ in st['k']}; st['s'] = [x for x in st['s'] if x[0] not in ks]   # щелчок кика в полосе снейра
         # 808 по басу: высота по шагам 1/16 (pyin), новая нота — смена высоты или удар
         seg = yb[int(a * R):int(b * R)]; d16 = 2 * T / 8
         f0, vf, _ = librosa.pyin(seg, fmin=27.5, fmax=220, sr=R, frame_length=4096, hop_length=256)
@@ -81,7 +95,7 @@ def analyze(s, sd, OUT, nloops=2):
         for nm, x in (('mel', mel), ('bass', ba), ('drums', dr)):
             f = f'{OUT}/{lid}_{nm}.ogg'; seg2 = x[int(a * SR):int(b * SR)]
             sf.write(f, seg2 if nm == 'mel' else seg2.mean(1, keepdims=True), SR, format='OGG', subtype='VORBIS'); fs[nm] = os.path.basename(f)
-        out.append(dict(id=lid, genre=g, bpm=round(bpm, 3), key=NOTES[kk[1]], mode=kk[2], score=round(float(sc), 4), files=fs, steps=st, b808=notes,
+        out.append(dict(id=lid, genre=g, bpm=round(bpm, 3), fit=round(fit, 3), key=NOTES[kk[1]], mode=kk[2], score=round(float(sc), 4), files=fs, steps=st, b808=notes,
                         rms=dict(mel=mrms(a, b, ym), bass=mrms(a, b, yb), drums=mrms(a, b, yd))))
     return out
 
