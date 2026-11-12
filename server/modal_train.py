@@ -31,6 +31,8 @@ def train(src: str, out: str, env: str):
     e = dict(os.environ, SYSPY='1', INP=f'{VOL}/data/{src}', WORK=W)
     e.update(dict(kv.split('=', 1) for kv in env.split() if '=' in kv))
     rc = subprocess.run([sys.executable, '/al.py'], env=e).returncode
+    for lg in glob.glob(ACE + '/**/sidestep*.log', recursive=True) + glob.glob('/root/**/sidestep*.log', recursive=True):
+        print('==== лог', lg); print(open(lg, errors='replace').read()[-6000:])
     vol.commit()
     print('код', rc, 'итог:', sorted(os.path.basename(f) for f in glob.glob(W + '/*')))
     return rc
