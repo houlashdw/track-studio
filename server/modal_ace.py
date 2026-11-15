@@ -295,6 +295,47 @@ def deboxx(v, sr):
     return (out * (pv / pk if pk > pv else 1)).astype('float32')
 
 
+# ---- Трек целиком: бит из пака в Reaper → ACE-вокал → сведение и мастер (CPU-контейнер с Reaper) ----
+_SRV = os.path.dirname(os.path.abspath(__file__))
+mix_image = (
+    modal.Image.debian_slim(python_version='3.11')
+    .apt_install('curl', 'xz-utils', 'xvfb', 'ffmpeg', 'libsndfile1', 'libgtk-3-0', 'libasound2', 'procps')
+    .pip_install('numpy<2', 'scipy', 'soundfile', 'librosa==0.10.2.post1', 'fastapi[standard]')
+    .run_commands(
+        "U=$(curl -sL https://www.reaper.fm/download.php | grep -oE 'files/[0-9.x]+/reaper[0-9a-z_]+_linux_x86_64\\.tar\\.xz' | head -1); echo \"Reaper: $U\"; "
+        "curl -sL \"https://www.reaper.fm/$U\" -o /tmp/r.tar.xz && mkdir -p /tmp/rp && tar xf /tmp/r.tar.xz -C /tmp/rp && "
+        "D=$(dirname $(find /tmp/rp -name install-reaper.sh | head -1)) && $D/install-reaper.sh --install /opt --quiet && test -x /opt/REAPER/reaper && rm -rf /tmp/rp /tmp/r.tar.xz")
+    .add_local_dir(os.path.join(_SRV, 'daw'), '/app/daw', ignore=['__pycache__']).add_local_dir(os.path.join(_SRV, 'reaper'), '/app/reaper')
+    .add_local_dir(os.path.join(_SRV, '..', 'app', 'smp'), '/app/smp')
+)
+PACK = os.environ.get('TS_PACK', 'pack1')
+
+
+@app.cls(image=mix_image, cpu=4, memory=4096, volumes={VOL: vol}, timeout=1500, scaledown_window=300)
+class Mixer:
+    @modal.method()
+    def warm(self): return True
+
+    @modal.method()
+    def make(self, q: dict) -> bytes:
+        """q: genre, seed, lang(ja|ru), vseed, lyrics?  → mp3 готового трека (дополнительно в лог — тайминги и замеры)"""
+        import sys, tempfile
+        sys.path.insert(0, '/app/daw')
+        os.environ['TS_BUILD_LUA'] = '/app/reaper/build.lua'
+        import track
+        g = q.get('genre', 'plugg'); lang = q.get('lang', 'ja'); vseed = int(q.get('vseed', 11 if lang == 'ja' else 5))
+        lyr = q.get('lyrics') or (LYR_JA if lang == 'ja' else LYR_POP)
+
+        def sing(beat_mp3, bpm):
+            qq = dict(beat_b64=base64.b64encode(beat_mp3).decode(), bpm=bpm, lang=lang, lyrics=lyr, caption=VOC_CAP.get(lang, VOC_CAP['ru']) + VOC_TAG,
+                      seed=vseed, voice=float(q.get('voice', 1.0)), sex='f', steps=int(q.get('steps', 30)), f0max=380.0, tries=3)
+            return AceLego().lego.remote(qq)
+        work = tempfile.mkdtemp(prefix='trk')
+        mp3, info = track.make_track(f'{VOL}/pack/{PACK}', g, int(q.get('seed', 1)), work, sing, '/app/smp', q.get('drums', 'kit'), log=lambda m: print(m, flush=True))
+        print('трек:', json.dumps(info, ensure_ascii=False), flush=True)
+        return mp3
+
+
 web_image = modal.Image.debian_slim(python_version='3.11').pip_install('fastapi[standard]')
 
 
@@ -315,6 +356,7 @@ def web():
                 if w == 'lego': AceLego().warm.spawn()
                 elif w == 'beat': AceBeat().warm.spawn()
                 elif w == 'ace': Ace().warm.spawn()
+                elif w == 'track': Mixer().warm.spawn(); AceLego().warm.spawn()
         except Exception as e: print('warm', e)
         return {'ok': True, 'voice': True}
 
@@ -342,6 +384,11 @@ def web():
     async def beat(request: Request, x_key: Optional[str] = Header(default=None)):
         if not ok(x_key): raise HTTPException(status_code=401, detail='bad key')
         return {'id': (await AceBeat().beat.spawn.aio(await request.json())).object_id}
+
+    @api.post('/track')   # трек целиком: бит (Reaper) + вокалоид-голос + мастер → задание, результат через /job/<id>
+    async def track(request: Request, x_key: Optional[str] = Header(default=None)):
+        if not ok(x_key): raise HTTPException(status_code=401, detail='bad key')
+        return {'id': (await Mixer().make.spawn.aio(await request.json())).object_id}
 
     @api.get('/job/{jid}')
     def job(jid: str, x_key: Optional[str] = Header(default=None), k: Optional[str] = None):
@@ -456,3 +503,10 @@ def vocal_for(beat: str, out: str, bpm: int = 0, lang: str = 'ru', seed: int = 5
     q = dict(beat_b64=base64.b64encode(open(beat, 'rb').read()).decode(), bpm=bpm or None, lang=lang, lyrics=LYR_JA if lang == 'ja' else LYR_POP,
              caption=VOC_CAP.get(lang, VOC_CAP['ru']) + VOC_TAG, seed=seed, voice=voice, sex='f', steps=steps, f0max=f0max, tries=3)
     t0 = time.time(); b = AceLego().lego.remote(q); open(out, 'wb').write(b); print('вокал %s: %d КБ за %.0f с' % (lang, len(b) // 1024, time.time() - t0))
+
+
+@app.local_entrypoint()
+def track_test(outdir: str = 'trk', genre: str = 'plugg', seed: int = 1, lang: str = 'ja'):
+    os.makedirs(outdir, exist_ok=True); t0 = time.time()
+    b = Mixer().make.remote(dict(genre=genre, seed=seed, lang=lang)); open(f'{outdir}/track_{genre}_{lang}.mp3', 'wb').write(b)
+    print('трек %s/%s: %d КБ, всего %.0f с' % (genre, lang, len(b) // 1024, time.time() - t0))
