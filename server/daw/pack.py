@@ -193,29 +193,26 @@ def build(pack_dir, genre, seed, smp, out_wav, drums='kit', vox=None, voxvol=0.0
         if its: tracks.append(dict(name='fx', kind='audio', file=fxw[nm], items=its, lvl=LVL['fx'] + (3 if nm == 'impact' else 0), pan=0))
     if vox:   # вокал по секциям (интро/аутро — тишина), второй хук — с октавным дублем; копия на хуках идёт лишь на плейт-реверб
         vd = sf.info(vox).duration; dur = min(vd, total - .5)
-        # склеиваем соседние вокальные секции в один непрерывный кусок и двигаем границы в ближайшую паузу голоса (±1 такт), чтобы не рубить фразы
-        sp = []
+        # фразы голоса (между паузами ≥ .25 с); в секции берём ЦЕЛЫЕ фразы, чей старт попал в окно секции (с заходом до такта назад) — никаких обрывов; в куплетах иногда пропускаем фразу, чтобы голос дышал
+        xv, _sr = sf.read(vox, always_2d=True); W_ = int(.03 * _sr); ev = np.sqrt(np.convolve(xv.mean(1) ** 2, np.ones(W_) / W_, 'same')); H = int(.02 * _sr)
+        ev = ev[:len(ev) // H * H].reshape(-1, H).mean(1); on_ = ev > max(ev.max() * .05, 1e-5); ph = []; i = 0; n_ = len(on_)
+        while i < n_:
+            if on_[i]:
+                j = i; gap = 0
+                while j < n_ and gap < 13: gap = 0 if on_[j] else gap + 1; j += 1
+                ph.append((i * .02, (j - gap) * .02)); i = j
+            else: i += 1
+        RV = random.Random(seed * 31 + 5); vl = []
         for t_, d_, nm in vitems:
-            if sp and abs(sp[-1][0] + sp[-1][1] - t_) < 1e-3: sp[-1][1] += d_; sp[-1][2].append(nm)
-            else: sp.append([t_, d_, [nm]])
-        xv, _sr = sf.read(vox, always_2d=True); ev = np.sqrt(np.convolve(xv.mean(1) ** 2, np.ones(int(.03 * _sr)) / int(.03 * _sr), 'same')); H = int(.02 * _sr)
-        ev = ev[:len(ev) // H * H].reshape(-1, H).mean(1); thr = max(ev.max() * .04, 1e-5)
-        def snap(t):
-            c = int(t / .02); w = int(BAR / .02)
-            lo, hi = max(0, c - w), min(len(ev) - 1, c + w)
-            if hi <= lo: return t
-            q = [i for i in range(lo, hi + 1) if ev[i] < thr]
-            if not q: return t
-            q = min(q, key=lambda i: abs(i - c)); return q * .02
-        vl = []
-        for a_, d_, nms in sp:
-            b_ = a_ + d_; a2 = snap(a_) if a_ > 0 else a_; b2 = snap(b_) if b_ < dur - 1 else min(b_, dur)
-            if b2 - a2 < 1 or a2 > dur - 1: continue
-            vl.append((dict(t=a2, d=min(b2 - a2, dur - a2), v=1.0, rate=1.0, off=a2, fi=.08, fo=.25), nms[-1] if 'hook' in nms[-1:] else nms[0]))
+            for k, (p0, p1) in enumerate(ph):
+                if not (t_ - BAR * .5 <= p0 < t_ + d_ - .3) or p1 - p0 < .25: continue
+                if nm == 'verse' and RV.random() < .22 and k % 3 == 2: continue
+                t2 = max(0, p0 - .06); e2 = min(p1 + .35, dur)
+                vl.append((dict(t=t2, d=e2 - t2, v=1.0, rate=1.0, off=t2, fi=.05, fo=.3), nm))
         tracks.append(dict(name='vox', kind='audio', file=os.path.abspath(vox), items=[x for x, _ in vl], lvl=0, vol=voxvol, pan=0))
         hk = [dict(t=t_, d=min(d_, dur - t_), v=1.0, rate=1.0, off=t_, fi=.04, fo=.5) for t_, d_ in hooks if t_ < dur - 1]  # копия-плейт на хуках
         tracks.append(dict(name='voxhook', kind='audio', file=os.path.abspath(vox), nomain=True, lvl=0, vol=voxvol, pan=0, items=hk))
-        hv_ = [x for x, nm in vl if nm == 'hook'][-1:]   # октавный дубль голоса — на последнем хуке
+        hv_ = [x for x, nm in vl if nm == 'hook' and hooks and x['t'] >= hooks[-1][0] - BAR * .5]   # октавный дубль голоса — на последнем хуке
         if hv_: tracks.append(dict(name='voxdbl', kind='audio', file=os.path.abspath(vox), lvl=0, vol=voxvol - 8, pan=.25, items=[dict(x, v=.5, pitch=12, fi=.05) for x in hv_]))
     for t in tracks:   # фейдер: RMS звучащей части → целевая громкость
         if t['name'] in ('vox', 'voxhook', 'voxdbl'): continue
