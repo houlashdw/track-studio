@@ -62,7 +62,7 @@ jobs:
             unset TS_NOMASTER
             VV=$(python3 server/daw/balance.py /tmp/out/bpre.wav /tmp/out/vpre.wav 0 --want 1.5); echo "вокал $L: фейдер $VV дБ (по замеру до мастера)"
             python3 server/daw/pack.py --pack "$PK" --genre $g --seed $s --drums ${{ inputs.drums }} --smp app/smp --wav /tmp/out/mix_$L.wav --lua /tmp/out/mix_$L.lua --vox /tmp/out/vox_$L.wav --voxvol $VV
-            render /tmp/out/mix_$L.lua /tmp/out/mix_$L.wav ${{ inputs.lufs }}
+            render /tmp/out/mix_$L.lua /tmp/out/mix_$L.wav 15   # Reaper мягко, финальную громкость доводит ffmpeg
             # громкость и потолок — финальным шагом (лимитер Reaper на горячем миксе не держит ни то ни другое)
             I=$(lufs /tmp/out/mix_$L.wav); G=$(python3 -c "print(round(-${{ inputs.lufs }} - float('$I'), 2))")
             ffmpeg -v error -y -i /tmp/out/mix_$L.wav -af "volume=${G}dB,alimiter=limit=0.966:attack=3:release=60:level=disabled" -b:a 192k /tmp/out/mix_$L.mp3
