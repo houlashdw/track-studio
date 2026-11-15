@@ -53,9 +53,18 @@ jobs:
             modal run server/modal_ace.py::vocal_for --beat /tmp/out/beat.mp3 --out /tmp/out/vox_raw_$L.mp3 --bpm $BPM --lang $L --seed ${{ inputs.vseed }} 2>&1 | grep -aE "вокал|Error|Traceback" | tail -5
             [ -f /tmp/out/vox_raw_$L.mp3 ] || continue
             python3 server/daw/voxprep.py /tmp/out/vox_raw_$L.mp3 /tmp/out/vox_$L.wav --bpm $BPM
-            LV=$(lufs /tmp/out/vox_$L.wav); VV=$(python3 -c "print(round(float('$LB') + 1.5 - float('$LV'), 1))"); echo "вокал $L: $LV LUFS → фейдер $VV дБ"
-            python3 server/daw/pack.py --pack "$PK" --genre $g --seed $s --drums ${{ inputs.drums }} --smp app/smp --wav /tmp/out/mix_$L.wav --lua /tmp/out/mix_$L.lua --vox /tmp/out/vox_$L.wav --voxvol $VV
-            render /tmp/out/mix_$L.lua /tmp/out/mix_$L.wav ${{ inputs.lufs }} && ffmpeg -v error -y -i /tmp/out/mix_$L.wav -b:a 192k /tmp/out/mix_$L.mp3
+            LV=$(lufs /tmp/out/vox_$L.wav); VV=$(python3 -c "print(round(float('$LB') - 6 - float('$LV'), 1))"); echo "вокал $L: $LV LUFS → стартовый фейдер $VV дБ"
+            for it in 1 2 3; do
+              python3 server/daw/pack.py --pack "$PK" --genre $g --seed $s --drums ${{ inputs.drums }} --smp app/smp --wav /tmp/out/mix_$L.wav --lua /tmp/out/mix_$L.lua --vox /tmp/out/vox_$L.wav --voxvol $VV
+              render /tmp/out/mix_$L.lua /tmp/out/mix_$L.wav ${{ inputs.lufs }} || break
+              DV=$(python3 server/daw/balance.py /tmp/out/beat.wav /tmp/out/mix_$L.wav /tmp/out/vox_$L.wav --want 1.5); echo "баланс $L, итерация $it: вокал отличается от цели на $DV дБ (фейдер $VV)"
+              python3 -c "import sys; sys.exit(0 if abs(float('$DV')) < 1.0 else 1)" && break
+              VV=$(python3 -c "print(round($VV - float('$DV'), 1))")
+            done
+            # громкость и потолок — финальным шагом (лимитер Reaper на горячем миксе не держит ни то ни другое)
+            I=$(lufs /tmp/out/mix_$L.wav); G=$(python3 -c "print(round(-${{ inputs.lufs }} - float('$I'), 2))")
+            ffmpeg -v error -y -i /tmp/out/mix_$L.wav -af "volume=${G}dB,alimiter=limit=0.966:attack=3:release=60:level=disabled" -b:a 192k /tmp/out/mix_$L.mp3
+            echo "мастер $L: $(lufs /tmp/out/mix_$L.mp3) LUFS"; ffmpeg -hide_banner -i /tmp/out/mix_$L.mp3 -af ebur128=peak=true -f null - 2>&1 | grep -aE "Peak:" | tail -1
             ffmpeg -hide_banner -i /tmp/out/mix_$L.wav -af astats=metadata=0 -f null - 2>&1 | grep -aE "Peak level dB" | head -1
             grep -aE "НЕТ ПЛАГ|нет параметра|не найден" /tmp/out/mix_$L.log | sort | uniq -c | head
           done
