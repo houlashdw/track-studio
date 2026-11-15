@@ -110,10 +110,12 @@ jobs:
           K="$TSK"; [ -n "$K" ] || K=$(printf %s "$P" | sha256sum | cut -c1-32)
           U=https://fantasydrawingart--track-studio-ace-ace-web.us-east.modal.run; mkdir -p o /tmp/tt
           for i in $(seq 1 40); do [ "$(curl -s -L -o /dev/null -w "%{http_code}" "$U/ping" --max-time 200)" = 200 ] && break; sleep 5; done; echo "сервер проснулся"
-          T0=$(date +%s); curl -s -o /tmp/r.json -w "track POST: %{http_code}\n" -X POST "$U/track" -H "Content-Type: application/json" -H "X-Key: $K" -d '{"genre":"rage","lang":"ja","seed":7}' --max-time 120
-          ID=$(python3 -c "import json; print(json.load(open('/tmp/r.json'))['id'])") || exit 0
-          for i in $(seq 1 200); do C=$(curl -s -o /tmp/tt/app_rage_ja.mp3 -w "%{http_code}" "$U/job/$ID" -H "X-Key: $K" --max-time 120); [ "$C" = 202 ] || break; sleep 4; done
-          echo "track: код $C, $(stat -c %s /tmp/tt/app_rage_ja.mp3) байт, $(( $(date +%s) - T0 )) с"
+          T0=$(date +%s)
+          one() { S=$1; curl -s -o /tmp/r$S.json -X POST "$U/track" -H "Content-Type: application/json" -H "X-Key: $K" -d "{\"genre\":\"auto\",\"lang\":\"auto\",\"seed\":$S}" --max-time 120
+            ID=$(python3 -c "import json; print(json.load(open('/tmp/r$S.json'))['id'])") || return
+            for i in $(seq 1 200); do C=$(curl -s -o /tmp/tt/track_s$S.mp3 -w "%{http_code}" "$U/job/$ID" -H "X-Key: $K" --max-time 120); [ "$C" = 202 ] || break; sleep 4; done
+            echo "seed $S: код $C, $(stat -c %s /tmp/tt/track_s$S.mp3) байт, $(( $(date +%s) - T0 )) с"; }
+          for S in ${SEEDS:-101 102 103}; do one $S & done; wait
           bash tools/enc_out.sh /tmp/tt o
           cd o && git init -q -b modal-out && git config user.name gha && git config user.email gha@users.noreply.github.com
           git add -A && git commit -q -m "track test" && git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" modal-out
