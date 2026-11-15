@@ -6,7 +6,7 @@ on:
       genre: { default: 'plugg' }
       seed: { default: '1' }
       drums: { default: 'kit' }
-      variants: { description: 'язык:сид:режим (full — вся обработка, raw — только срез гула)', default: 'ja:5:full ja:5:raw ja:11:full' }
+      variants: { description: 'язык:сид:режим (full — вся обработка, raw — только срез гула)', default: 'ja:11:full' }
       pack: { default: 'pack1' }
       lufs: { description: 'целевая громкость, LUFS по модулю', default: '10' }
       vseed: { default: '5' }
