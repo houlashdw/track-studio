@@ -120,8 +120,10 @@ def build(pack_dir, genre, seed, smp, out_wav, drums='loop', vox=None, voxvol=0.
 
 if __name__ == '__main__':
     ap = argparse.ArgumentParser(); ap.add_argument('--pack', required=True); ap.add_argument('--genre', default='trap'); ap.add_argument('--seed', type=int, default=3)
-    ap.add_argument('--smp', default='app/smp'); ap.add_argument('--wav', required=True); ap.add_argument('--lua', required=True); ap.add_argument('--drums', default='loop'); ap.add_argument('--vox'); ap.add_argument('--voxvol', type=float, default=0.0); ap.add_argument('--info')
+    ap.add_argument('--smp', default='app/smp'); ap.add_argument('--wav', required=True); ap.add_argument('--lua', required=True); ap.add_argument('--drums', default='loop'); ap.add_argument('--vox'); ap.add_argument('--voxvol', type=float, default=0.0); ap.add_argument('--info'); ap.add_argument('--solo')
     a = ap.parse_args(); Rp = build(a.pack, a.genre, a.seed, a.smp, a.wav, a.drums, a.vox, a.voxvol)
+    if a.solo:   # замер: оставить только вокальные дорожки (vox) или только бит (beat)
+        Rp['tracks'] = [t for t in Rp['tracks'] if (t['name'] in ('vox', 'voxhook')) == (a.solo == 'vox')]
     open(a.lua, 'w').write('return ' + to_lua(Rp) + '\n')
     if a.info: json.dump(dict(bpm=Rp['bpm'], total=Rp['total'], info=Rp['info']), open(a.info, 'w'))
     print('пак → Reaper:', a.genre, json.dumps(Rp['info'], ensure_ascii=False), 'дорожки:', [(t['name'], len(t['items'])) for t in Rp['tracks']])

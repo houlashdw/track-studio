@@ -153,10 +153,12 @@ if fxd then local q = 60 / P.bpm; setv(dly, fxd, '1: Length (time)', q * 750); s
 -- мастер: EQ → многополосный ReaXcomp → склейка ReaComp → ReaLimit
 local M = reaper.GetMasterTrack(0)
 reaper.SetMediaTrackInfo_Value(M, 'D_VOL', 1)
+if not os.getenv('TS_NOMASTER') then   -- TS_NOMASTER: замер уровней до мастера (без EQ/компрессии/лимитера)
 eq(M, {{0, 30, -6}, {0, 250, -1, 2}, {0, 3000, 0.5, 2}, {0, 12000, 1.5}})
 addfx(M, 'ReaXcomp (Cockos)')
 local gl = comp(M, -10, 2, 10, 200)
 local lim = addfx(M, 'ReaLimit (Cockos)'); if lim then setv(M, lim, 'Threshold', P.loud + MG); setv(M, lim, 'Ceiling', P.vox and -0.3 or -1) end
+end
 
 -- рендер
 reaper.GetSetProjectInfo(0, 'RENDER_SETTINGS', 0, true); reaper.GetSetProjectInfo(0, 'RENDER_BOUNDSFLAG', 0, true)

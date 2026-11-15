@@ -53,14 +53,16 @@ jobs:
             modal run server/modal_ace.py::vocal_for --beat /tmp/out/beat.mp3 --out /tmp/out/vox_raw_$L.mp3 --bpm $BPM --lang $L --seed ${{ inputs.vseed }} 2>&1 | grep -aE "вокал|Error|Traceback" | tail -5
             [ -f /tmp/out/vox_raw_$L.mp3 ] || continue
             python3 server/daw/voxprep.py /tmp/out/vox_raw_$L.mp3 /tmp/out/vox_$L.wav --bpm $BPM
-            LV=$(lufs /tmp/out/vox_$L.wav); VV=$(python3 -c "print(round(float('$LB') - 6 - float('$LV'), 1))"); echo "вокал $L: $LV LUFS → стартовый фейдер $VV дБ"
-            for it in 1 2 3; do
-              python3 server/daw/pack.py --pack "$PK" --genre $g --seed $s --drums ${{ inputs.drums }} --smp app/smp --wav /tmp/out/mix_$L.wav --lua /tmp/out/mix_$L.lua --vox /tmp/out/vox_$L.wav --voxvol $VV
-              render /tmp/out/mix_$L.lua /tmp/out/mix_$L.wav ${{ inputs.lufs }} || break
-              DV=$(python3 server/daw/balance.py /tmp/out/beat.wav /tmp/out/mix_$L.wav /tmp/out/vox_$L.wav --want 1.5); echo "баланс $L, итерация $it: вокал отличается от цели на $DV дБ (фейдер $VV)"
-              python3 -c "import sys; sys.exit(0 if abs(float('$DV')) < 1.0 else 1)" && break
-              VV=$(python3 -c "print(round($VV - float('$DV'), 1))")
-            done
+            # баланс до мастера: бит отдельно и вокал с цепочкой отдельно (без EQ/компрессии/лимитера мастера), вокал на ~1.5 дБ выше уровня бита
+            export TS_NOMASTER=1
+            python3 server/daw/pack.py --pack "$PK" --genre $g --seed $s --drums ${{ inputs.drums }} --smp app/smp --wav /tmp/out/bpre.wav --lua /tmp/out/bpre.lua --vox /tmp/out/vox_$L.wav --voxvol 0 --solo beat
+            python3 server/daw/pack.py --pack "$PK" --genre $g --seed $s --drums ${{ inputs.drums }} --smp app/smp --wav /tmp/out/vpre.wav --lua /tmp/out/vpre.lua --vox /tmp/out/vox_$L.wav --voxvol 0 --solo vox
+            for n in bpre vpre; do rm -f /tmp/out/$n.wav /tmp/out/$n.log; (TS_PROJ=/tmp/out/$n.lua TS_LOG=/tmp/out/$n.log timeout 240 xvfb-run -a /opt/REAPER/reaper -nosplash -newinst server/reaper/build.lua >/dev/null 2>&1 &)
+              for i in $(seq 1 230); do grep -q "РЕНДЕР ГОТОВ" /tmp/out/$n.log 2>/dev/null && break; sleep 1; done; sleep 1; pkill -f /opt/REAPER/reaper || true; pkill Xvfb || true; sleep 1; done
+            unset TS_NOMASTER
+            VV=$(python3 server/daw/balance.py /tmp/out/bpre.wav /tmp/out/vpre.wav 0 --want 1.5); echo "вокал $L: фейдер $VV дБ (по замеру до мастера)"
+            python3 server/daw/pack.py --pack "$PK" --genre $g --seed $s --drums ${{ inputs.drums }} --smp app/smp --wav /tmp/out/mix_$L.wav --lua /tmp/out/mix_$L.lua --vox /tmp/out/vox_$L.wav --voxvol $VV
+            render /tmp/out/mix_$L.lua /tmp/out/mix_$L.wav ${{ inputs.lufs }}
             # громкость и потолок — финальным шагом (лимитер Reaper на горячем миксе не держит ни то ни другое)
             I=$(lufs /tmp/out/mix_$L.wav); G=$(python3 -c "print(round(-${{ inputs.lufs }} - float('$I'), 2))")
             ffmpeg -v error -y -i /tmp/out/mix_$L.wav -af "volume=${G}dB,alimiter=limit=0.966:attack=3:release=60:level=disabled" -b:a 192k /tmp/out/mix_$L.mp3
