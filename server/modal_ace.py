@@ -208,8 +208,9 @@ class AceLego:
             self.dit.set_use_lora(voice > 0)
             if voice > 0: self.dit.set_lora_scale(voice)
         seed0 = int(q.get('seed', -1))
-        for att in range(2):   # женский голос вышел низким (мужским) → ещё раз с другим сидом
-            seed = seed0 if att == 0 else (abs(seed0) + 7919 if seed0 >= 0 else -1)
+        f0max = float(q.get('f0max', 0)); tries = int(q.get('tries', 2))
+        for att in range(tries):   # женский голос вышел низким (мужским) или слишком высоким («писк») → ещё раз с другим сидом
+            seed = seed0 if att == 0 else (abs(seed0) + 7919 * att if seed0 >= 0 else -1)
             p = GenerationParams(task_type='lego', src_audio='/tmp/beat.mp3', instruction='Generate the vocals track based on the audio context:',
                                  caption=('vc2, ' if voice > 0 else '') + q.get('caption', 'female vocal in Russian'), lyrics=q.get('lyrics', ''), bpm=q.get('bpm') or None,
                                  vocal_language=q.get('lang', 'ru'), repainting_start=0.0, repainting_end=-1, inference_steps=int(q.get('steps', 30)), seed=seed, reference_audio=ref)
@@ -227,7 +228,7 @@ class AceLego:
             v = st[self.sep.sources.index('vocals')].cpu().numpy().T; print('lego: +demucs %.0f с' % (time.time() - T0), flush=True)
             if q.get('full') or q.get('sex', 'f') != 'f': break
             f0 = vox_f0(v, sr); print('lego: высота голоса %.0f Гц (попытка %d)' % (f0, att + 1), flush=True)
-            if f0 == 0 or f0 >= 175: break
+            if f0 == 0 or (f0 >= 175 and not (f0max and f0 > f0max)): break
         # сдвиг ACE относительно нашего бита (огибающие атак, ±0.5 с): голос подвигаем, чтобы шёл ровно с битом
         try:
             subprocess.run(['ffmpeg', '-v', 'error', '-y', '-i', '/tmp/beat.mp3', '-ac', '1', '-ar', '44100', '/tmp/beat.wav'], check=True)
@@ -446,12 +447,12 @@ def buzz_ab(outdir: str = 'bz', seed: int = 7):
 
 LYR_JA = '[Verse]\n夜の街に光が揺れる\n君の声が胸に響く\n\n[Chorus]\n走り出せ 夢のその先へ\n輝く空を二人で越えて'
 VOC_CAP = {'ja': 'anime vocaloid style female vocal in Japanese', 'ru': 'anime vocaloid style female vocal in Russian'}
-VOC_TAG = ', soft airy slightly synthetic timbre, mid-high soprano, light vibrato, clear diction, bright J-pop'
+VOC_TAG = ', soft airy slightly synthetic timbre, warm mid-range mezzo-soprano, comfortable low-mid register, gentle, light vibrato, clear diction, J-pop'
 
 
 @app.local_entrypoint()
-def vocal_for(beat: str, out: str, bpm: int = 0, lang: str = 'ru', seed: int = 5, voice: float = 1.0, steps: int = 30):
+def vocal_for(beat: str, out: str, bpm: int = 0, lang: str = 'ru', seed: int = 5, voice: float = 1.0, steps: int = 30, f0max: float = 380.0):
     """вокалоид-аниме голос под готовый бит (mp3 из Reaper) → чистый вокал-стем, уже подвинутый под бит"""
     q = dict(beat_b64=base64.b64encode(open(beat, 'rb').read()).decode(), bpm=bpm or None, lang=lang, lyrics=LYR_JA if lang == 'ja' else LYR_POP,
-             caption=VOC_CAP.get(lang, VOC_CAP['ru']) + VOC_TAG, seed=seed, voice=voice, sex='f', steps=steps)
+             caption=VOC_CAP.get(lang, VOC_CAP['ru']) + VOC_TAG, seed=seed, voice=voice, sex='f', steps=steps, f0max=f0max, tries=3)
     t0 = time.time(); b = AceLego().lego.remote(q); open(out, 'wb').write(b); print('вокал %s: %d КБ за %.0f с' % (lang, len(b) // 1024, time.time() - t0))

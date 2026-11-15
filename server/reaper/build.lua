@@ -135,7 +135,7 @@ for _, t in ipairs(P.tracks) do
     local sat = addfx(tr, 'JS: Saturation'); if sat then setv(tr, sat, 'Amount', P.drive * 60) end
     comp(tr, -20, 3, 3, 120)
   elseif nm == 'vox' then   -- вокалоид: воздух 5–8 кГц, придавить 2–3 кГц, мягкий компрессор (релиз ≈ 1/8 такта), без гула (срез 120 Гц сделан до Reaper)
-    eq(tr, {{0, 110, -3}, {0, 2600, -2.5, 1.2}, {0, 4800, 0, 1}, {0, 6800, 2.8}}); comp(tr, -24, 2.5, 15, math.min(500, 60000 / P.bpm * 0.5))
+    eq(tr, {{0, 110, -3}, {0, 2800, -2.5, 1.2}, {0, 4600, -2.5, 1}, {0, 7500, 1.2}}); comp(tr, -24, 2.5, 15, math.min(500, 60000 / P.bpm * 0.5))
   elseif nm == 'voxhook' then
     reaper.SetMediaTrackInfo_Value(tr, 'B_MAINSEND', 0)
   elseif nm == 'melody' or nm == 'pad' then

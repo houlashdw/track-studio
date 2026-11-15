@@ -50,7 +50,7 @@ jobs:
           ffmpeg -v error -y -i /tmp/out/beat.wav -b:a 192k /tmp/out/beat.mp3
           BPM=$(python3 -c "import json;print(json.load(open('/tmp/out/info.json'))['bpm'])"); LB=$(lufs /tmp/out/beat.wav); echo "бит: $BPM BPM, $LB LUFS"
           for L in ${{ inputs.langs }}; do
-            modal run server/modal_ace.py::vocal_for --beat /tmp/out/beat.mp3 --out /tmp/out/vox_raw_$L.mp3 --bpm $BPM --lang $L --seed ${{ inputs.vseed }} 2>&1 | grep -aE "вокал|Error|Traceback" | tail -5
+            modal run server/modal_ace.py::vocal_for --beat /tmp/out/beat.mp3 --out /tmp/out/vox_raw_$L.mp3 --bpm $BPM --lang $L --seed ${{ inputs.vseed }} 2>&1 | grep -aE "вокал|высота|Error|Traceback" | tail -8
             [ -f /tmp/out/vox_raw_$L.mp3 ] || continue
             python3 server/daw/voxprep.py /tmp/out/vox_raw_$L.mp3 /tmp/out/vox_$L.wav --bpm $BPM
             # баланс до мастера: бит отдельно и вокал с цепочкой отдельно (без EQ/компрессии/лимитера мастера), вокал на ~1.5 дБ выше уровня бита
