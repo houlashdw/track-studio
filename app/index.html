@@ -560,11 +560,11 @@ short lines in English…
         <div id="cloudOpts" hidden>
           <div class="seg3 mt8" id="cloudVoiceSeg"><button type="button" data-v="0" class="on">Голос ACE (выше, аниме)</button><button type="button" data-v="0.5">Наполовину</button><button type="button" data-v="1">Голос vc2 (ниже)</button></div>
           <p class="hint" style="margin:10px 2px 0">Бит</p>
-          <div class="seg3 mt8" id="cloudBeatSeg"><button type="button" data-v="ours" class="on">Наш (из приложения)</button><button type="button" data-v="ace">ACE целиком</button><button type="button" data-v="aibeat">ИИ-бит (обученный)</button></div>
+          <div class="seg3 mt8" id="cloudBeatSeg"><button type="button" data-v="reaper" class="on">Reaper + вокалоид</button><button type="button" data-v="ours">Наш (из приложения)</button><button type="button" data-v="ace">ACE целиком</button><button type="button" data-v="aibeat">ИИ-бит (обученный)</button></div>
           <p class="hint" style="margin:10px 2px 0">Подача</p>
           <div class="seg3 mt8" id="cloudDelSeg"><button type="button" data-v="auto" class="on">Авто</button><button type="button" data-v="soft">Нежно</button><button type="button" data-v="power">Мощно</button><button type="button" data-v="rap">Рэп-флоу</button><button type="button" data-v="atl">Atlanta</button></div>
           <p class="hint" style="margin:10px 2px 0">Язык и голос</p>
-          <div class="seg3 mt8" id="cloudLangSeg"><button type="button" data-v="ru" class="on">Русский</button><button type="button" data-v="en">English</button></div>
+          <div class="seg3 mt8" id="cloudLangSeg"><button type="button" data-v="ru" class="on">Русский</button><button type="button" data-v="ja">日本語</button><button type="button" data-v="en">English</button></div>
           <div class="seg3 mt8" id="cloudSexSeg"><button type="button" data-v="f" class="on">Женский (vc2)</button><button type="button" data-v="m">Мужской</button></div>
           <p class="hint" style="margin:10px 2px 0">Тембр</p>
           <div class="seg3 mt8" id="cloudTimSeg"><button type="button" data-v="anime" class="on">Аниме</button><button type="button" data-v="auto">Авто</button><button type="button" data-v="low">Ниже, с хрипотцой</button><button type="button" data-v="high">Выше, воздушно</button></div>
@@ -3606,7 +3606,7 @@ function simpleSet(v) { cloudSet('ts_simple', v ? '1' : '0'); document.body.clas
 let cloudWarmAt = 0;
 function cloudWarm() {   /* будим GPU заранее, пока человек пишет текст: к нажатию «Создать» сервер уже загружен */
   if (cloudGet('ts_cloud', '0') !== '1' || Date.now() - cloudWarmAt < 240000) return; cloudWarmAt = Date.now();
-  const bm = cloudGet('ts_cbeat', 'ours'), w = bm === 'ace' ? 'ace' : bm === 'aibeat' ? 'lego,beat,ace' : 'lego,ace';
+  const bm = cloudGet('ts_cbeat', 'ours'), w = bm === 'reaper' ? 'track' : bm === 'ace' ? 'ace' : bm === 'aibeat' ? 'lego,beat,ace' : 'lego,ace';
   fetch(CLOUD_URL + '/ping?warm=' + w).catch(() => { });
 }
 function cloudInit() {
@@ -3618,6 +3618,7 @@ function cloudInit() {
   on.onchange = sync; sync();
   $('#cloudVoiceSeg').querySelectorAll('button').forEach((b) => { b.classList.toggle('on', parseFloat(b.dataset.v) === CLOUD.voice);
     b.onclick = () => { CLOUD.voice = parseFloat(b.dataset.v); cloudSet('ts_cvoice', b.dataset.v); $('#cloudVoiceSeg').querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b)); }; });
+  if (cloudGet('ts_cbeat_v', '') !== '1') { cloudSet('ts_cbeat_v', '1'); cloudSet('ts_cbeat', 'reaper'); }   /* новый режим по умолчанию: бит в Reaper из пака + вокалоид-голос */
   for (const [id, k, d] of [['#cloudDelSeg', 'ts_cdel', 'auto'], ['#cloudTimSeg', 'ts_ctim', 'anime'], ['#cloudBeatSeg', 'ts_cbeat', 'ours'], ['#cloudLangSeg', 'ts_clang', 'ru'], ['#cloudSexSeg', 'ts_csex', 'f']]) {
     const seg = $(id), cur = cloudGet(k, d);
     seg.querySelectorAll('button').forEach((b) => { b.classList.toggle('on', b.dataset.v === cur); b.onclick = () => { cloudSet(k, b.dataset.v); seg.querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b)); }; });
@@ -3644,6 +3645,7 @@ async function cloudMake() {
   const prompt = $('#prompt').value.trim();
   if (!prompt) { $('#prompt').focus(); setStatus('Напиши, какой трек нужен.', 0, false); return; }
   let key = cloudGet('ts_ckey', ''); if (!key) key = cloudAskKey(); if (!key) { $('#cloudMsg').textContent = 'Нужен ключ сервера.'; return; }
+  if (cloudGet('ts_cbeat', 'ours') === 'reaper') return cloudReaper(key, prompt);
   const bpmM = prompt.match(/(\d{2,3})\s*bpm/i), rap = $('#voiceMode').value === 'rap';
   /* подача/тембр/перегруз — словами в описании (замер на сервере: «low husky deep» заметно опускает высоту голоса, перегруз и чистота слышны в звуке) */
   const del = cloudGet('ts_cdel', 'auto'), tim = cloudGet('ts_ctim', 'anime'), dirt = dirtMode(), tags = [];
@@ -3684,6 +3686,27 @@ async function cloudMake() {
     CLOUD.blob = await r.blob(); if (CLOUD.url) URL.revokeObjectURL(CLOUD.url); CLOUD.url = URL.createObjectURL(CLOUD.blob);
     const au = $('#cloudAudio'); au.src = CLOUD.url; au.hidden = false; $('#cloudActs').hidden = false; au.play().catch(() => { });
     msg.textContent = 'Готово за ' + Math.round((Date.now() - t0) / 1000) + ' с.'; setStatus('', 0, false);
+  } catch (e) { msg.textContent = 'Не вышло: ' + (e && e.message || e); setStatus('', 0, false); }
+  finally { clearInterval(tick); setBusy(false); }
+}
+/* трек целиком на сервере: бит собирается в Reaper из пака (нарезка скачанных битов), ACE поёт вокалоид-голос под него, сведение и мастер в Reaper → готовый mp3 (~2 мин) */
+async function cloudReaper(key, prompt) {
+  const msg = $('#cloudMsg'), t0 = Date.now(), p = prompt.toLowerCase();
+  const genre = /rage|рейдж/.test(p) ? 'rage' : /phonk|фонк/.test(p) ? 'phonk' : /plugg|плагг|плаг/.test(p) ? 'plugg' : /drill|дрилл/.test(p) ? 'drill' : /trap|трэп|трап/.test(p) ? 'trap' : 'plugg';
+  const l0 = cloudGet('ts_clang', 'ru'), lang = l0 === 'ru' ? 'ru' : 'ja', own = ($('#lyrics').value || '').trim();
+  stop(); setBusy(true); setStatus('Облако: трек в Reaper…', .3, true);
+  const tick = setInterval(() => { const s = Math.round((Date.now() - t0) / 1000); msg.textContent = 'Собираю трек в Reaper: бит → голос → сведение… ' + s + ' с' + (s > 150 ? ' (сервер просыпался — первый раз дольше)' : ''); }, 1000);
+  try {
+    for (let i = 0; ; i++) { try { const pr = await fetch(CLOUD_URL + '/ping'); if (pr.ok) break; } catch (e) { } if (i > 40) throw new Error('сервер не просыпается — проверь интернет или кредиты Modal'); await new Promise((ok) => setTimeout(ok, 5000)); }
+    const r = await fetch(CLOUD_URL + '/track', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Key': key }, body: JSON.stringify({ genre, lang, seed: 1 + Math.floor(Math.random() * 9000), lyrics: lang === 'ru' && own ? cloudLyrics() : undefined }) });
+    if (r.status === 401) { cloudSet('ts_ckey', ''); throw new Error('неверный ключ сервера — нажми «Создать» ещё раз и введи ключ'); }
+    if (!r.ok) throw new Error('сервер: ' + r.status + ' ' + (await r.text()).slice(0, 200));
+    const id = (await r.json()).id; let ab = null;
+    for (let i = 0; i < 200 && !ab; i++) { await new Promise((ok) => setTimeout(ok, 4000)); const j = await fetch(CLOUD_URL + '/job/' + id, { headers: { 'X-Key': key } }); if (j.status === 202) continue; if (!j.ok) throw new Error('сервер: ' + j.status + ' ' + (await j.text()).slice(0, 200)); ab = await j.arrayBuffer(); }
+    if (!ab) throw new Error('слишком долго — попробуй ещё раз');
+    CLOUD.blob = new Blob([ab], { type: 'audio/mpeg' }); if (CLOUD.url) URL.revokeObjectURL(CLOUD.url); CLOUD.url = URL.createObjectURL(CLOUD.blob);
+    const au = $('#cloudAudio'); au.src = CLOUD.url; au.hidden = false; $('#cloudActs').hidden = false; au.play().catch(() => { });
+    msg.textContent = 'Готово за ' + Math.round((Date.now() - t0) / 1000) + ' с (' + genre + ', ' + (lang === 'ja' ? '日本語' : 'русский') + ').'; setStatus('', 0, false);
   } catch (e) { msg.textContent = 'Не вышло: ' + (e && e.message || e); setStatus('', 0, false); }
   finally { clearInterval(tick); setBusy(false); }
 }
