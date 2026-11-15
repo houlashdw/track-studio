@@ -6,7 +6,7 @@ on:
       genre: { default: 'plugg' }
       seed: { default: '1' }
       drums: { default: 'kit' }
-      langs: { description: 'языки вокала через пробел (ru ja)', default: 'ru ja' }
+      variants: { description: 'язык:сид:режим (full — вся обработка, raw — только срез гула)', default: 'ja:5:full ja:5:raw ja:11:full' }
       pack: { default: 'pack1' }
       lufs: { description: 'целевая громкость, LUFS по модулю', default: '10' }
       vseed: { default: '5' }
@@ -49,26 +49,26 @@ jobs:
           render /tmp/out/beat.lua /tmp/out/beat.wav ${{ inputs.lufs }}
           ffmpeg -v error -y -i /tmp/out/beat.wav -b:a 192k /tmp/out/beat.mp3
           BPM=$(python3 -c "import json;print(json.load(open('/tmp/out/info.json'))['bpm'])"); LB=$(lufs /tmp/out/beat.wav); echo "бит: $BPM BPM, $LB LUFS"
-          for L in ${{ inputs.langs }}; do
-            modal run server/modal_ace.py::vocal_for --beat /tmp/out/beat.mp3 --out /tmp/out/vox_raw_$L.mp3 --bpm $BPM --lang $L --seed ${{ inputs.vseed }} 2>&1 | grep -aE "вокал|высота|Error|Traceback" | tail -8
-            [ -f /tmp/out/vox_raw_$L.mp3 ] || continue
-            python3 server/daw/voxprep.py /tmp/out/vox_raw_$L.mp3 /tmp/out/vox_$L.wav --bpm $BPM
+          for V in ${{ inputs.variants }}; do IFS=: read L S M <<< "$V"; N=${L}_${S}_${M}
+            [ -f /tmp/out/vox_raw_${L}_$S.mp3 ] || modal run server/modal_ace.py::vocal_for --beat /tmp/out/beat.mp3 --out /tmp/out/vox_raw_${L}_$S.mp3 --bpm $BPM --lang $L --seed $S 2>&1 | grep -aE "вокал|высота|Error|Traceback" | tail -8
+            [ -f /tmp/out/vox_raw_${L}_$S.mp3 ] || continue
+            python3 server/daw/voxprep.py /tmp/out/vox_raw_${L}_$S.mp3 /tmp/out/vox_$N.wav --bpm $BPM $([ $M = raw ] && echo --raw)
             # баланс до мастера: бит отдельно и вокал с цепочкой отдельно (без EQ/компрессии/лимитера мастера), вокал на ~1.5 дБ выше уровня бита
             export TS_NOMASTER=1
-            python3 server/daw/pack.py --pack "$PK" --genre $g --seed $s --drums ${{ inputs.drums }} --smp app/smp --wav /tmp/out/bpre.wav --lua /tmp/out/bpre.lua --vox /tmp/out/vox_$L.wav --voxvol 0 --solo beat
-            python3 server/daw/pack.py --pack "$PK" --genre $g --seed $s --drums ${{ inputs.drums }} --smp app/smp --wav /tmp/out/vpre.wav --lua /tmp/out/vpre.lua --vox /tmp/out/vox_$L.wav --voxvol 0 --solo vox
+            python3 server/daw/pack.py --pack "$PK" --genre $g --seed $s --drums ${{ inputs.drums }} --smp app/smp --wav /tmp/out/bpre.wav --lua /tmp/out/bpre.lua --vox /tmp/out/vox_$N.wav --voxvol 0 --solo beat
+            python3 server/daw/pack.py --pack "$PK" --genre $g --seed $s --drums ${{ inputs.drums }} --smp app/smp --wav /tmp/out/vpre.wav --lua /tmp/out/vpre.lua --vox /tmp/out/vox_$N.wav --voxvol 0 --solo vox
             for n in bpre vpre; do rm -f /tmp/out/$n.wav /tmp/out/$n.log; (TS_PROJ=/tmp/out/$n.lua TS_LOG=/tmp/out/$n.log timeout 240 xvfb-run -a /opt/REAPER/reaper -nosplash -newinst server/reaper/build.lua >/dev/null 2>&1 &)
               for i in $(seq 1 230); do grep -q "РЕНДЕР ГОТОВ" /tmp/out/$n.log 2>/dev/null && break; sleep 1; done; sleep 1; pkill -f /opt/REAPER/reaper || true; pkill Xvfb || true; sleep 1; done
             unset TS_NOMASTER
-            VV=$(python3 server/daw/balance.py /tmp/out/bpre.wav /tmp/out/vpre.wav 0 --want 1.5); echo "вокал $L: фейдер $VV дБ (по замеру до мастера)"
-            python3 server/daw/pack.py --pack "$PK" --genre $g --seed $s --drums ${{ inputs.drums }} --smp app/smp --wav /tmp/out/mix_$L.wav --lua /tmp/out/mix_$L.lua --vox /tmp/out/vox_$L.wav --voxvol $VV
-            render /tmp/out/mix_$L.lua /tmp/out/mix_$L.wav 15   # Reaper мягко, финальную громкость доводит ffmpeg
+            VV=$(python3 server/daw/balance.py /tmp/out/bpre.wav /tmp/out/vpre.wav 0 --want 1.5); echo "вокал $N: фейдер $VV дБ (по замеру до мастера)"
+            python3 server/daw/pack.py --pack "$PK" --genre $g --seed $s --drums ${{ inputs.drums }} --smp app/smp --wav /tmp/out/mix_$N.wav --lua /tmp/out/mix_$N.lua --vox /tmp/out/vox_$N.wav --voxvol $VV
+            render /tmp/out/mix_$N.lua /tmp/out/mix_$N.wav 15   # Reaper мягко, финальную громкость доводит ffmpeg
             # громкость и потолок — финальным шагом (лимитер Reaper на горячем миксе не держит ни то ни другое)
-            I=$(lufs /tmp/out/mix_$L.wav); G=$(python3 -c "print(round(-${{ inputs.lufs }} - float('$I'), 2))")
-            ffmpeg -v error -y -i /tmp/out/mix_$L.wav -af "volume=${G}dB,alimiter=limit=0.966:attack=3:release=60:level=disabled" -b:a 192k /tmp/out/mix_$L.mp3
-            echo "мастер $L: $(lufs /tmp/out/mix_$L.mp3) LUFS"; ffmpeg -hide_banner -i /tmp/out/mix_$L.mp3 -af ebur128=peak=true -f null - 2>&1 | grep -aE "Peak:" | tail -1
-            ffmpeg -hide_banner -i /tmp/out/mix_$L.wav -af astats=metadata=0 -f null - 2>&1 | grep -aE "Peak level dB" | head -1
-            grep -aE "НЕТ ПЛАГ|нет параметра|не найден" /tmp/out/mix_$L.log | sort | uniq -c | head
+            I=$(lufs /tmp/out/mix_$N.wav); G=$(python3 -c "print(round(-${{ inputs.lufs }} - float('$I'), 2))")
+            ffmpeg -v error -y -i /tmp/out/mix_$N.wav -af "volume=${G}dB,alimiter=limit=0.966:attack=3:release=60:level=disabled" -b:a 192k /tmp/out/mix_$N.mp3
+            echo "мастер $N: $(lufs /tmp/out/mix_$N.mp3) LUFS"; ffmpeg -hide_banner -i /tmp/out/mix_$N.mp3 -af ebur128=peak=true -f null - 2>&1 | grep -aE "Peak:" | tail -1
+            ffmpeg -hide_banner -i /tmp/out/mix_$N.wav -af astats=metadata=0 -f null - 2>&1 | grep -aE "Peak level dB" | head -1
+            grep -aE "НЕТ ПЛАГ|нет параметра|не найден" /tmp/out/mix_$N.log | sort | uniq -c | head
           done
           ls /tmp/out
       - name: Выгрузка (шифр открытым ключом)

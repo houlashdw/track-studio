@@ -61,8 +61,11 @@ def deess(x, sr=SR, lo=5000, hi=9500, reduce=.6):
     return x - band + band * g
 
 
-def prep(x, bpm, t0=0.0, strength=.6):
+def prep(x, bpm, t0=0.0, strength=.6, raw=False):
     f0, m0 = grid_fit(x, bpm, t0)
+    if raw:   # только срез гула: сравнить со всей обработкой (подгонка к сетке, дезноиз, дебриссинг)
+        y = hpf(x); pk = np.abs(y).max(); y = y * (.9 / pk) if pk > .9 else y
+        return y.astype(np.float32), dict(grid_before=round(f0, 2), ms_before=round(m0, 1), raw=True)
     y = quantize(x, bpm, t0, strength); f1, m1 = grid_fit(y, bpm, t0)
     y = deess(denoise(hpf(y)))
     pk = np.abs(y).max(); y = y * (.9 / pk) if pk > .9 else y
@@ -71,8 +74,8 @@ def prep(x, bpm, t0=0.0, strength=.6):
 
 if __name__ == '__main__':
     ap = argparse.ArgumentParser(); ap.add_argument('inp'); ap.add_argument('out'); ap.add_argument('--bpm', type=float, required=True)
-    ap.add_argument('--t0', type=float, default=0.0); ap.add_argument('--strength', type=float, default=.6)
+    ap.add_argument('--t0', type=float, default=0.0); ap.add_argument('--strength', type=float, default=.6); ap.add_argument('--raw', action='store_true')
     a = ap.parse_args()
     x, sr = librosa.load(a.inp, sr=SR, mono=True)
-    y, info = prep(x, a.bpm, a.t0, a.strength); sf.write(a.out, y, SR, subtype='PCM_24')
+    y, info = prep(x, a.bpm, a.t0, a.strength, a.raw); sf.write(a.out, y, SR, subtype='PCM_24')
     print('вокал:', json.dumps(info), 'длина %.1f с' % (len(y) / SR))
