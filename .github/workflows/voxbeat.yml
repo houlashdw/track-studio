@@ -22,7 +22,7 @@ jobs:
       - name: Reaper и пак
         run: |
           sudo apt-get -qq update && (sudo apt-get -qq install -y xvfb ffmpeg libgtk-3-0 libasound2t64 >/dev/null || sudo apt-get -qq install -y xvfb ffmpeg libgtk-3-0 libasound2 >/dev/null)
-          pip install -q numpy scipy soundfile librosa modal
+          pip install -q numpy scipy soundfile librosa modal "fastapi[standard]"
           U=$(curl -sL https://www.reaper.fm/download.php | grep -oE 'files/[0-9.x]+/reaper[0-9a-z_]+_linux_x86_64\.tar\.xz' | head -1)
           curl -sL "https://www.reaper.fm/$U" -o /tmp/r.tar.xz && mkdir -p /tmp/rp && tar xf /tmp/r.tar.xz -C /tmp/rp
           D=$(dirname "$(find /tmp/rp -name install-reaper.sh | head -1)"); sudo "$D/install-reaper.sh" --install /opt --quiet || true
