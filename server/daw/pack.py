@@ -35,7 +35,7 @@ def pick_kit(smp, genre, R):
     return out
 
 
-def build(pack_dir, genre, seed, smp, out_wav, drums='loop'):
+def build(pack_dir, genre, seed, smp, out_wav, drums='loop', vox=None, voxvol=0.0):
     R = random.Random(seed); P = json.load(open(os.path.join(pack_dir, 'pack.json')))
     L = [x for x in P if x['genre'] == genre] or [x for x in P if x['genre'] == NEAR.get(genre, 'trap')]
     L = [x for x in L if len(x['steps']['k']) >= 6 and len(x['b808']) >= 4] or L
@@ -64,8 +64,10 @@ def build(pack_dir, genre, seed, smp, out_wav, drums='loop'):
     N808 = [[i, ln, pa[i]] for i, ln, m in B['b808']] if drums == 'loop' and B is not A and len(B['b808']) >= 4 else A['b808']
     drumloop = os.path.abspath(os.path.join(pack_dir, B['files']['drums'])); rateB = bpm / B['bpm']; dl = []
     bar0 = 0
+    hooks = []
     for sec, nb in FORM:
         t0 = bar0 * BAR
+        if sec == 'hook': hooks.append((t0, nb * BAR))
         # мелодия: интро/аутро — первые 4 такта петли, остальное — петля целиком
         loops.append(dict(t=t0, d=nb * BAR, v=.7 if sec in ('intro', 'outro') else (.85 if sec == 'verse' else 1.0), rate=rate, pp=True, fi=.005 if sec != 'intro' else 1.5 * BAR,
                           fo=2 * BAR if sec == 'outro' else .01, loop=True))
@@ -102,17 +104,24 @@ def build(pack_dir, genre, seed, smp, out_wav, drums='loop'):
     if use_bassloop:
         bl = os.path.abspath(os.path.join(pack_dir, A['files']['bass'])); bi = [dict(x, v=1.0, fi=.005, fo=.01) for x in loops[1:-1]]
         tracks.append(dict(name='bassloop', kind='audio', file=bl, items=bi, lvl=LVL['bassloop'], pan=0))
+    if vox:   # вокал: общий трек + копия только на хуках (идёт лишь на длинный плейт-реверб, в мастер не звучит)
+        vd = sf.info(vox).duration; dur = min(vd, total - .5)
+        tracks.append(dict(name='vox', kind='audio', file=os.path.abspath(vox), items=[dict(t=0, d=dur, v=1.0, rate=1.0, fi=.01, fo=.6)], lvl=0, vol=voxvol, pan=0))
+        tracks.append(dict(name='voxhook', kind='audio', file=os.path.abspath(vox), nomain=True, lvl=0, vol=voxvol, pan=0,
+                           items=[dict(t=t, d=min(d, dur - t), v=1.0, rate=1.0, off=t, fi=.04, fo=.5) for t, d in hooks if t < dur - 1]))
     for t in tracks:   # фейдер: RMS звучащей части → целевая громкость
         r = arms(t['file'], None if t['name'] in ('mel', 'bassloop', 'drumloop') else .35)
+        if t['name'] in ('vox', 'voxhook'): continue
         t['vol'] = float(np.clip(t['lvl'] - 20 * np.log10(r + 1e-9), -40, 18))
     info = dict(drums=drums, A=A['id'], B=B['id'], bpm=bpm, key=A['key'] + ' ' + A['mode'], kit={c: kit[c]['f'] for c in kit}, bassloop=use_bassloop)
     return dict(genre=genre, bpm=bpm, total=total, out=out_wav, tracks=tracks, info=info,
-                drive={'rage': .7, 'phonk': .6}.get(genre, .3), loud={'rage': -7, 'phonk': -7, 'drill': -8}.get(genre, -9))
+                drive={'rage': .7, 'phonk': .6}.get(genre, .3), loud={'rage': -7, 'phonk': -7, 'drill': -8}.get(genre, -9), vox=bool(vox), q=round(60 / bpm, 5))
 
 
 if __name__ == '__main__':
     ap = argparse.ArgumentParser(); ap.add_argument('--pack', required=True); ap.add_argument('--genre', default='trap'); ap.add_argument('--seed', type=int, default=3)
-    ap.add_argument('--smp', default='app/smp'); ap.add_argument('--wav', required=True); ap.add_argument('--lua', required=True); ap.add_argument('--drums', default='loop')
-    a = ap.parse_args(); Rp = build(a.pack, a.genre, a.seed, a.smp, a.wav, a.drums)
+    ap.add_argument('--smp', default='app/smp'); ap.add_argument('--wav', required=True); ap.add_argument('--lua', required=True); ap.add_argument('--drums', default='loop'); ap.add_argument('--vox'); ap.add_argument('--voxvol', type=float, default=0.0); ap.add_argument('--info')
+    a = ap.parse_args(); Rp = build(a.pack, a.genre, a.seed, a.smp, a.wav, a.drums, a.vox, a.voxvol)
     open(a.lua, 'w').write('return ' + to_lua(Rp) + '\n')
+    if a.info: json.dump(dict(bpm=Rp['bpm'], total=Rp['total'], info=Rp['info']), open(a.info, 'w'))
     print('пак → Reaper:', a.genre, json.dumps(Rp['info'], ensure_ascii=False), 'дорожки:', [(t['name'], len(t['items'])) for t in Rp['tracks']])

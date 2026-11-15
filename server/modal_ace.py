@@ -442,3 +442,16 @@ def buzz_ab(outdir: str = 'bz', seed: int = 7):
         for st in (32, 60):
             open(f'{outdir}/{g}_base_{st}.mp3', 'wb').write(lg.t2m.remote({'caption': cap, 'bpm': HY_BPM[g], 'key': HY_KEY[g], 'duration': 45, 'seed': seed, 'steps': st}))
         print(g, 'готово', flush=True)
+
+
+LYR_JA = '[Verse]\n夜の街に光が揺れる\n君の声が胸に響く\n\n[Chorus]\n走り出せ 夢のその先へ\n輝く空を二人で越えて'
+VOC_CAP = {'ja': 'anime vocaloid style female vocal in Japanese', 'ru': 'anime vocaloid style female vocal in Russian'}
+VOC_TAG = ', soft airy slightly synthetic timbre, mid-high soprano, light vibrato, clear diction, bright J-pop'
+
+
+@app.local_entrypoint()
+def vocal_for(beat: str, out: str, bpm: int = 0, lang: str = 'ru', seed: int = 5, voice: float = 1.0, steps: int = 30):
+    """вокалоид-аниме голос под готовый бит (mp3 из Reaper) → чистый вокал-стем, уже подвинутый под бит"""
+    q = dict(beat_b64=base64.b64encode(open(beat, 'rb').read()).decode(), bpm=bpm or None, lang=lang, lyrics=LYR_JA if lang == 'ja' else LYR_POP,
+             caption=VOC_CAP.get(lang, VOC_CAP['ru']) + VOC_TAG, seed=seed, voice=voice, sex='f', steps=steps)
+    t0 = time.time(); b = AceLego().lego.remote(q); open(out, 'wb').write(b); print('вокал %s: %d КБ за %.0f с' % (lang, len(b) // 1024, time.time() - t0))

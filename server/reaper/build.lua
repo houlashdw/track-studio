@@ -64,6 +64,21 @@ end
 -- шины: реверб и дилей
 local rev = newtrack('REVERB'); local fxr = addfx(rev, 'ReaVerbate (Cockos)'); if fxr then setv(rev, fxr, 'Room size', 70); setv(rev, fxr, 'Dampening', 50); setv(rev, fxr, 'Wet', 0); setv(rev, fxr, 'Dry', -150) end
 eq(rev, {{0, 300, -6}, {0, 1000, 0}, {0, 4000, 0}, {0, 9000, -4}})
+-- вокальные шины (только если в проекте есть вокал)
+local room, plate, vdl, vdr
+if P.vox then
+  local q = P.q
+  room = newtrack('ROOM'); local f = addfx(room, 'ReaVerbate (Cockos)'); if f then setv(room, f, 'Room size', 22); setv(room, f, 'Dampening', 60); setv(room, f, 'Wet', 0); setv(room, f, 'Dry', -150) end
+  eq(room, {{0, 250, -6}, {0, 1000, 0}, {0, 4000, 0}, {0, 8000, -3}})
+  plate = newtrack('PLATE')   -- предзадержка 1/32 такта: хвост не залезает на следующий удар, потом длинный плейт
+  local pd = addfx(plate, 'ReaDelay (Cockos)'); if pd then setv(plate, pd, 'Wet', 0); setv(plate, pd, 'Dry', -150); setv(plate, pd, '1: Length (time)', q * 125); setv(plate, pd, '1: Feedback', -60) end
+  local f2 = addfx(plate, 'ReaVerbate (Cockos)'); if f2 then setv(plate, f2, 'Room size', 92); setv(plate, f2, 'Dampening', 35); setv(plate, f2, 'Wet', 0); setv(plate, f2, 'Dry', -150) end
+  eq(plate, {{0, 350, -8}, {0, 1200, 0}, {0, 5000, 1, 1}, {0, 11000, 1}})
+  vdl = newtrack('VDL'); local d1 = addfx(vdl, 'ReaDelay (Cockos)'); if d1 then setv(vdl, d1, 'Wet', 0); setv(vdl, d1, 'Dry', -150); setv(vdl, d1, '1: Length (time)', q * 500); setv(vdl, d1, '1: Feedback', -13) end
+  eq(vdl, {{0, 300, -6}, {0, 1500, 0}, {0, 4000, -2}, {0, 6000, -8}}); reaper.SetMediaTrackInfo_Value(vdl, 'D_PAN', -0.7)
+  vdr = newtrack('VDR'); local d2 = addfx(vdr, 'ReaDelay (Cockos)'); if d2 then setv(vdr, d2, 'Wet', 0); setv(vdr, d2, 'Dry', -150); setv(vdr, d2, '1: Length (time)', q * 1000); setv(vdr, d2, '1: Feedback', -14) end
+  eq(vdr, {{0, 300, -6}, {0, 1500, 0}, {0, 4000, -2}, {0, 6000, -8}}); reaper.SetMediaTrackInfo_Value(vdr, 'D_PAN', 0.7)
+end
 local dly = newtrack('DELAY'); local fxd = addfx(dly, 'ReaDelay (Cockos)'); if fxd then setv(dly, fxd, 'Wet', 0); setv(dly, fxd, 'Dry', -150) end
 
 for _, t in ipairs(P.tracks) do
@@ -119,6 +134,10 @@ for _, t in ipairs(P.tracks) do
     eq(tr, {{0, 35, 1}, {0, 250, -2, 1.5}, {0, 1200, 0, 1}, {0, 5000, -6}})
     local sat = addfx(tr, 'JS: Saturation'); if sat then setv(tr, sat, 'Amount', P.drive * 60) end
     comp(tr, -20, 3, 3, 120)
+  elseif nm == 'vox' then   -- вокалоид: воздух 5–8 кГц, придавить 2–3 кГц, мягкий компрессор (релиз ≈ 1/8 такта), без гула (срез 120 Гц сделан до Reaper)
+    eq(tr, {{0, 110, -3}, {0, 2600, -2.5, 1.2}, {0, 4800, 0, 1}, {0, 6800, 2.8}}); comp(tr, -24, 2.5, 15, math.min(500, 60000 / P.bpm * 0.5))
+  elseif nm == 'voxhook' then
+    reaper.SetMediaTrackInfo_Value(tr, 'B_MAINSEND', 0)
   elseif nm == 'melody' or nm == 'pad' then
     local bright = (t.inst == 'glock' or t.inst == 'chimes' or t.inst == 'cowbell') and -7 or -2   -- колокола очень звонкие: верх приглушаем
     eq(tr, {{0, 180, -8}, {0, 600, -2, 1.5}, {0, 3000, bright / 3, 1}, {0, 6500, bright}}); comp(tr, -18, 2.5, 10, 150)
@@ -126,7 +145,8 @@ for _, t in ipairs(P.tracks) do
   end
   -- посылы
   local function send(dst, dbv) local s = reaper.CreateTrackSend(tr, dst); reaper.SetTrackSendInfo_Value(tr, 0, s, 'D_VOL', db(dbv)) end
-  if nm == 'mel' then send(rev, -16) elseif nm == 'melody' then send(rev, -10); send(dly, -14) elseif nm == 'pad' then send(rev, -8) elseif nm == 'clap' or nm == 'snare' then send(rev, -18) end
+  if nm == 'vox' then send(room, -17); send(vdl, -17); send(vdr, -20) elseif nm == 'voxhook' then send(plate, -9); send(vdl, -16)
+  elseif nm == 'mel' then send(rev, -16) elseif nm == 'melody' then send(rev, -10); send(dly, -14) elseif nm == 'pad' then send(rev, -8) elseif nm == 'clap' or nm == 'snare' then send(rev, -18) end
 end
 if fxd then local q = 60 / P.bpm; setv(dly, fxd, '1: Length (time)', q * 750); setv(dly, fxd, '1: Feedback', -12) end
 
@@ -136,7 +156,7 @@ reaper.SetMediaTrackInfo_Value(M, 'D_VOL', 1)
 eq(M, {{0, 30, -6}, {0, 250, -1, 2}, {0, 3000, 0.5, 2}, {0, 12000, 1.5}})
 addfx(M, 'ReaXcomp (Cockos)')
 local gl = comp(M, -10, 2, 10, 200)
-local lim = addfx(M, 'ReaLimit (Cockos)'); if lim then setv(M, lim, 'Threshold', P.loud + MG); setv(M, lim, 'Ceiling', -1) end
+local lim = addfx(M, 'ReaLimit (Cockos)'); if lim then setv(M, lim, 'Threshold', P.loud + MG); setv(M, lim, 'Ceiling', P.vox and -0.3 or -1) end
 
 -- рендер
 reaper.GetSetProjectInfo(0, 'RENDER_SETTINGS', 0, true); reaper.GetSetProjectInfo(0, 'RENDER_BOUNDSFLAG', 0, true)
