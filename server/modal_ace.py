@@ -295,6 +295,29 @@ def deboxx(v, sr):
     return (out * (pv / pk if pk > pv else 1)).astype('float32')
 
 
+# ---- банк для «бесконечного» разнообразия вокала: тембры, темы текста (куплет×4 + припев×4), язык — случайно по сиду ----
+TIMBRES = [('soft airy slightly synthetic timbre, warm mezzo-soprano, gentle, light vibrato', 360), ('bright cute anime idol voice, youthful, sweet, light and bouncy', 400),
+           ('cool detached dreamy breathy voice, intimate, whisper-singing, soft', 330), ('clear crystalline vocaloid timbre, precise, polished, gentle', 390),
+           ('melancholic emotional tender voice, slightly husky, soft', 330), ('energetic punchy idol pop voice, confident, vibrant, clear', 400)]
+LYR_BANK = {
+    'ja': [('夜の街に光が揺れる|君の声が胸に響く|眠れない空を見上げて|星のかけらを数えてる', '走り出せ 夢のその先へ|輝く空を二人で越えて|離さないで この手を|未来まで届け'),
+           ('窓の向こうに雨が降る|君の名前を呼んでみる|消えないままの思い出が|小さな胸を揺らしてる', 'ありがとう さよならじゃない|また会える日まで歌うよ|心の奥で光る|あの日の約束'),
+           ('画面の中の世界で|私は今日も目を覚ます|ノイズの海に溺れても|君の声だけ聞こえてる', '電脳の空を駆け抜けて|光の糸をたぐり寄せる|繋がって 響いて 溶けてく|永遠のメロディ')],
+    'ru': [('Ночной город тихо дышит|Свет мерцает на стекле|Я иду по мокрым улицам|Где-то рядом ты во мне', 'Лети, не оглядывайся|Мы сильнее темноты|Эта ночь только для нас|До рассвета будем мы'),
+           ('За окном шумит дождь|Я шепчу твоё имя|Память греет как огонь|Но не скажет мне прощай', 'Не отпускай, держи мой голос|Мы вернёмся в тот июль|Светит звёздная дорога|Я с тобой, а ты со мной'),
+           ('Цифровой рассвет в экране|Я проснулась в шуме волн|Все слова теряют вес|Но я слышу только тебя', 'Свети, мой далёкий сигнал|Мы навсегда на одной волне|Пой со мной, пока горит свет|Мелодия не умрёт')]}
+
+
+def pick_vocal(seed, lang):
+    """тембр, язык, текст, сила голоса и сид вокала — детерминированно из сида трека (каждый новый сид — новое сочетание)"""
+    import random
+    R = random.Random(seed * 7919 + 13)
+    if lang not in ('ja', 'ru'): lang = 'ja' if R.random() < .7 else 'ru'
+    tim, f0max = R.choice(TIMBRES); v, c = R.choice(LYR_BANK[lang]); V = v.split('|'); C = c.split('|'); R.shuffle(V) if R.random() < .35 else None
+    lyr = '[Verse]\n' + '\n'.join(V) + '\n\n[Chorus]\n' + '\n'.join(C) + '\n\n[Verse]\n' + '\n'.join(R.sample(V, len(V))) + '\n\n[Chorus]\n' + '\n'.join(C)
+    return dict(lang=lang, timbre=tim, f0max=f0max, lyrics=lyr, vseed=R.randrange(1, 99999), voice=round(R.uniform(.75, 1.0), 2))
+
+
 # ---- Трек целиком: бит из пака в Reaper → ACE-вокал → сведение и мастер (CPU-контейнер с Reaper) ----
 _SRV = os.path.dirname(os.path.abspath(__file__))
 mix_image = (
@@ -323,15 +346,16 @@ class Mixer:
         sys.path.insert(0, '/app/daw')
         os.environ['TS_BUILD_LUA'] = '/app/reaper/build.lua'
         import track
-        g = q.get('genre', 'plugg'); lang = q.get('lang', 'ja'); vseed = int(q.get('vseed', 11 if lang == 'ja' else 5))
-        lyr = q.get('lyrics') or (LYR_JA if lang == 'ja' else LYR_POP)
+        g = q.get('genre', 'auto'); seed = int(q.get('seed', 1)); V = pick_vocal(seed, q.get('lang', 'auto'))
+        if q.get('lyrics') and V['lang'] == 'ru': V['lyrics'] = q['lyrics']
+        print('голос:', json.dumps({k: V[k] for k in ('lang', 'timbre', 'f0max', 'vseed', 'voice')}, ensure_ascii=False), flush=True)
 
         def sing(beat_mp3, bpm):
-            qq = dict(beat_b64=base64.b64encode(beat_mp3).decode(), bpm=bpm, lang=lang, lyrics=lyr, caption=VOC_CAP.get(lang, VOC_CAP['ru']) + VOC_TAG,
-                      seed=vseed, voice=float(q.get('voice', 1.0)), sex='f', steps=int(q.get('steps', 30)), f0max=380.0, tries=3)
+            qq = dict(beat_b64=base64.b64encode(beat_mp3).decode(), bpm=bpm, lang=V['lang'], lyrics=V['lyrics'], caption=VOC_CAP[V['lang']] + ', ' + V['timbre'] + ', clear diction, J-pop',
+                      seed=V['vseed'], voice=float(q.get('voice', V['voice'])), sex='f', steps=int(q.get('steps', 30)), f0max=float(V['f0max']), tries=3)
             return AceLego().lego.remote(qq)
         work = tempfile.mkdtemp(prefix='trk')
-        mp3, info = track.make_track(f'{VOL}/pack/{PACK}', g, int(q.get('seed', 1)), work, sing, '/app/smp', q.get('drums', 'kit'), log=lambda m: print(m, flush=True))
+        mp3, info = track.make_track(f'{VOL}/pack/{PACK}', g, seed, work, sing, '/app/smp', q.get('drums', 'kit'), log=lambda m: print(m, flush=True))
         print('трек:', json.dumps(info, ensure_ascii=False), flush=True)
         return mp3
 

@@ -126,7 +126,7 @@ for _, t in ipairs(P.tracks) do
     eq(tr, {{0, 35, 2}, {0, 250, -3, 1.5}, {0, 1200, 1, 1}, {0, 6000, -6}})
     local sat = addfx(tr, 'JS: Saturation'); if sat then setv(tr, sat, 'Amount', P.drive * 100) end
     comp(tr, -20, 4, 1, 120)
-  elseif nm == 'mel' then   -- петля мелодии из пака: низ освобождаем под 808, чуть плотнее
+  elseif nm == 'mel' or nm == 'mel2' then   -- петля мелодии из пака: низ освобождаем под 808, чуть плотнее
     eq(tr, {{0, 140, -10}, {0, 350, -2, 1.5}, {0, 3000, 0.5, 1}, {0, 10000, 0}}); comp(tr, -20, 2, 15, 150)
   elseif nm == 'drumloop' then   -- живые барабаны: панч и воздух, чуть склеить
     eq(tr, {{0, 60, 1.5}, {0, 400, -2, 1.5}, {0, 4000, 1, 1}, {0, 11000, 1.5}}); comp(tr, -16, 2.5, 8, 90)
@@ -136,6 +136,10 @@ for _, t in ipairs(P.tracks) do
     comp(tr, -20, 3, 3, 120)
   elseif nm == 'vox' then   -- вокалоид: воздух 5–8 кГц, придавить 2–3 кГц, мягкий компрессор (релиз ≈ 1/8 такта), без гула (срез 120 Гц сделан до Reaper)
     eq(tr, {{0, 110, -3}, {0, 2800, -2.5, 1.2}, {0, 4600, -2.5, 1}, {0, 7500, 1.2}}); comp(tr, -24, 2.5, 15, math.min(500, 60000 / P.bpm * 0.5))
+  elseif nm == 'voxdbl' then   -- октавный дубль голоса: только воздух, без низа
+    eq(tr, {{0, 300, -12}, {0, 2800, -3, 1.2}, {0, 6000, 2}, {0, 9000, 2}}); comp(tr, -24, 2.5, 15, 120)
+  elseif nm == 'fx' then   -- райзеры/удары: без низа лишнего, в реверб
+    eq(tr, {{0, 120, -6}, {0, 800, 0}, {0, 4000, 0}, {0, 10000, 0}})
   elseif nm == 'voxhook' then
     reaper.SetMediaTrackInfo_Value(tr, 'B_MAINSEND', 0)
   elseif nm == 'melody' or nm == 'pad' then
@@ -146,7 +150,7 @@ for _, t in ipairs(P.tracks) do
   -- посылы
   local function send(dst, dbv) local s = reaper.CreateTrackSend(tr, dst); reaper.SetTrackSendInfo_Value(tr, 0, s, 'D_VOL', db(dbv)) end
   if nm == 'vox' then send(room, -17); send(vdl, -17); send(vdr, -20) elseif nm == 'voxhook' then send(plate, -9); send(vdl, -16)
-  elseif nm == 'mel' then send(rev, -16) elseif nm == 'melody' then send(rev, -10); send(dly, -14) elseif nm == 'pad' then send(rev, -8) elseif nm == 'clap' or nm == 'snare' then send(rev, -18) end
+  elseif nm == 'voxdbl' then send(room, -14); send(vdr, -16) elseif nm == 'fx' then send(rev, -14) elseif nm == 'mel' or nm == 'mel2' then send(rev, -16) elseif nm == 'melody' then send(rev, -10); send(dly, -14) elseif nm == 'pad' then send(rev, -8) elseif nm == 'clap' or nm == 'snare' then send(rev, -18) end
 end
 if fxd then local q = 60 / P.bpm; setv(dly, fxd, '1: Length (time)', q * 750); setv(dly, fxd, '1: Feedback', -12) end
 

@@ -564,7 +564,7 @@ short lines in English…
           <p class="hint" style="margin:10px 2px 0">Подача</p>
           <div class="seg3 mt8" id="cloudDelSeg"><button type="button" data-v="auto" class="on">Авто</button><button type="button" data-v="soft">Нежно</button><button type="button" data-v="power">Мощно</button><button type="button" data-v="rap">Рэп-флоу</button><button type="button" data-v="atl">Atlanta</button></div>
           <p class="hint" style="margin:10px 2px 0">Язык и голос</p>
-          <div class="seg3 mt8" id="cloudLangSeg"><button type="button" data-v="ru" class="on">Русский</button><button type="button" data-v="ja">日本語</button><button type="button" data-v="en">English</button></div>
+          <div class="seg3 mt8" id="cloudLangSeg"><button type="button" data-v="auto" class="on">Авто</button><button type="button" data-v="ru">Русский</button><button type="button" data-v="ja">日本語</button><button type="button" data-v="en">English</button></div>
           <div class="seg3 mt8" id="cloudSexSeg"><button type="button" data-v="f" class="on">Женский (vc2)</button><button type="button" data-v="m">Мужской</button></div>
           <p class="hint" style="margin:10px 2px 0">Тембр</p>
           <div class="seg3 mt8" id="cloudTimSeg"><button type="button" data-v="anime" class="on">Аниме</button><button type="button" data-v="auto">Авто</button><button type="button" data-v="low">Ниже, с хрипотцой</button><button type="button" data-v="high">Выше, воздушно</button></div>
@@ -3618,8 +3618,9 @@ function cloudInit() {
   on.onchange = sync; sync();
   $('#cloudVoiceSeg').querySelectorAll('button').forEach((b) => { b.classList.toggle('on', parseFloat(b.dataset.v) === CLOUD.voice);
     b.onclick = () => { CLOUD.voice = parseFloat(b.dataset.v); cloudSet('ts_cvoice', b.dataset.v); $('#cloudVoiceSeg').querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b)); }; });
+  if (cloudGet('ts_clang_v', '') !== '1') { cloudSet('ts_clang_v', '1'); cloudSet('ts_clang', 'auto'); }
   if (cloudGet('ts_cbeat_v', '') !== '1') { cloudSet('ts_cbeat_v', '1'); cloudSet('ts_cbeat', 'reaper'); }   /* новый режим по умолчанию: бит в Reaper из пака + вокалоид-голос */
-  for (const [id, k, d] of [['#cloudDelSeg', 'ts_cdel', 'auto'], ['#cloudTimSeg', 'ts_ctim', 'anime'], ['#cloudBeatSeg', 'ts_cbeat', 'ours'], ['#cloudLangSeg', 'ts_clang', 'ru'], ['#cloudSexSeg', 'ts_csex', 'f']]) {
+  for (const [id, k, d] of [['#cloudDelSeg', 'ts_cdel', 'auto'], ['#cloudTimSeg', 'ts_ctim', 'anime'], ['#cloudBeatSeg', 'ts_cbeat', 'ours'], ['#cloudLangSeg', 'ts_clang', 'auto'], ['#cloudSexSeg', 'ts_csex', 'f']]) {
     const seg = $(id), cur = cloudGet(k, d);
     seg.querySelectorAll('button').forEach((b) => { b.classList.toggle('on', b.dataset.v === cur); b.onclick = () => { cloudSet(k, b.dataset.v); seg.querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b)); }; });
   }
@@ -3692,8 +3693,8 @@ async function cloudMake() {
 /* трек целиком на сервере: бит собирается в Reaper из пака (нарезка скачанных битов), ACE поёт вокалоид-голос под него, сведение и мастер в Reaper → готовый mp3 (~2 мин) */
 async function cloudReaper(key, prompt) {
   const msg = $('#cloudMsg'), t0 = Date.now(), p = prompt.toLowerCase();
-  const genre = /rage|рейдж/.test(p) ? 'rage' : /phonk|фонк/.test(p) ? 'phonk' : /plugg|плагг|плаг/.test(p) ? 'plugg' : /drill|дрилл/.test(p) ? 'drill' : /trap|трэп|трап/.test(p) ? 'trap' : 'plugg';
-  const l0 = cloudGet('ts_clang', 'ru'), lang = l0 === 'ru' ? 'ru' : 'ja', own = ($('#lyrics').value || '').trim();
+  const genre = /rage|рейдж/.test(p) ? 'rage' : /phonk|фонк/.test(p) ? 'phonk' : /plugg|плагг|плаг/.test(p) ? 'plugg' : /drill|дрилл/.test(p) ? 'drill' : /trap|трэп|трап/.test(p) ? 'trap' : 'auto';
+  const l0 = cloudGet('ts_clang', 'auto'), lang = l0 === 'ru' ? 'ru' : l0 === 'ja' ? 'ja' : 'auto', own = ($('#lyrics').value || '').trim();
   stop(); setBusy(true); setStatus('Облако: трек в Reaper…', .3, true);
   const tick = setInterval(() => { const s = Math.round((Date.now() - t0) / 1000); msg.textContent = 'Собираю трек в Reaper: бит → голос → сведение… ' + s + ' с' + (s > 150 ? ' (сервер просыпался — первый раз дольше)' : ''); }, 1000);
   try {
@@ -3706,7 +3707,7 @@ async function cloudReaper(key, prompt) {
     if (!ab) throw new Error('слишком долго — попробуй ещё раз');
     CLOUD.blob = new Blob([ab], { type: 'audio/mpeg' }); if (CLOUD.url) URL.revokeObjectURL(CLOUD.url); CLOUD.url = URL.createObjectURL(CLOUD.blob);
     const au = $('#cloudAudio'); au.src = CLOUD.url; au.hidden = false; $('#cloudActs').hidden = false; au.play().catch(() => { });
-    msg.textContent = 'Готово за ' + Math.round((Date.now() - t0) / 1000) + ' с (' + genre + ', ' + (lang === 'ja' ? '日本語' : 'русский') + ').'; setStatus('', 0, false);
+    msg.textContent = 'Готово за ' + Math.round((Date.now() - t0) / 1000) + ' с (' + (genre === 'auto' ? 'случайный жанр' : genre) + ').'; setStatus('', 0, false);
   } catch (e) { msg.textContent = 'Не вышло: ' + (e && e.message || e); setStatus('', 0, false); }
   finally { clearInterval(tick); setBusy(false); }
 }
