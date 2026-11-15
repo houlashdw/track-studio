@@ -69,5 +69,5 @@ def make_track(pack_dir, genre, seed, work, sing, smp, drums='kit', target=-10.0
     project(pack_dir, genre, seed, smp, W('mix.wav'), W('mix.lua'), drums, W('vox.wav'), vv); reaper_render(W('mix.lua'), W('mix.wav'), W('mix.log'))
     g = target - lufs(W('mix.wav'))
     subprocess.run(['ffmpeg', '-v', 'error', '-y', '-i', W('mix.wav'), '-af', 'volume=%.2fdB,alimiter=limit=0.966:attack=3:release=60:level=disabled' % g, '-b:a', '192k', W('mix.mp3')], check=True); tick('мастер')
-    info = dict(bpm=bpm, genre=genre, vox=vinfo, fader=round(vv, 1), loud=round(lufs(W('mix.mp3')), 1), t=T, **R['info'])
+    info = dict(R['info'], genre=genre, vox=vinfo, fader=round(vv, 1), loud=round(lufs(W('mix.mp3')), 1), t=T)
     return open(W('mix.mp3'), 'rb').read(), info
