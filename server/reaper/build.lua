@@ -149,8 +149,9 @@ for _, t in ipairs(P.tracks) do
   end
   -- посылы
   local function send(dst, dbv) local s = reaper.CreateTrackSend(tr, dst); reaper.SetTrackSendInfo_Value(tr, 0, s, 'D_VOL', db(dbv)) end
-  if nm == 'vox' then send(room, -24); send(vdl, -23); send(vdr, -26) elseif nm == 'voxhook' then send(plate, -17); send(vdl, -22)
+  if nm == 'vox' then send(room, -17); send(vdl, -23); send(vdr, -26) elseif nm == 'voxhook' then send(plate, -17); send(vdl, -22)
   elseif nm == 'voxdbl' then send(room, -14); send(vdr, -16) elseif nm == 'fx' then send(rev, -14) elseif nm == 'mel' or nm == 'mel2' then send(rev, -16) elseif nm == 'melody' then send(rev, -10); send(dly, -14) elseif nm == 'pad' then send(rev, -8) elseif nm == 'clap' or nm == 'snare' then send(rev, -18) end
+  if P.vox and room and (nm == 'mel' or nm == 'mel2' or nm == 'snare' or nm == 'clap' or nm == 'hat' or nm == 'drumloop') then send(room, -19) end   -- общая комната: голос и бит в одном пространстве
 end
 if fxd then local q = 60 / P.bpm; setv(dly, fxd, '1: Length (time)', q * 750); setv(dly, fxd, '1: Feedback', -12) end
 

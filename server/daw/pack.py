@@ -61,7 +61,7 @@ def seed_tag(R): return '%x' % (id(R) & 0xffff)
 def make_form(R, genre):
     """случайная структура: список секций (имя, такты, барабаны, 808, мелодия, вокал, слой); интро/хуки/куплеты разной длины, иногда брейк и билд"""
     S = lambda name, bars, **k: dict(name=name, bars=bars, drums=k.get('drums', 'full'), b808=k.get('b808', True), mel=k.get('mel', 1.0), vox=k.get('vox', False), layer=k.get('layer', False), loop=k.get('loop', 0), hv=k.get('hv', 'A'))
-    F = [S('intro', R.choice([2, 4, 4, 8]), drums=R.choice(['none', 'none', 'hats']), b808=False, mel=.6)]
+    F = [S('intro', R.choice([2, 4, 4]), drums=R.choice(['hats', 'light']), b808=R.random() < .5, mel=.9)]
     two_verses = R.random() < .65
     if R.random() < .75: F.append(S('verse', R.choice([8, 8, 12]), drums='light', mel=.8, vox=True, loop=1, hv=R.choice(['sparse', 'B'])))
     F.append(S('hook', R.choice([8, 8, 12, 16]), vox=True, hv=R.choice(['A', 'A', 'roll'])))
@@ -121,7 +121,7 @@ def build(pack_dir, genre, seed, smp, out_wav, drums='kit', vox=None, voxvol=0.0
         if sec['name'] == 'hook' and nh == 1 and len(MEL) > 1 and R.random() < .4: M = MEL[1]   # второй хук иногда на другой петле
         pitch = shift + (semis(A['key'], M['key']) if M is not A else 0)
         mf = os.path.abspath(os.path.join(pack_dir, M['files']['mel']))
-        it = dict(t=t0, d=nb * BAR, v=sec['mel'], rate=bpm / M['bpm'], pp=True, pitch=pitch, fi=(nb * BAR * .75 if sec['name'] == 'intro' else .01), fo=(nb * BAR * .8 if sec['name'] == 'outro' else .02), loop=True, off=(R.choice([0, 0, 4 * 4 * (60 / M['bpm'])]) if sec['name'] != 'hook' else 0))
+        it = dict(t=t0, d=nb * BAR, v=sec['mel'], rate=bpm / M['bpm'], pp=True, pitch=pitch, fi=(nb * BAR * .2 if sec['name'] == 'intro' else .01), fo=(nb * BAR * .8 if sec['name'] == 'outro' else .02), loop=True, off=(R.choice([0, 0, 4 * 4 * (60 / M['bpm'])]) if sec['name'] != 'hook' else 0))
         mels.setdefault(mf, []).append(it)
         if sec['layer'] and len(MEL) > 1:   # слой: вторая петля тихо поверх на большом хуке
             L2 = MEL[-1] if MEL[-1] is not M else MEL[1]; lay.append((os.path.abspath(os.path.join(pack_dir, L2['files']['mel'])),
@@ -131,7 +131,7 @@ def build(pack_dir, genre, seed, smp, out_wav, drums='kit', vox=None, voxvol=0.0
         if use_bassloop and sec['b808']:
             bl.append(dict(t=t0, d=nb * BAR, v=1.0, rate=bpm / A['bpm'], pp=True, pitch=shift, fi=.005, fo=.02, loop=True))
         # переход перед хуком: райзер на 2 такта + дроп барабанов; удар на 1-й доле хука
-        if nxt == 'hook' and nb >= 4: fxi.append(('riser', t0 + (nb - 2) * BAR, 2 * BAR))
+        if nxt in ('hook', 'verse') and nb >= 2: fxi.append(('riser', t0 + (nb - 2) * BAR, 2 * BAR))
         if sec['name'] == 'hook':
             fxi.append(('impact', t0, 1.6)); nh += 1
             if 'ohat' in kit: hit('ohat', t0, .9)
