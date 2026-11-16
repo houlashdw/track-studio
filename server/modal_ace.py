@@ -308,12 +308,13 @@ LYR_BANK = {
            ('Цифровой рассвет в экране|Я проснулась в шуме волн|Все слова теряют вес|Но я слышу только тебя', 'Свети, мой далёкий сигнал|Мы навсегда на одной волне|Пой со мной, пока горит свет|Мелодия не умрёт')]}
 
 
-def pick_vocal(seed, lang):
+def pick_vocal(seed, lang, genre='auto'):
     """тембр, язык, текст, сила голоса и сид вокала — детерминированно из сида трека (каждый новый сид — новое сочетание)"""
     import random
     R = random.Random(seed * 7919 + 13)
     if lang not in ('ja', 'ru'): lang = 'ja' if R.random() < .7 else 'ru'
-    tim, f0max = R.choice(TIMBRES); v, c = R.choice(LYR_BANK[lang]); V = v.split('|'); C = c.split('|'); R.shuffle(V) if R.random() < .35 else None
+    pool = TIMBRES if genre not in ('rage', 'phonk', 'drill', 'trap') else [TIMBRES[i] for i in (2, 3, 4)]   # тёмные жанры — холоднее и ближе, без «конфетных» тембров
+    tim, f0max = R.choice(pool); v, c = R.choice(LYR_BANK[lang]); V = v.split('|'); C = c.split('|'); R.shuffle(V) if R.random() < .35 else None
     lyr = '[Verse]\n' + '\n'.join(V) + '\n\n[Chorus]\n' + '\n'.join(C) + '\n\n[Verse]\n' + '\n'.join(R.sample(V, len(V))) + '\n\n[Chorus]\n' + '\n'.join(C)
     return dict(lang=lang, timbre=tim, f0max=f0max, lyrics=lyr, vseed=R.randrange(1, 99999), voice=round(R.uniform(.75, 1.0), 2))
 
@@ -346,7 +347,7 @@ class Mixer:
         sys.path.insert(0, '/app/daw')
         os.environ['TS_BUILD_LUA'] = '/app/reaper/build.lua'
         import track
-        g = q.get('genre', 'auto'); seed = int(q.get('seed', 1)); V = pick_vocal(seed, q.get('lang', 'auto'))
+        g = q.get('genre', 'auto'); seed = int(q.get('seed', 1)); V = pick_vocal(seed, q.get('lang', 'auto'), g)
         if q.get('lyrics') and V['lang'] == 'ru': V['lyrics'] = q['lyrics']
         print('голос:', json.dumps({k: V[k] for k in ('lang', 'timbre', 'f0max', 'vseed', 'voice')}, ensure_ascii=False), flush=True)
 

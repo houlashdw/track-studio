@@ -213,7 +213,7 @@ def build(pack_dir, genre, seed, smp, out_wav, drums='kit', vox=None, voxvol=0.0
         hk = [dict(t=t_, d=min(d_, dur - t_), v=1.0, rate=1.0, off=t_, fi=.04, fo=.5) for t_, d_ in hooks if t_ < dur - 1]  # копия-плейт на хуках
         tracks.append(dict(name='voxhook', kind='audio', file=os.path.abspath(vox), nomain=True, lvl=0, vol=voxvol, pan=0, items=hk))
         hv_ = [x for x, nm in vl if nm == 'hook' and hooks and x['t'] >= hooks[-1][0] - BAR * .5]   # октавный дубль голоса — на последнем хуке
-        if hv_: tracks.append(dict(name='voxdbl', kind='audio', file=os.path.abspath(vox), lvl=0, vol=voxvol - 8, pan=.25, items=[dict(x, v=.5, pitch=12, fi=.05) for x in hv_]))
+        if False and hv_: tracks.append(dict(name='voxdbl', kind='audio', file=os.path.abspath(vox), lvl=0, vol=voxvol - 8, pan=.25, items=[dict(x, v=.5, pitch=12, fi=.05) for x in hv_]))
     for t in tracks:   # фейдер: RMS звучащей части → целевая громкость
         if t['name'] in ('vox', 'voxhook', 'voxdbl'): continue
         r = arms(t['file'], None if t['name'] in ('mel', 'mel2', 'bassloop', 'drumloop', 'fx') else .35)

@@ -60,7 +60,7 @@ def make_track(pack_dir, genre, seed, work, sing, smp, drums='kit', target=-10.0
     reaper_render(W('beat.lua'), W('beat.wav'), W('beat.log')); subprocess.run(['ffmpeg', '-v', 'error', '-y', '-i', W('beat.wav'), '-b:a', '192k', W('beat.mp3')], check=True); tick('бит')
     # 2) голос
     raw = sing(open(W('beat.mp3'), 'rb').read(), bpm); open(W('vox_raw.mp3'), 'wb').write(raw); tick('голос')
-    x, _ = librosa.load(W('vox_raw.mp3'), sr=voxprep.SR, mono=True); y, vinfo = voxprep.prep(x, bpm); sf.write(W('vox.wav'), y, voxprep.SR, subtype='PCM_24'); tick('подгонка')
+    x, _ = librosa.load(W('vox_raw.mp3'), sr=voxprep.SR, mono=True); y, vinfo = voxprep.prep(x, bpm, raw=True); sf.write(W('vox.wav'), y, voxprep.SR, subtype='PCM_24'); tick('подгонка')
     # 3) баланс до мастера
     for nm, solo in (('bpre', 'beat'), ('vpre', 'vox')):
         project(pack_dir, genre, seed, smp, W(nm + '.wav'), W(nm + '.lua'), drums, W('vox.wav'), 0.0, solo); reaper_render(W(nm + '.lua'), W(nm + '.wav'), W(nm + '.log'), nomaster=True)
