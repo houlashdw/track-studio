@@ -41,7 +41,7 @@ def lufs(path):
 
 def project(pack_dir, genre, seed, smp, wav, lua, drums='kit', vox=None, voxvol=0.0, solo=None):
     R = packmod.build(pack_dir, genre, seed, smp, wav, drums, vox, voxvol)
-    if solo: R['tracks'] = [t for t in R['tracks'] if (t['name'] in ('vox', 'voxhook')) == (solo == 'vox')]
+    if solo: R['tracks'] = [t for t in R['tracks'] if (t['name'] in ('vox', 'voxhook', 'voxdbl', 'voxstk')) == (solo == 'vox')]
     open(lua, 'w').write('return ' + packmod.to_lua(R) + '\n'); return R
 
 
@@ -73,13 +73,24 @@ def key_of(ch):
     return best[1], best[2], best[0]
 
 
-def key_fix(vox_wav, ch_beat, k, md):
-    """на сколько полутонов сдвинуть голос, чтобы он лёг в ноты бита: доля энергии голоса в гамме бита + сходство с хромой бита (0 — уже в тональности)"""
+def key_fix(vox_wav, ch_beat, k, md, kconf=1.0):
+    """на сколько полутонов сдвинуть голос, чтобы он лёг в ноты бита (0 — уже в тональности или нельзя уверенно сказать).
+    Сдвигаем только при уверенности: тональность бита читается (kconf), у голоса чёткие ноты (хрома не плоская), и оба признака — доля в гамме и прямое сходство с хромой бита — согласны."""
     S = np.roll(np.array([1, 0, 1, 0, 1, 1, 0, 1, 0, 1, 0, 1.]) if md == 'major' else np.array([1, 0, 1, 1, 0, 1, 0, 1, 1, 0, 1, 0.]), k)
-    cv = chroma(vox_wav, harm=False); cv = cv / (cv.sum() + 1e-9)
-    sc = {s_: float((np.roll(cv, s_) * S).sum()) + .5 * float(np.corrcoef(np.roll(cv, s_), ch_beat)[0, 1]) for s_ in range(-5, 6)}
-    s_ = max(sc, key=lambda z: (round(sc[z], 3), -abs(z)))
-    return (s_ if s_ != 0 and sc[s_] - sc[0] > .15 else 0), round(sc[0], 2), round(sc[s_], 2)
+    cv = chroma(vox_wav, harm=False); peak = float((cv.max() - cv.min()) / (cv.max() + 1e-9)); cv = cv / (cv.sum() + 1e-9)
+    dc = {s_: float(np.corrcoef(np.roll(cv, s_), ch_beat)[0, 1]) for s_ in range(-5, 6)}
+    sc = {s_: float((np.roll(cv, s_) * S).sum()) + .5 * dc[s_] for s_ in range(-5, 6)}
+    s_ = max(sc, key=lambda z: (round(sc[z], 3), -abs(z))); bd = max(dc, key=dc.get)
+    sure = kconf >= .5 and peak >= .45 and sc[s_] - sc[0] > .15 and dc[s_] - dc[0] > .3 and abs(bd - s_) <= 1
+    return (s_ if s_ != 0 and sure else 0), round(sc[0], 2), round(sc[s_], 2), round(peak, 2)
+
+
+def grid_phase(path, bpm, sr=22050, delta=.15):
+    """средняя фаза атак относительно сетки 1/16 (мс) и её устойчивость R (0 — атаки как попало, 1 — все в одной фазе)"""
+    x, _ = librosa.load(path, sr=sr, mono=True); on = librosa.onset.onset_detect(y=x, sr=sr, units='time', delta=delta)
+    if len(on) < 8: return 0.0, 0.0
+    st = 15 / bpm; z = np.exp(2j * np.pi * (on / st % 1)).mean()
+    return float(np.angle(z) / (2 * np.pi) * st * 1000), float(abs(z))
 
 
 def pshift(inp, out, semis):
@@ -100,8 +111,14 @@ def make_track(pack_dir, genre, seed, work, sing, smp, drums='kit', target=-10.0
     except TypeError: raw = sing(open(W('beat.mp3'), 'rb').read(), bpm)
     open(W('vox_raw.mp3'), 'wb').write(raw); tick('голос')
     x, _ = librosa.load(W('vox_raw.mp3'), sr=voxprep.SR, mono=True); y, vinfo = voxprep.prep(x, bpm, raw=True); sf.write(W('vox.wav'), y, voxprep.SR, subtype='PCM_24')
-    sh, c0, c1 = key_fix(W('vox.wav'), chb, k, md); vinfo.update(key=key, key_fit=c0, shift=sh, key_fit_after=c1)
+    sh, c0, c1, pk = key_fix(W('vox.wav'), chb, k, md, ks); vinfo.update(key=key, key_conf=round(ks, 2), key_fit=c0, shift=sh, key_fit_after=c1, vox_peak=pk)
     if sh: pshift(W('vox.wav'), W('vox_k.wav'), sh); os.replace(W('vox_k.wav'), W('vox.wav')); log('  голос не в тональности: сдвиг %+d пт (%.2f → %.2f)' % (sh, c0, c1))
+    # голос в «карман» бита: сдвиг по времени, чтобы атаки голоса шли в той же фазе сетки 1/16, что и удары бита (не больше ±40 мс)
+    bp, bR = grid_phase(W('beat.wav'), bpm, delta=.2); vp, vR = grid_phase(W('vox.wav'), bpm); st = 15000 / bpm
+    dt = ((bp - vp + st / 2) % st) - st / 2; vinfo.update(beat_phase=round(bp), vox_phase=round(vp), vox_R=round(vR, 2))
+    if vR > .25 and bR > .4 and 8 < abs(dt) <= 40:
+        y, srv = sf.read(W('vox.wav')); n = int(round(abs(dt) / 1000 * srv)); z = np.zeros((n,) + y.shape[1:], y.dtype)
+        y = np.concatenate([z, y[:-n]]) if dt > 0 else np.concatenate([y[n:], z]); sf.write(W('vox.wav'), y, srv, subtype='PCM_24'); vinfo['nudge_ms'] = round(dt); log('  голос в карман: %+.0f мс' % dt)
     tick('подгонка')
     # 3) баланс до мастера
     for nm, solo in (('bpre', 'beat'), ('vpre', 'vox')):
@@ -111,5 +128,5 @@ def make_track(pack_dir, genre, seed, work, sing, smp, drums='kit', target=-10.0
     project(pack_dir, genre, seed, smp, W('mix.wav'), W('mix.lua'), drums, W('vox.wav'), vv); reaper_render(W('mix.lua'), W('mix.wav'), W('mix.log'))
     g = target - lufs(W('mix.wav'))
     subprocess.run(['ffmpeg', '-v', 'error', '-y', '-i', W('mix.wav'), '-af', 'volume=%.2fdB,alimiter=limit=0.966:attack=3:release=60:level=disabled' % g, '-b:a', '192k', W('mix.mp3')], check=True); tick('мастер')
-    info = dict(R['info'], genre=genre, vox=vinfo, fader=round(vv, 1), loud=round(lufs(W('mix.mp3')), 1), t=T)
+    info = dict(R['info'], genre=R.get('genre', genre), vox=vinfo, fader=round(vv, 1), loud=round(lufs(W('mix.mp3')), 1), t=T)
     return open(W('mix.mp3'), 'rb').read(), info

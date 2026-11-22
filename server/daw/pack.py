@@ -207,14 +207,20 @@ def build(pack_dir, genre, seed, smp, out_wav, drums='kit', vox=None, voxvol=0.0
             for k, (p0, p1) in enumerate(ph):
                 if not (t_ - BAR * .5 <= p0 < t_ + d_ - .3) or p1 - p0 < .25: continue
                 t2 = max(0, p0 - .06); e2 = min(p1 + .35, dur)
-                vl.append((dict(t=t2, d=e2 - t2, v=1.0, rate=1.0, off=t2, fi=.05, fo=.3), nm))
+                vl.append((dict(t=t2, d=e2 - t2, v=1.0 if nm == 'hook' else .85, rate=1.0, off=t2, fi=.05, fo=.3), nm))   # куплет на ~1.5 дБ тише хука
         tracks.append(dict(name='vox', kind='audio', file=os.path.abspath(vox), items=[x for x, _ in vl], lvl=0, vol=voxvol, pan=0))
         hk = [dict(t=t_, d=min(d_, dur - t_), v=1.0, rate=1.0, off=t_, fi=.04, fo=.5) for t_, d_ in hooks if t_ < dur - 1]  # копия-плейт на хуках
         tracks.append(dict(name='voxhook', kind='audio', file=os.path.abspath(vox), nomain=True, lvl=0, vol=voxvol, pan=0, items=hk))
         hv_ = [x for x, nm in vl if nm == 'hook' and hooks and x['t'] >= hooks[-1][0] - BAR * .5]   # октавный дубль голоса — на последнем хуке
-        if False and hv_: tracks.append(dict(name='voxdbl', kind='audio', file=os.path.abspath(vox), lvl=0, vol=voxvol - 8, pan=.25, items=[dict(x, v=.5, pitch=12, fi=.05) for x in hv_]))
+        # стак на хуках: два дубля голоса жёстко влево/вправо, чуть расстроены (±9…14 центов) и опаздывают на 14…30 мс — как вторая/третья дорожка в студии
+        hk_ph = [x for x, nm in vl if nm == 'hook']
+        if hk_ph:
+            for side in (-1, 1):
+                dl_ = RV.uniform(.014, .030); cents = side * RV.uniform(.09, .14)
+                tracks.append(dict(name='voxstk', kind='audio', file=os.path.abspath(vox), lvl=0, vol=voxvol - RV.uniform(6.5, 8.5), pan=side * .85,
+                                   items=[dict(x, t=x['t'] + dl_, v=1.0, pitch=cents, fi=.06) for x in hk_ph]))
     for t in tracks:   # фейдер: RMS звучащей части → целевая громкость
-        if t['name'] in ('vox', 'voxhook', 'voxdbl'): continue
+        if t['name'] in ('vox', 'voxhook', 'voxdbl', 'voxstk'): continue
         r = arms(t['file'], None if t['name'] in ('mel', 'mel2', 'bassloop', 'drumloop', 'fx') else .35)
         t['vol'] = float(np.clip(t['lvl'] - 20 * np.log10(r + 1e-9), -40, 18))
     struct = ' '.join('%s%d%s' % (x['name'][0] + ('H' if x['name'] == 'hook' else ''), x['bars'], '+' if x['layer'] else '') for x in FM)
@@ -229,7 +235,7 @@ if __name__ == '__main__':
     ap.add_argument('--smp', default='app/smp'); ap.add_argument('--wav', required=True); ap.add_argument('--lua', required=True); ap.add_argument('--drums', default='kit'); ap.add_argument('--vox'); ap.add_argument('--voxvol', type=float, default=0.0); ap.add_argument('--info'); ap.add_argument('--solo')
     a = ap.parse_args(); Rp = build(a.pack, a.genre, a.seed, a.smp, a.wav, a.drums, a.vox, a.voxvol)
     if a.solo:   # замер: оставить только вокальные дорожки (vox) или только бит (beat)
-        Rp['tracks'] = [t for t in Rp['tracks'] if (t['name'] in ('vox', 'voxhook', 'voxdbl')) == (a.solo == 'vox')]
+        Rp['tracks'] = [t for t in Rp['tracks'] if (t['name'] in ('vox', 'voxhook', 'voxdbl', 'voxstk')) == (a.solo == 'vox')]
     open(a.lua, 'w').write('return ' + to_lua(Rp) + '\n')
     if a.info: json.dump(dict(bpm=Rp['bpm'], total=Rp['total'], info=Rp['info']), open(a.info, 'w'))
     print('пак → Reaper:', json.dumps(Rp['info'], ensure_ascii=False), 'дорожки:', [(t['name'], len(t['items'])) for t in Rp['tracks']])
