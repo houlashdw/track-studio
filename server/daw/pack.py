@@ -204,12 +204,13 @@ def build(pack_dir, genre, seed, smp, out_wav, drums='kit', vox=None, voxvol=0.0
                 while j < n_ and gap < 13: gap = 0 if on_[j] else gap + 1; j += 1
                 ph.append((i * .02, (j - gap) * .02)); i = j
             else: i += 1
-        RV = random.Random(seed * 31 + 5); vl = []
+        RV = random.Random(seed * 31 + 5); vl = []; music_end = total - 2.5 - 1.5 * BAR   # до последних полутора тактов аутро (там идёт затухание)
         for t_, d_, nm in vitems:
             for k, (p0, p1) in enumerate(ph):
                 if not (t_ - BAR * .5 <= p0 < t_ + d_ - .3) or p1 - p0 < .25: continue
+                if p1 > music_end + .25: continue   # фраза уходит за конец музыки — её бы обрезало на полуслове; лучше без неё
                 t2 = max(0, p0 - .06); e2 = min(p1 + .35, dur)
-                vl.append((dict(t=t2, d=e2 - t2, v=1.0 if nm == 'hook' else .85, rate=1.0, off=t2, fi=.05, fo=.3 if e2 < dur - .05 else min(2.0, (e2 - t2) * .5)), nm))   # куплет на ~1.5 дБ тише хука
+                vl.append((dict(t=t2, d=e2 - t2, v=1.0 if nm == 'hook' else .85, rate=1.0, off=t2, fi=.05 if p0 > t_ + .3 else .14, fo=.3 if e2 < dur - .05 else min(2.0, (e2 - t2) * .5)), nm))   # куплет на ~1.5 дБ тише хука
         tracks.append(dict(name='vox', kind='audio', file=os.path.abspath(vox), items=[x for x, _ in vl], lvl=0, vol=voxvol, pan=0))
         hk = [dict(t=t_, d=min(d_, dur - t_), v=1.0, rate=1.0, off=t_, fi=.04, fo=.5) for t_, d_ in hooks if t_ < dur - 1]  # копия-плейт на хуках
         tracks.append(dict(name='voxhook', kind='audio', file=os.path.abspath(vox), nomain=True, lvl=0, vol=voxvol, pan=0, items=hk))
