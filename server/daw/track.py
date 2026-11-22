@@ -205,12 +205,10 @@ def make_track(pack_dir, genre, seed, work, sing, smp, drums='kit', target=-10.0
         log('  голос мимо аккордов бита: бит транспонирован на %+d пт (%.3f → %.3f)' % (XS, c0, c1))
     # тональность для автотюна: если бит читается плохо — выбираем ту, что лучше объясняет и бит, и голос вместе
     ka, ma = k, md
-    if ks < .45:
-        cv = chroma(W('vox.wav'), harm=False); best = -9
-        for k2 in range(12):
-            for prof, m2 in ((KMAJ, 'major'), (KMIN, 'minor')):
-                r = float(np.corrcoef(chb, np.roll(prof, k2))[0, 1]) + float(np.corrcoef(cv, np.roll(prof, k2))[0, 1])
-                if r > best: best, ka, ma = r, k2, m2
+    if ks < .45:   # тональность бита неясна: выбираем из 3 лучших для САМОГО бита ту, в которую лучше ложится голос (чужую биту не берём)
+        cv = chroma(W('vox.wav'), harm=False)
+        cand = sorted(((float(np.corrcoef(chb, np.roll(prof, k2))[0, 1]), k2, m2) for k2 in range(12) for prof, m2 in ((KMAJ, 'major'), (KMIN, 'minor'))), reverse=True)[:3]
+        _, ka, ma = max(cand, key=lambda c: c[0] + .5 * float(np.corrcoef(cv, np.roll(KMAJ if c[2] == 'major' else KMIN, c[1]))[0, 1]))
     at = []
     for _ in range(2):   # два прохода мягкого автотюна к гамме бита
         r = autotune(W('vox.wav'), W('vox_t.wav'), ka, ma, VS['tune'])

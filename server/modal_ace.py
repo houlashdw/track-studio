@@ -346,7 +346,7 @@ def pick_vocal(seed, lang, genre='auto'):
     R = random.Random(seed * 7919 + 13)
     if lang not in ('ja', 'ru'): lang = 'ja' if R.random() < .7 else 'ru'
     tim, f0max, tune, vdrive = R.choice(GENRE_VOX[genre]) if genre in GENRE_VOX else R.choice(TIMBRES) + (.85, 0)
-    tim += ', female anime vocaloid voice'; v, c = R.choice(LYR_BANK[lang]); V = v.split('|'); C = c.split('|'); R.shuffle(V) if R.random() < .35 else None
+    tim += ', slight anime vocaloid tint'; v, c = R.choice(LYR_BANK[lang]); V = v.split('|'); C = c.split('|'); R.shuffle(V) if R.random() < .35 else None
     lyr = '[Verse]\n' + '\n'.join(V) + '\n\n[Chorus]\n' + '\n'.join(C) + '\n\n[Verse]\n' + '\n'.join(R.sample(V, len(V))) + '\n\n[Chorus]\n' + '\n'.join(C)
     return dict(lang=lang, timbre=tim, f0max=f0max, tune=tune, vdrive=vdrive, lyrics=lyr, vlines=V, clines=C, vseed=R.randrange(1, 99999), voice=round(R.uniform(.75, 1.0), 2))
 
@@ -389,7 +389,7 @@ class Mixer:
         def sing(beat_mp3, bpm, key=None, sections=None):
             lyr = V['lyrics'] if (q.get('lyrics') or not sections) else lyrics_for(sections, V, seed)
             print('текст:', lyr.replace('\n', ' / ')[:300], '| тональность:', key, flush=True)
-            qq = dict(beat_b64=base64.b64encode(beat_mp3).decode(), bpm=bpm, key=key or '', lang=V['lang'], lyrics=lyr, caption=VOC_CAP[V['lang']] + ', ' + V['timbre'] + ', clear diction, J-pop',
+            qq = dict(beat_b64=base64.b64encode(beat_mp3).decode(), bpm=bpm, key=key or '', lang=V['lang'], lyrics=lyr, caption='%s song, female vocal in %s, %s' % (g, {'ja': 'Japanese', 'ru': 'Russian'}[V['lang']], V['timbre']) + (', J-pop' if g == 'plugg' else ''),
                       seed=V['vseed'], voice=float(q.get('voice', V['voice'])), sex='f', steps=int(q.get('steps', 30)), f0max=float(V['f0max']), tries=3)
             return AceLego().lego.remote(qq)
         work = tempfile.mkdtemp(prefix='trk')
