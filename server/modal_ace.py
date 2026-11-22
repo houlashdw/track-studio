@@ -280,7 +280,7 @@ def deboxx(v, sr):
     tgt = [(1500, 1000, 2000, -7), (3000, 2000, 4000, -12), (6000, 4000, 8000, -18), (10000, 8000, 12000, -23), (14000, 12000, 16000, -30)]
     pts = [(20, 0.0), (250, 0.0)]; boxy = band(300, 700) - ref
     pts.append((500, -min(3.0, max(0.0, boxy + 1))))   # середина толще остального — срезаем до 3 дБ
-    for c, a, b, t in tgt: pts.append((c, float(np.clip(t - (band(a, b) - ref), 0, 12))))
+    for c, a, b, t in tgt: pts.append((c, float(np.clip(t - (band(a, b) - ref), 0, 6))))   # больше +6 дБ подъёма — металлический звон артефактов
     pts.append((sr / 2, pts[-1][1]))
     xs = np.log10([p[0] for p in pts]); ys = [p[1] for p in pts]
     g = 10 ** (np.interp(np.log10(np.maximum(fr, 20)), xs, ys) / 20)

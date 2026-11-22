@@ -62,16 +62,16 @@ def make_form(R, genre):
     """случайная структура: список секций (имя, такты, барабаны, 808, мелодия, вокал, слой); интро/хуки/куплеты разной длины, иногда брейк и билд"""
     S = lambda name, bars, **k: dict(name=name, bars=bars, drums=k.get('drums', 'full'), b808=k.get('b808', True), mel=k.get('mel', 1.0), vox=k.get('vox', False), layer=k.get('layer', False), loop=k.get('loop', 0), hv=k.get('hv', 'A'))
     F = [S('intro', R.choice([2, 4, 4]), drums=R.choice(['hats', 'light']), b808=R.random() < .5, mel=.9)]
-    two_verses = R.random() < .65
-    if R.random() < .75: F.append(S('verse', R.choice([8, 8, 12]), drums='light', mel=.8, vox=True, loop=1, hv=R.choice(['sparse', 'B'])))
-    F.append(S('hook', R.choice([8, 8, 12, 16]), vox=True, hv=R.choice(['A', 'A', 'roll'])))
-    if R.random() < .6: F.append(S('break', R.choice([2, 4]), drums='none', b808=False, mel=.9, vox=True, loop=0))
-    if two_verses and F[1]['name'] == 'verse': F.append(S('verse', R.choice([8, 8]), drums='light', mel=.8, vox=True, loop=R.choice([1, 2]), hv=R.choice(['sparse', 'B', 'roll'])))
-    F.append(S('hook', R.choice([8, 12, 16]), vox=True, layer=R.random() < .6, loop=0, hv=R.choice(['roll', 'A'])))
-    F.append(S('outro', R.choice([2, 4, 4, 8]), drums=R.choice(['kick', 'hats', 'none']), b808=R.random() < .5, mel=.6))
+    F.append(S('verse', 8, drums='light', mel=.8, vox=True, loop=1, hv=R.choice(['sparse', 'B'])))
+    F.append(S('hook', 8, vox=True, hv=R.choice(['A', 'A', 'roll'])))
+    # между хуками всегда что-то другое: второй куплет и/или брейк (два хука подряд = одна фраза 4 раза — скучно)
+    mid = R.choice(['verse', 'verse', 'break+verse', 'break'])
+    if 'break' in mid: F.append(S('break', R.choice([2, 4]), drums='none', b808=False, mel=.9, vox=True, loop=0))
+    if 'verse' in mid: F.append(S('verse', 8, drums='light', mel=.8, vox=True, loop=R.choice([1, 2]), hv=R.choice(['sparse', 'B', 'roll'])))
+    if mid == 'break': F[-1]['bars'] = 4
     tot = lambda: sum(x['bars'] for x in F)
-    for nm in ('break', 'verse'):   # длина трека для ACE-голоса: до ~48 тактов (зависит от темпа)
-        while tot() > 48 and any(x['name'] == nm for x in F): F.pop(max(i for i, x in enumerate(F) if x['name'] == nm))
+    F.append(S('hook', 16 if tot() + 16 + 4 <= 48 and R.random() < .2 else 8, vox=True, layer=R.random() < .6, loop=0, hv=R.choice(['roll', 'A'])))
+    F.append(S('outro', 4, drums=R.choice(['kick', 'hats', 'none']), b808=R.random() < .5, mel=.6))
     return F
 
 
@@ -118,10 +118,12 @@ def build(pack_dir, genre, seed, smp, out_wav, drums='kit', vox=None, voxvol=0.0
         if sec['vox']: vitems.append((t0, nb * BAR, sec['name']))
         # мелодия: петля нужной секции (loop → индекс в MEL, если петель меньше — берём A); ключ и темп подгоняем
         M = MEL[min(sec['loop'], len(MEL) - 1)] if sec['name'] not in ('hook', 'break') else MEL[0]
+        stop = nxt == 'hook' and R.random() < .85
         if sec['name'] == 'hook' and nh == 1 and len(MEL) > 1 and R.random() < .4: M = MEL[1]   # второй хук иногда на другой петле
         pitch = shift + (semis(A['key'], M['key']) if M is not A else 0)
         mf = os.path.abspath(os.path.join(pack_dir, M['files']['mel']))
         it = dict(t=t0, d=nb * BAR, v=sec['mel'], rate=bpm / M['bpm'], pp=True, pitch=pitch, fi=(nb * BAR * .2 if sec['name'] == 'intro' else .01), fo=(nb * BAR * .8 if sec['name'] == 'outro' else .02), loop=True, off=(R.choice([0, 0, 4 * 4 * (60 / M['bpm'])]) if sec['name'] != 'hook' else 0))
+        if stop: it['d'] -= 2 * T   # мелодия тоже замолкает на последние 2 доли перед хуком
         mels.setdefault(mf, []).append(it)
         if sec['layer'] and len(MEL) > 1:   # слой: вторая петля тихо поверх на большом хуке
             L2 = MEL[-1] if MEL[-1] is not M else MEL[1]; lay.append((os.path.abspath(os.path.join(pack_dir, L2['files']['mel'])),
@@ -140,7 +142,7 @@ def build(pack_dir, genre, seed, smp, out_wav, drums='kit', vox=None, voxvol=0.0
                 lb = b % 8; tb = t0 + b * BAR; last = b == nb - 1; pre = nxt == 'hook' and b >= nb - 2
                 phrase_end = (b % 4 == 3) or last
                 fill = phrase_end and sec['drums'] in ('full', 'light') and (last or R.random() < .55)
-                drop = pre and b == nb - 1 and R.random() < .5   # последний такт перед хуком — тишина под райзер (только хэт)
+                drop = pre and b == nb - 1 and stop   # последний такт перед хуком: стоп-тайм — бит замолкает на 2 доли, потом удар хука
                 kicks = [(i % 16, v) for i, v in K if i // 16 == lb]; sns = [(i % 16, v) for i, v in SN if i // 16 == lb]
                 hh = [(i % 32, v) for i, v in HAT[sec['hv'] if sec['hv'] in HAT else 'A'] if i // 32 == lb]
                 if sec['hv'] == 'sparse': hh = [x for x in hh if x[0] % 4 == 0 or R.random() < .35]
@@ -154,7 +156,7 @@ def build(pack_dir, genre, seed, smp, out_wav, drums='kit', vox=None, voxvol=0.0
                     if kind == 'roll': sns = [x for x in sns if x[0] < 12] + [(s, .55 + .15 * (s - 12)) for s in (12, 13, 14, 15)]
                     elif kind == 'double': sns = [x for x in sns if x[0] < 8] + [(s, .7 + .05 * k_) for k_, s in enumerate((8, 10, 12, 13, 14, 15))]
                     else: hh = [x for x in hh if x[0] < 16] + [(j, .45 + .5 * (j - 16) / 16) for j in range(16, 32)]
-                if drop: kicks = [x for x in kicks if x[0] < 4]; sns = []; hh = [x for x in hh if x[0] % 4 == 0]
+                if drop: kicks = [x for x in kicks if x[0] < 8]; sns = [x for x in sns if x[0] < 8]; hh = [x for x in hh if x[0] < 16]
                 if sec['name'] == 'hook' and R.random() < .3 and not drop:   # призрачный кик в хуке
                     g = R.choice([3, 6, 7, 11, 14]);
                     if all(x[0] != g for x in sns + kicks): kicks.append((g, .65))
@@ -172,7 +174,7 @@ def build(pack_dir, genre, seed, smp, out_wav, drums='kit', vox=None, voxvol=0.0
                         m += shift
                         while m > 50: m -= 12
                         while m < 28: m += 12
-                        if (fill or drop) and i % 16 >= 12: continue
+                        if (fill and i % 16 >= 12) or (drop and i % 16 >= 8): continue
                         if sec['name'] == 'hook' and b % 4 == 3 and R.random() < .25 and m + 12 <= 52: m += 12   # октавный «поп» в хуке
                         r8 = 440 * 2 ** ((m - 69) / 12) / hz8; d = min(d8 / r8, ln * S16 + .04)
                         hit('808', tb + (i % 16) * S16, 1.0, d, r8)
@@ -207,7 +209,7 @@ def build(pack_dir, genre, seed, smp, out_wav, drums='kit', vox=None, voxvol=0.0
             for k, (p0, p1) in enumerate(ph):
                 if not (t_ - BAR * .5 <= p0 < t_ + d_ - .3) or p1 - p0 < .25: continue
                 t2 = max(0, p0 - .06); e2 = min(p1 + .35, dur)
-                vl.append((dict(t=t2, d=e2 - t2, v=1.0 if nm == 'hook' else .85, rate=1.0, off=t2, fi=.05, fo=.3), nm))   # куплет на ~1.5 дБ тише хука
+                vl.append((dict(t=t2, d=e2 - t2, v=1.0 if nm == 'hook' else .85, rate=1.0, off=t2, fi=.05, fo=.3 if e2 < dur - .05 else min(2.0, (e2 - t2) * .5)), nm))   # куплет на ~1.5 дБ тише хука
         tracks.append(dict(name='vox', kind='audio', file=os.path.abspath(vox), items=[x for x, _ in vl], lvl=0, vol=voxvol, pan=0))
         hk = [dict(t=t_, d=min(d_, dur - t_), v=1.0, rate=1.0, off=t_, fi=.04, fo=.5) for t_, d_ in hooks if t_ < dur - 1]  # копия-плейт на хуках
         tracks.append(dict(name='voxhook', kind='audio', file=os.path.abspath(vox), nomain=True, lvl=0, vol=voxvol, pan=0, items=hk))

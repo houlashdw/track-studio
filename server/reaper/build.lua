@@ -74,7 +74,7 @@ if P.vox then
   local pd = addfx(plate, 'ReaDelay (Cockos)'); if pd then setv(plate, pd, 'Wet', 0); setv(plate, pd, 'Dry', -150); setv(plate, pd, '1: Length (time)', q * 125); setv(plate, pd, '1: Feedback', -60) end
   local f2 = addfx(plate, 'ReaVerbate (Cockos)'); if f2 then setv(plate, f2, 'Room size', 92); setv(plate, f2, 'Dampening', 35); setv(plate, f2, 'Wet', 0); setv(plate, f2, 'Dry', -150) end
   eq(plate, {{0, 350, -8}, {0, 1200, 0}, {0, 5000, 1, 1}, {0, 11000, 1}})
-  vdl = newtrack('VDL'); local d1 = addfx(vdl, 'ReaDelay (Cockos)'); if d1 then setv(vdl, d1, 'Wet', 0); setv(vdl, d1, 'Dry', -150); setv(vdl, d1, '1: Length (time)', q * 500); setv(vdl, d1, '1: Feedback', -13) end
+  vdl = newtrack('VDL'); local d1 = addfx(vdl, 'ReaDelay (Cockos)'); if d1 then setv(vdl, d1, 'Wet', 0); setv(vdl, d1, 'Dry', -150); setv(vdl, d1, '1: Length (time)', q * 750); setv(vdl, d1, '1: Feedback', -13) end
   eq(vdl, {{0, 300, -6}, {0, 1500, 0}, {0, 4000, -2}, {0, 6000, -8}}); reaper.SetMediaTrackInfo_Value(vdl, 'D_PAN', -0.7)
   vdr = newtrack('VDR'); local d2 = addfx(vdr, 'ReaDelay (Cockos)'); if d2 then setv(vdr, d2, 'Wet', 0); setv(vdr, d2, 'Dry', -150); setv(vdr, d2, '1: Length (time)', q * 1000); setv(vdr, d2, '1: Feedback', -14) end
   eq(vdr, {{0, 300, -6}, {0, 1500, 0}, {0, 4000, -2}, {0, 6000, -8}}); reaper.SetMediaTrackInfo_Value(vdr, 'D_PAN', 0.7)
@@ -135,7 +135,7 @@ for _, t in ipairs(P.tracks) do
     local sat = addfx(tr, 'JS: Saturation'); if sat then setv(tr, sat, 'Amount', P.drive * 60) end
     comp(tr, -20, 3, 3, 120)
   elseif nm == 'vox' then   -- вокалоид: воздух 5–8 кГц, придавить 2–3 кГц, мягкий компрессор (релиз ≈ 1/8 такта), без гула (срез 120 Гц сделан до Reaper)
-    eq(tr, {{0, 110, -3}, {0, 2800, -2.5, 1.2}, {0, 4600, -2.5, 1}, {0, 7500, 1.2}}); comp(tr, -24, 2.5, 15, math.min(500, 60000 / P.bpm * 0.5))
+    eq(tr, {{0, 110, -3}, {0, 2800, -2.5, 1.2}, {0, 5200, -3.5, 1.2}, {0, 10000, 0.8}}); comp(tr, -24, 2.5, 15, math.min(500, 60000 / P.bpm * 0.5))
   elseif nm == 'voxstk' then   -- дубли-стак на хуках: без низа и плотной середины, больше воздуха, плотнее сжаты — «обнимают» главный голос по краям
     eq(tr, {{0, 260, -12}, {0, 800, -2, 1}, {0, 2800, -3, 1.2}, {0, 9000, 2.5}}); comp(tr, -28, 4, 10, 100)
   elseif nm == 'voxdbl' then   -- октавный дубль голоса: только воздух, без низа
@@ -151,7 +151,7 @@ for _, t in ipairs(P.tracks) do
   end
   -- посылы
   local function send(dst, dbv) local s = reaper.CreateTrackSend(tr, dst); reaper.SetTrackSendInfo_Value(tr, 0, s, 'D_VOL', db(dbv)) end
-  if nm == 'vox' then send(room, -17); send(vdl, -23); send(vdr, -26) elseif nm == 'voxhook' then send(plate, -17); send(vdl, -22)
+  if nm == 'vox' then send(room, -17); send(plate, -17); send(vdl, -20); send(vdr, -23) elseif nm == 'voxhook' then send(plate, -17); send(vdl, -22)
   elseif nm == 'voxdbl' then send(room, -14); send(vdr, -16) elseif nm == 'voxstk' then send(room, -15); send(plate, -18) elseif nm == 'fx' then send(rev, -14) elseif nm == 'mel' or nm == 'mel2' then send(rev, -16) elseif nm == 'melody' then send(rev, -10); send(dly, -14) elseif nm == 'pad' then send(rev, -8) elseif nm == 'clap' or nm == 'snare' then send(rev, -18) end
   if P.vox and room and (nm == 'mel' or nm == 'mel2' or nm == 'snare' or nm == 'clap' or nm == 'hat' or nm == 'drumloop') then send(room, -19) end   -- общая комната: голос и бит в одном пространстве
 end
@@ -162,9 +162,8 @@ local M = reaper.GetMasterTrack(0)
 reaper.SetMediaTrackInfo_Value(M, 'D_VOL', 1)
 if not os.getenv('TS_NOMASTER') then   -- TS_NOMASTER: замер уровней до мастера (без EQ/компрессии/лимитера)
 eq(M, {{0, 30, -6}, {0, 250, -1, 2}, {0, 3000, 0.5, 2}, {0, 12000, 1.5}})
-addfx(M, 'ReaXcomp (Cockos)')
-local gl = comp(M, -10, 2, 10, 200)
-local lim = addfx(M, 'ReaLimit (Cockos)'); if lim then setv(M, lim, 'Threshold', P.loud + MG); setv(M, lim, 'Ceiling', P.vox and -0.3 or -1) end
+local gl = comp(M, -12, 1.6, 15, 200)   -- мягкая склейка; громкость и потолок — потом в ffmpeg (кирпичный лимитер тут съедал подъёмы и спады секций)
+local lim = addfx(M, 'ReaLimit (Cockos)'); if lim then setv(M, lim, 'Threshold', -2 + MG); setv(M, lim, 'Ceiling', -1) end
 end
 
 -- рендер
