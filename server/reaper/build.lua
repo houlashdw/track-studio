@@ -142,7 +142,7 @@ for _, t in ipairs(P.tracks) do
     eq(tr, {{0, 300, -12}, {0, 2800, -3, 1.2}, {0, 6000, 2}, {0, 9000, 2}}); comp(tr, -24, 2.5, 15, 120)
   elseif nm == 'fx' then   -- райзеры/удары: без низа лишнего, в реверб
     eq(tr, {{0, 120, -6}, {0, 800, 0}, {0, 4000, 0}, {0, 10000, 0}})
-  elseif nm == 'voxhook' then
+  elseif nm == 'voxhook' or nm == 'voxthrow' then
     reaper.SetMediaTrackInfo_Value(tr, 'B_MAINSEND', 0)
   elseif nm == 'melody' or nm == 'pad' then
     local bright = (t.inst == 'glock' or t.inst == 'chimes' or t.inst == 'cowbell') and -7 or -2   -- колокола очень звонкие: верх приглушаем
@@ -152,7 +152,7 @@ for _, t in ipairs(P.tracks) do
   -- посылы
   local function send(dst, dbv) local s = reaper.CreateTrackSend(tr, dst); reaper.SetTrackSendInfo_Value(tr, 0, s, 'D_VOL', db(dbv)) end
   if nm == 'vox' then send(room, -13); send(plate, -12); send(vdl, -16); send(vdr, -19) elseif nm == 'voxhook' then send(plate, -17); send(vdl, -22)
-  elseif nm == 'voxdbl' then send(room, -14); send(vdr, -16) elseif nm == 'voxstk' then send(room, -15); send(plate, -18) elseif nm == 'fx' then send(rev, -14) elseif nm == 'mel' or nm == 'mel2' then send(rev, -16) elseif nm == 'melody' then send(rev, -10); send(dly, -14) elseif nm == 'pad' then send(rev, -8) elseif nm == 'clap' or nm == 'snare' then send(rev, -18) end
+  elseif nm == 'voxdbl' then send(room, -14); send(vdr, -16) elseif nm == 'voxstk' then send(room, -15); send(plate, -18) elseif nm == 'voxthrow' then send(vdl, -4); send(vdr, -7); send(plate, -9) elseif nm == 'fx' then send(rev, -14) elseif nm == 'mel' or nm == 'mel2' then send(rev, -16) elseif nm == 'melody' then send(rev, -10); send(dly, -14) elseif nm == 'pad' then send(rev, -8) elseif nm == 'clap' or nm == 'snare' then send(rev, -18) end
   if P.vox and room and (nm == 'mel' or nm == 'mel2' or nm == 'snare' or nm == 'clap' or nm == 'hat' or nm == 'drumloop') then send(room, -19) end   -- общая комната: голос и бит в одном пространстве
 end
 if fxd then local q = 60 / P.bpm; setv(dly, fxd, '1: Length (time)', q * 750); setv(dly, fxd, '1: Feedback', -12) end

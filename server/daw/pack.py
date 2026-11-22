@@ -212,6 +212,14 @@ def build(pack_dir, genre, seed, smp, out_wav, drums='kit', vox=None, voxvol=0.0
                 t2 = max(0, p0 - .06); e2 = min(p1 + .35, dur)
                 vl.append((dict(t=t2, d=e2 - t2, v=1.0 if nm == 'hook' else .85, rate=1.0, off=t2, fi=.05 if p0 > t_ + .3 else .14, fo=.3 if e2 < dur - .05 else min(2.0, (e2 - t2) * .5)), nm))   # куплет на ~1.5 дБ тише хука
         tracks.append(dict(name='vox', kind='audio', file=os.path.abspath(vox), items=[x for x, _ in vl], lvl=0, vol=voxvol, pan=0))
+        # «выброс» в эхо: хвост последнего слова каждой вокальной секции уходит в дилей и плейт и звенит через переход (обрыв голоса ACE не слышен как срез)
+        thr_ = []
+        for t_, d_, nm in vitems:
+            inn = [x for x, _ in vl if t_ - BAR * .5 <= x['t'] < t_ + d_]
+            if inn:
+                x = max(inn, key=lambda z: z['t'] + z['d']); e = x['t'] + x['d']; a = max(x['t'], e - .7)
+                thr_.append(dict(t=a, d=e - a, v=1.0, rate=1.0, off=x['off'] + (a - x['t']), fi=.15, fo=.08))
+        if thr_: tracks.append(dict(name='voxthrow', kind='audio', file=os.path.abspath(vox), nomain=True, lvl=0, vol=voxvol, pan=0, items=thr_))
         hk = [dict(t=t_, d=min(d_, dur - t_), v=1.0, rate=1.0, off=t_, fi=.04, fo=.5) for t_, d_ in hooks if t_ < dur - 1]  # копия-плейт на хуках
         tracks.append(dict(name='voxhook', kind='audio', file=os.path.abspath(vox), nomain=True, lvl=0, vol=voxvol, pan=0, items=hk))
         hv_ = [x for x, nm in vl if nm == 'hook' and hooks and x['t'] >= hooks[-1][0] - BAR * .5]   # октавный дубль голоса — на последнем хуке
@@ -223,13 +231,13 @@ def build(pack_dir, genre, seed, smp, out_wav, drums='kit', vox=None, voxvol=0.0
                 tracks.append(dict(name='voxstk', kind='audio', file=os.path.abspath(vox), lvl=0, vol=voxvol - RV.uniform(6.5, 8.5), pan=side * .85,
                                    items=[dict(x, t=x['t'] + dl_, v=1.0, pitch=cents, fi=.06) for x in hk_ph]))
     for t in tracks:   # фейдер: RMS звучащей части → целевая громкость
-        if t['name'] in ('vox', 'voxhook', 'voxdbl', 'voxstk'): continue
+        if t['name'] in ('vox', 'voxhook', 'voxdbl', 'voxstk', 'voxthrow'): continue
         r = arms(t['file'], None if t['name'] in ('mel', 'mel2', 'bassloop', 'drumloop', 'fx') else .35)
         t['vol'] = float(np.clip(t['lvl'] - 20 * np.log10(r + 1e-9), -40, 18))
     if secgain:   # энергетическая кривая формы: поправка громкости бита по секциям (дБ, из замера первого рендера)
         ed = np.cumsum([0] + [x['bars'] for x in FM]) * BAR
         for t in tracks:
-            if t['name'] in ('vox', 'voxhook', 'voxdbl', 'voxstk'): continue
+            if t['name'] in ('vox', 'voxhook', 'voxdbl', 'voxstk', 'voxthrow'): continue
             for it in t['items']:
                 i = int(np.clip(np.searchsorted(ed, it['t'] + 1e-3, 'right') - 1, 0, len(FM) - 1)); it['v'] = it.get('v', 1.0) * 10 ** (secgain[i] / 20)
     struct = ' '.join('%s%d%s' % (x['name'][0] + ('H' if x['name'] == 'hook' else ''), x['bars'], '+' if x['layer'] else '') for x in FM)
@@ -244,7 +252,7 @@ if __name__ == '__main__':
     ap.add_argument('--smp', default='app/smp'); ap.add_argument('--wav', required=True); ap.add_argument('--lua', required=True); ap.add_argument('--drums', default='kit'); ap.add_argument('--vox'); ap.add_argument('--voxvol', type=float, default=0.0); ap.add_argument('--info'); ap.add_argument('--solo')
     a = ap.parse_args(); Rp = build(a.pack, a.genre, a.seed, a.smp, a.wav, a.drums, a.vox, a.voxvol)
     if a.solo:   # замер: оставить только вокальные дорожки (vox) или только бит (beat)
-        Rp['tracks'] = [t for t in Rp['tracks'] if (t['name'] in ('vox', 'voxhook', 'voxdbl', 'voxstk')) == (a.solo == 'vox')]
+        Rp['tracks'] = [t for t in Rp['tracks'] if (t['name'] in ('vox', 'voxhook', 'voxdbl', 'voxstk', 'voxthrow')) == (a.solo == 'vox')]
     open(a.lua, 'w').write('return ' + to_lua(Rp) + '\n')
     if a.info: json.dump(dict(bpm=Rp['bpm'], total=Rp['total'], info=Rp['info']), open(a.info, 'w'))
     print('пак → Reaper:', json.dumps(Rp['info'], ensure_ascii=False), 'дорожки:', [(t['name'], len(t['items'])) for t in Rp['tracks']])

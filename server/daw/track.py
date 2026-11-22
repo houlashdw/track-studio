@@ -41,11 +41,11 @@ def lufs(path):
 
 def project(pack_dir, genre, seed, smp, wav, lua, drums='kit', vox=None, voxvol=0.0, solo=None, secgain=None):
     R = packmod.build(pack_dir, genre, seed, smp, wav, drums, vox, voxvol, secgain)
-    if solo: R['tracks'] = [t for t in R['tracks'] if (t['name'] in ('vox', 'voxhook', 'voxdbl', 'voxstk')) == (solo == 'vox')]
+    if solo: R['tracks'] = [t for t in R['tracks'] if (t['name'] in ('vox', 'voxhook', 'voxdbl', 'voxstk', 'voxthrow')) == (solo == 'vox')]
     open(lua, 'w').write('return ' + packmod.to_lua(R) + '\n'); return R
 
 
-def fader(bpre, vpre, want=-2.5):
+def fader(bpre, vpre, want=-3.5):
     SR = 22050; H = int(.4 * SR); ld = lambda f: librosa.load(f, sr=SR, mono=True)[0]
     def wr(x): k = len(x) // H; return np.sqrt((x[:k * H].reshape(k, H) ** 2).mean(1) + 1e-12)
     rb, rv = wr(ld(bpre)), wr(ld(vpre))
