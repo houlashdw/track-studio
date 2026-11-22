@@ -21,15 +21,16 @@ P = """Ты — опытный продюсер и звукорежиссёр х
 
 
 def models():
-    names = []
+    names = []; allnames = set()
     try:
         for m in cl.models.list():
-            n = m.name.split('/')[-1]; acts = getattr(m, 'supported_actions', None) or []
+            n = m.name.split('/')[-1]; allnames.add(n); acts = getattr(m, 'supported_actions', None) or []
             if n.startswith('gemini') and 'flash' in n and ('generateContent' in acts or not acts) and not any(x in n for x in ['tts', 'image', 'embed', 'live', 'audio', 'lite']): names.append(n)
     except Exception as e: print('list', e)
     ver = lambda n: float((re.findall(r'gemini-(\d+(?:\.\d+)?)', n) or ['0'])[0])
     names.sort(key=lambda n: (ver(n), 'preview' not in n and 'exp' not in n), reverse=True)
-    return names[:4] or ['gemini-2.5-flash']
+    top = [n for n in ('gemini-4-neon', 'gemini-4-hydrogen') if n in allnames] or ['gemini-4-neon', 'gemini-4-hydrogen']   # Gemini 4: Neon (платный ключ), Hydrogen (есть бесплатно)
+    return top + names[:3] or ['gemini-2.5-flash']
 
 
 M = models(); print('модели:', M)
@@ -43,7 +44,7 @@ for f in sorted(glob.glob(os.path.join(d, '*.mp3'))):
             try: txt = cl.models.generate_content(model=m, contents=[up, P]).text; used = m; break
             except Exception as e:
                 errs.append(m + ': ' + str(e)[:160])
-                if '429' in str(e): dead.add(m)
+                if any(c in str(e) for c in ('429', '403', '404', 'PERMISSION', 'NOT_FOUND')): dead.add(m)
         if txt or len(dead) == len(M): break
         time.sleep(30 + 15 * att)
     out = ('# %s (%s)\n\n%s' % (os.path.basename(f), used, txt)) if txt else 'ошибки:\n' + '\n'.join(errs)
