@@ -85,6 +85,20 @@ def key_fix(vox_wav, ch_beat, k, md, kconf=1.0):
     return (s_ if s_ != 0 and sure else 0), round(sc[0], 2), round(sc[s_], 2), round(peak, 2)
 
 
+def chord_fix(beat_wav, vox_wav, sr=22050):
+    """сдвиг голоса по созвучию с аккордами бита во времени: для каждого кадра (≈0.1 с) сходство хромы голоса и бита, среднее по кадрам, где голос звучит.
+    Это ловит «мимо аккордов», даже когда голос формально в гамме. → (сдвиг, созвучие при 0, при сдвиге)"""
+    xb, _ = librosa.load(beat_wav, sr=sr, mono=True); xv, _ = librosa.load(vox_wav, sr=sr, mono=True)
+    cb = librosa.feature.chroma_cqt(y=librosa.effects.harmonic(xb, margin=3), sr=sr, hop_length=2048); cv = librosa.feature.chroma_cqt(y=xv, sr=sr, hop_length=2048)
+    n = min(cb.shape[1], cv.shape[1]); cb, cv = cb[:, :n], cv[:, :n]
+    e = librosa.feature.rms(y=xv, hop_length=2048)[0][:n]; act = e > np.percentile(e, 50)
+    cb = cb / (np.linalg.norm(cb, axis=0) + 1e-9); sc = {}
+    for s_ in range(-5, 7):
+        v = np.roll(cv, s_, axis=0); v = v / (np.linalg.norm(v, axis=0) + 1e-9); sc[s_] = float((v * cb).sum(0)[act].mean())
+    top = max(sc.values()); s_ = min((z for z in sc if sc[z] >= top - .008), key=abs)   # почти равные — берём меньший сдвиг (меньше артефактов)
+    return (s_ if s_ != 0 and sc[s_] - sc[0] > .035 else 0), round(sc[0], 3), round(sc[s_], 3)
+
+
 def grid_phase(path, bpm, sr=22050, delta=.15):
     """средняя фаза атак относительно сетки 1/16 (мс) и её устойчивость R (0 — атаки как попало, 1 — все в одной фазе)"""
     x, _ = librosa.load(path, sr=sr, mono=True); on = librosa.onset.onset_detect(y=x, sr=sr, units='time', delta=delta)
@@ -181,7 +195,9 @@ def make_track(pack_dir, genre, seed, work, sing, smp, drums='kit', target=-10.0
     except TypeError: raw = sing(open(W('beat.mp3'), 'rb').read(), bpm)
     open(W('vox_raw.mp3'), 'wb').write(raw); tick('голос')
     x, _ = librosa.load(W('vox_raw.mp3'), sr=voxprep.SR, mono=True); y, vinfo = voxprep.prep(x, bpm, raw=True); sf.write(W('vox.wav'), y, voxprep.SR, subtype='PCM_24')
-    sh, c0, c1, pk = key_fix(W('vox.wav'), chb, k, md, ks); vinfo.update(key=key, key_conf=round(ks, 2), key_fit=c0, shift=sh, key_fit_after=c1, vox_peak=pk)
+    sh0, c0, c1, pk = key_fix(W('vox.wav'), chb, k, md, ks)   # старая оценка по гамме — только в журнал
+    sh, h0, h1 = chord_fix(W('beat.wav'), W('vox.wav')); vinfo.update(key=key, key_conf=round(ks, 2), scale_shift=sh0, shift=sh, chord_fit=h0, chord_fit_after=h1, vox_peak=pk)
+    c0, c1 = h0, h1
     if sh: pshift(W('vox.wav'), W('vox_k.wav'), sh); os.replace(W('vox_k.wav'), W('vox.wav')); log('  голос не в тональности: сдвиг %+d пт (%.2f → %.2f)' % (sh, c0, c1))
     # тональность для автотюна: если бит читается плохо — выбираем ту, что лучше объясняет и бит, и голос вместе
     ka, ma = k, md

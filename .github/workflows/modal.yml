@@ -112,7 +112,7 @@ jobs:
           for i in $(seq 1 40); do [ "$(curl -s -L -o /dev/null -w "%{http_code}" "$U/ping" --max-time 200)" = 200 ] && break; sleep 5; done; echo "сервер проснулся"
           T0=$(date +%s)
           one() { S=$1; for a in 1 2 3; do curl -s -o /tmp/r$S.json -X POST "$U/track" -H "Content-Type: application/json" -H "X-Key: $K" -d "{\"genre\":\"auto\",\"lang\":\"auto\",\"seed\":$S,\"debug\":true}" --max-time 120; grep -q '"id"' /tmp/r$S.json && break; sleep 5; done
-            ID=$(python3 -c "import json; print(json.load(open('/tmp/r$S.json'))['id'])") || return
+            ID=$(python3 -c "import json; print(json.load(open('/tmp/r$S.json'))['id'])") || { echo "seed $S: POST не дал id: $(head -c 300 /tmp/r$S.json)"; return; }
             for i in $(seq 1 320); do C=$(curl -s -o /tmp/j$S -w "%{http_code}" "$U/job/$ID" -H "X-Key: $K" --max-time 120); [ "$C" = 202 ] || [ "$C" = 000 ] || break; sleep 4; done; mv /tmp/j$S /tmp/tt/track_s$S.mp3
             echo "seed $S: код $C, $(stat -c %s /tmp/tt/track_s$S.mp3) байт, $(( $(date +%s) - T0 )) с"; }
           [ -n "$SEEDS" ] && [ -z "${SEEDS//[0-9 ]/}" ] || SEEDS="101 102 103"
