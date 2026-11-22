@@ -206,7 +206,6 @@ def build(pack_dir, genre, seed, smp, out_wav, drums='kit', vox=None, voxvol=0.0
         for t_, d_, nm in vitems:
             for k, (p0, p1) in enumerate(ph):
                 if not (t_ - BAR * .5 <= p0 < t_ + d_ - .3) or p1 - p0 < .25: continue
-                if nm == 'verse' and RV.random() < .22 and k % 3 == 2: continue
                 t2 = max(0, p0 - .06); e2 = min(p1 + .35, dur)
                 vl.append((dict(t=t2, d=e2 - t2, v=1.0, rate=1.0, off=t2, fi=.05, fo=.3), nm))
         tracks.append(dict(name='vox', kind='audio', file=os.path.abspath(vox), items=[x for x, _ in vl], lvl=0, vol=voxvol, pan=0))

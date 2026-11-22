@@ -213,7 +213,7 @@ class AceLego:
             seed = seed0 if att == 0 else (abs(seed0) + 7919 * att if seed0 >= 0 else -1)
             p = GenerationParams(task_type='lego', src_audio='/tmp/beat.mp3', instruction='Generate the vocals track based on the audio context:',
                                  caption=('vc2, ' if voice > 0 else '') + q.get('caption', 'female vocal in Russian'), lyrics=q.get('lyrics', ''), bpm=q.get('bpm') or None,
-                                 vocal_language=q.get('lang', 'ru'), repainting_start=0.0, repainting_end=-1, inference_steps=int(q.get('steps', 30)), seed=seed, reference_audio=ref)
+                                 vocal_language=q.get('lang', 'ru'), keyscale=q.get('key') or '', repainting_start=0.0, repainting_end=-1, inference_steps=int(q.get('steps', 30)), seed=seed, reference_audio=ref)
             r = generate_music(self.dit, self.lm, p, GenerationConfig(batch_size=1, audio_format='wav', use_random_seed=seed < 0), save_dir='/tmp/lg')
             if not (r.success and r.audios): raise RuntimeError(str(getattr(r, 'error', r)))
             print('lego: генерация %.0f с (шагов %s)' % (time.time() - T0, q.get('steps', 30)), flush=True)
@@ -308,6 +308,24 @@ LYR_BANK = {
            ('Цифровой рассвет в экране|Я проснулась в шуме волн|Все слова теряют вес|Но я слышу только тебя', 'Свети, мой далёкий сигнал|Мы навсегда на одной волне|Пой со мной, пока горит свет|Мелодия не умрёт')]}
 
 
+def lyrics_for(sections, V, seed):
+    """текст под форму бита: интро/аутро без слов, куплет — строки куплета (строка на 2 такта), хук — припев, брейк — 2 строки припева тихо.
+    Так ACE поёт там же, где бит развивается, а не сплошняком поверх всего."""
+    import random
+    R = random.Random(seed * 17 + 3); v = V['vlines'][:]; c = V['clines']; out = []; vi = 0
+    for nm, bars in sections:
+        n = max(2, bars // 2)
+        if nm == 'intro': out.append('[Intro]')
+        elif nm == 'outro': out.append('[Outro]')
+        elif nm == 'verse':
+            L = [v[(vi + i) % len(v)] for i in range(n)]; vi += n
+            if vi >= len(v): R.shuffle(v); vi = 0
+            out.append('[Verse]\n' + '\n'.join(L))
+        elif nm == 'hook': out.append('[Chorus]\n' + '\n'.join(c[i % len(c)] for i in range(n)))
+        elif nm == 'break': out.append('[Bridge]\n' + '\n'.join(c[:2]))
+    return '\n\n'.join(out)
+
+
 def pick_vocal(seed, lang, genre='auto'):
     """тембр, язык, текст, сила голоса и сид вокала — детерминированно из сида трека (каждый новый сид — новое сочетание)"""
     import random
@@ -316,14 +334,14 @@ def pick_vocal(seed, lang, genre='auto'):
     pool = TIMBRES if genre not in ('rage', 'phonk', 'drill', 'trap') else [TIMBRES[i] for i in (2, 3, 4)]   # тёмные жанры — холоднее и ближе, без «конфетных» тембров
     tim, f0max = R.choice(pool); v, c = R.choice(LYR_BANK[lang]); V = v.split('|'); C = c.split('|'); R.shuffle(V) if R.random() < .35 else None
     lyr = '[Verse]\n' + '\n'.join(V) + '\n\n[Chorus]\n' + '\n'.join(C) + '\n\n[Verse]\n' + '\n'.join(R.sample(V, len(V))) + '\n\n[Chorus]\n' + '\n'.join(C)
-    return dict(lang=lang, timbre=tim, f0max=f0max, lyrics=lyr, vseed=R.randrange(1, 99999), voice=round(R.uniform(.75, 1.0), 2))
+    return dict(lang=lang, timbre=tim, f0max=f0max, lyrics=lyr, vlines=V, clines=C, vseed=R.randrange(1, 99999), voice=round(R.uniform(.75, 1.0), 2))
 
 
 # ---- Трек целиком: бит из пака в Reaper → ACE-вокал → сведение и мастер (CPU-контейнер с Reaper) ----
 _SRV = os.path.dirname(os.path.abspath(__file__))
 mix_image = (
     modal.Image.debian_slim(python_version='3.11')
-    .apt_install('curl', 'xz-utils', 'xvfb', 'ffmpeg', 'libsndfile1', 'libgtk-3-0', 'libasound2', 'procps')
+    .apt_install('curl', 'xz-utils', 'xvfb', 'ffmpeg', 'libsndfile1', 'libgtk-3-0', 'libasound2', 'procps', 'rubberband-cli')
     .pip_install('numpy<2', 'scipy', 'soundfile', 'librosa==0.10.2.post1', 'fastapi[standard]')
     .run_commands(
         "U=$(curl -sL https://www.reaper.fm/download.php | grep -oE 'files/[0-9.x]+/reaper[0-9a-z_]+_linux_x86_64\\.tar\\.xz' | head -1); echo \"Reaper: $U\"; "
@@ -351,13 +369,21 @@ class Mixer:
         if q.get('lyrics') and V['lang'] == 'ru': V['lyrics'] = q['lyrics']
         print('голос:', json.dumps({k: V[k] for k in ('lang', 'timbre', 'f0max', 'vseed', 'voice')}, ensure_ascii=False), flush=True)
 
-        def sing(beat_mp3, bpm):
-            qq = dict(beat_b64=base64.b64encode(beat_mp3).decode(), bpm=bpm, lang=V['lang'], lyrics=V['lyrics'], caption=VOC_CAP[V['lang']] + ', ' + V['timbre'] + ', clear diction, J-pop',
+        def sing(beat_mp3, bpm, key=None, sections=None):
+            lyr = V['lyrics'] if (q.get('lyrics') or not sections) else lyrics_for(sections, V, seed)
+            print('текст:', lyr.replace('\n', ' / ')[:300], '| тональность:', key, flush=True)
+            qq = dict(beat_b64=base64.b64encode(beat_mp3).decode(), bpm=bpm, key=key or '', lang=V['lang'], lyrics=lyr, caption=VOC_CAP[V['lang']] + ', ' + V['timbre'] + ', clear diction, J-pop',
                       seed=V['vseed'], voice=float(q.get('voice', V['voice'])), sex='f', steps=int(q.get('steps', 30)), f0max=float(V['f0max']), tries=3)
             return AceLego().lego.remote(qq)
         work = tempfile.mkdtemp(prefix='trk')
         mp3, info = track.make_track(f'{VOL}/pack/{PACK}', g, seed, work, sing, '/app/smp', q.get('drums', 'kit'), log=lambda m: print(m, flush=True))
         print('трек:', json.dumps(info, ensure_ascii=False), flush=True)
+        if q.get('debug'):   # для проверки: стемы и замеры в том /dbg/s<seed>
+            import shutil
+            dd = f'{VOL}/dbg/s{seed}'; shutil.rmtree(dd, ignore_errors=True); os.makedirs(dd)
+            for n in ('beat.mp3', 'vox_raw.mp3'):
+                if os.path.exists(os.path.join(work, n)): shutil.copy(os.path.join(work, n), dd)
+            json.dump(dict(info, voice=V['timbre'], lang=V['lang']), open(dd + '/info.json', 'w'), ensure_ascii=False, indent=1); vol.commit()
         return mp3
 
 

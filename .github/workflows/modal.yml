@@ -111,12 +111,14 @@ jobs:
           U=https://fantasydrawingart--track-studio-ace-ace-web.us-east.modal.run; mkdir -p o /tmp/tt
           for i in $(seq 1 40); do [ "$(curl -s -L -o /dev/null -w "%{http_code}" "$U/ping" --max-time 200)" = 200 ] && break; sleep 5; done; echo "сервер проснулся"
           T0=$(date +%s)
-          one() { S=$1; curl -s -o /tmp/r$S.json -X POST "$U/track" -H "Content-Type: application/json" -H "X-Key: $K" -d "{\"genre\":\"auto\",\"lang\":\"auto\",\"seed\":$S}" --max-time 120
+          one() { S=$1; curl -s -o /tmp/r$S.json -X POST "$U/track" -H "Content-Type: application/json" -H "X-Key: $K" -d "{\"genre\":\"auto\",\"lang\":\"auto\",\"seed\":$S,\"debug\":true}" --max-time 120
             ID=$(python3 -c "import json; print(json.load(open('/tmp/r$S.json'))['id'])") || return
-            for i in $(seq 1 200); do C=$(curl -s -o /tmp/tt/track_s$S.mp3 -w "%{http_code}" "$U/job/$ID" -H "X-Key: $K" --max-time 120); [ "$C" = 202 ] || break; sleep 4; done
+            for i in $(seq 1 320); do C=$(curl -s -o /tmp/tt/track_s$S.mp3 -w "%{http_code}" "$U/job/$ID" -H "X-Key: $K" --max-time 120); [ "$C" = 202 ] || break; sleep 4; done
             echo "seed $S: код $C, $(stat -c %s /tmp/tt/track_s$S.mp3) байт, $(( $(date +%s) - T0 )) с"; }
           [ -n "$SEEDS" ] && [ -z "${SEEDS//[0-9 ]/}" ] || SEEDS="101 102 103"
           for S in $SEEDS; do one $S & done; wait
+          mkdir -p /tmp/tt/st; for S in $SEEDS; do rm -rf /tmp/dg; modal volume get ts-ace /dbg/s$S /tmp/dg >/dev/null 2>&1 || continue
+            for f in $(find /tmp/dg -type f); do cp "$f" /tmp/tt/st/s${S}_$(basename "$f"); done; done; ls /tmp/tt/st
           if [ -n "$GEMINI_API_KEY" ]; then pip install -q google-genai && python3 tools/listen_track.py /tmp/tt || echo "уши: ошибка"; fi
           bash tools/enc_out.sh /tmp/tt o
           cd o && git init -q -b modal-out && git config user.name gha && git config user.email gha@users.noreply.github.com
