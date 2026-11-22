@@ -10,7 +10,7 @@ import pack as packmod, voxprep
 REAPER = os.environ.get('TS_REAPER', '/opt/REAPER/reaper'); BUILD = os.environ.get('TS_BUILD_LUA', os.path.join(HERE, '..', 'reaper', 'build.lua'))
 
 
-def reaper_render(lua, wav, log, mg=0.0, nomaster=False, timeout=200):
+def reaper_render(lua, wav, log, mg=0.0, nomaster=False, timeout=200, _try=0):
     """headless-рендер проекта build.lua: ждём строку «РЕНДЕР ГОТОВ» в логе, потом глушим Reaper"""
     for f in (wav, log):
         if os.path.exists(f): os.remove(f)
@@ -26,9 +26,14 @@ def reaper_render(lua, wav, log, mg=0.0, nomaster=False, timeout=200):
         if os.path.exists(log) and 'РЕНДЕР ГОТОВ' in open(log, errors='replace').read(): break
         time.sleep(.5)
     time.sleep(1)
-    subprocess.run(['pkill', '-f', REAPER], check=False); subprocess.run(['pkill', 'Xvfb'], check=False)
+    import signal
+    try: os.killpg(p.pid, signal.SIGTERM)   # глушим только свой Reaper и свой Xvfb (pkill всех ронял соседний рендер)
+    except Exception: pass
     try: p.wait(timeout=5)
-    except Exception: p.kill()
+    except Exception:
+        try: os.killpg(p.pid, signal.SIGKILL)
+        except Exception: pass
+    if not os.path.exists(wav) and _try < 1: time.sleep(2); return reaper_render(lua, wav, log, mg, nomaster, timeout, _try + 1)
     if not os.path.exists(wav):
         raise RuntimeError('Reaper не отрендерил %s: %s' % (os.path.basename(wav), open(log, errors='replace').read()[-600:] if os.path.exists(log) else 'нет лога'))
     return time.time() - t0
