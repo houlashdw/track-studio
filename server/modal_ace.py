@@ -297,7 +297,7 @@ def deboxx(v, sr):
 
 # ---- банк для «бесконечного» разнообразия вокала: тембры, темы текста (куплет×4 + припев×4), язык — случайно по сиду ----
 TIMBRES = [('soft airy slightly synthetic timbre, warm mezzo-soprano, gentle, light vibrato', 360), ('bright cute anime idol voice, youthful, sweet, light and bouncy', 400),
-           ('cool detached dreamy breathy voice, intimate, whisper-singing, soft', 330), ('clear crystalline vocaloid timbre, precise, polished, gentle', 390),
+           ('cool detached dreamy voice, intimate, soft, airy but sung with full tone', 330), ('clear crystalline vocaloid timbre, precise, polished, gentle', 390),
            ('melancholic emotional tender voice, slightly husky, soft', 330), ('energetic punchy idol pop voice, confident, vibrant, clear', 400)]
 LYR_BANK = {
     'ja': [('夜の街に光が揺れる|君の声が胸に響く|眠れない空を見上げて|星のかけらを数えてる', '走り出せ 夢のその先へ|輝く空を二人で越えて|離さないで この手を|未来まで届け'),
@@ -391,6 +391,7 @@ web_image = modal.Image.debian_slim(python_version='3.11').pip_install('fastapi[
 
 
 @app.function(image=web_image, cpu=0.25, memory=256, secrets=[modal.Secret.from_name('ts-key')], scaledown_window=300)
+@modal.concurrent(max_inputs=20)
 @modal.asgi_app(label='track-studio-ace-ace-web')
 def web():
     """лёгкий веб без GPU: принимает запросы сразу (раньше веб жил в GPU-классе и сам ждал загрузки модели — лишний холодный старт)"""

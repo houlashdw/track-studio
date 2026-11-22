@@ -61,7 +61,7 @@ def seed_tag(R): return '%x' % (id(R) & 0xffff)
 def make_form(R, genre):
     """случайная структура: список секций (имя, такты, барабаны, 808, мелодия, вокал, слой); интро/хуки/куплеты разной длины, иногда брейк и билд"""
     S = lambda name, bars, **k: dict(name=name, bars=bars, drums=k.get('drums', 'full'), b808=k.get('b808', True), mel=k.get('mel', 1.0), vox=k.get('vox', False), layer=k.get('layer', False), loop=k.get('loop', 0), hv=k.get('hv', 'A'))
-    F = [S('intro', R.choice([2, 4, 4]), drums=R.choice(['hats', 'light']), b808=R.random() < .5, mel=.9)]
+    F = [S('intro', R.choice([4, 4, 4, 8]), drums=R.choice(['hats', 'light']), b808=R.random() < .5, mel=.9)]
     F.append(S('verse', 8, drums='light', mel=.8, vox=True, loop=1, hv=R.choice(['sparse', 'B'])))
     F.append(S('hook', 8, vox=True, hv=R.choice(['A', 'A', 'roll'])))
     # между хуками всегда что-то другое: второй куплет и/или брейк (два хука подряд = одна фраза 4 раза — скучно)
@@ -210,7 +210,7 @@ def build(pack_dir, genre, seed, smp, out_wav, drums='kit', vox=None, voxvol=0.0
                 if not (t_ - BAR * .5 <= p0 < t_ + d_ - .3) or p1 - p0 < .25: continue
                 if p1 > music_end + .25: continue   # фраза уходит за конец музыки — её бы обрезало на полуслове; лучше без неё
                 t2 = max(0, p0 - .06); e2 = min(p1 + .35, dur)
-                vl.append((dict(t=t2, d=e2 - t2, v=1.0 if nm == 'hook' else .85, rate=1.0, off=t2, fi=.05 if p0 > t_ + .3 else .14, fo=.3 if e2 < dur - .05 else min(2.0, (e2 - t2) * .5)), nm))   # куплет на ~1.5 дБ тише хука
+                vl.append((dict(t=t2, d=e2 - t2, v=1.0 if nm == 'hook' else .85, rate=1.0, off=t2, fi=.08 if p0 > t_ + .3 else .14, fo=.45 if e2 < dur - .05 else min(2.0, (e2 - t2) * .5)), nm))   # куплет на ~1.5 дБ тише хука
         tracks.append(dict(name='vox', kind='audio', file=os.path.abspath(vox), items=[x for x, _ in vl], lvl=0, vol=voxvol, pan=0))
         # «выброс» в эхо: хвост последнего слова каждой вокальной секции уходит в дилей и плейт и звенит через переход (обрыв голоса ACE не слышен как срез)
         thr_ = []

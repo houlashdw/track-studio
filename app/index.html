@@ -3699,11 +3699,12 @@ async function cloudReaper(key, prompt) {
   const tick = setInterval(() => { const s = Math.round((Date.now() - t0) / 1000); msg.textContent = 'Собираю трек в Reaper: бит → голос → сведение… ' + s + ' с' + (s > 150 ? ' (сервер просыпался — первый раз дольше)' : ''); }, 1000);
   try {
     for (let i = 0; ; i++) { try { const pr = await fetch(CLOUD_URL + '/ping'); if (pr.ok) break; } catch (e) { } if (i > 40) throw new Error('сервер не просыпается — проверь интернет или кредиты Modal'); await new Promise((ok) => setTimeout(ok, 5000)); }
-    const r = await fetch(CLOUD_URL + '/track', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Key': key }, body: JSON.stringify({ genre, lang, seed: 1 + Math.floor(Math.random() * 9000), lyrics: lang === 'ru' && own ? cloudLyrics() : undefined }) });
+    const body = JSON.stringify({ genre, lang, seed: 1 + Math.floor(Math.random() * 90000), lyrics: lang === 'ru' && own ? cloudLyrics() : undefined }); let r = null;
+    for (let i = 0; i < 3; i++) { try { r = await fetch(CLOUD_URL + '/track', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Key': key }, body }); if (r.status < 500) break; } catch (e) { if (i === 2) throw e; } await new Promise((ok) => setTimeout(ok, 3000)); }
     if (r.status === 401) { cloudSet('ts_ckey', ''); throw new Error('неверный ключ сервера — нажми «Создать» ещё раз и введи ключ'); }
     if (!r.ok) throw new Error('сервер: ' + r.status + ' ' + (await r.text()).slice(0, 200));
     const id = (await r.json()).id; let ab = null;
-    for (let i = 0; i < 200 && !ab; i++) { await new Promise((ok) => setTimeout(ok, 4000)); const j = await fetch(CLOUD_URL + '/job/' + id, { headers: { 'X-Key': key } }); if (j.status === 202) continue; if (!j.ok) throw new Error('сервер: ' + j.status + ' ' + (await j.text()).slice(0, 200)); ab = await j.arrayBuffer(); }
+    for (let i = 0; i < 260 && !ab; i++) { await new Promise((ok) => setTimeout(ok, 4000)); let j; try { j = await fetch(CLOUD_URL + '/job/' + id, { headers: { 'X-Key': key } }); } catch (e) { continue; } if (j.status === 202 || j.status >= 500) continue; if (!j.ok) throw new Error('сервер: ' + j.status + ' ' + (await j.text()).slice(0, 200)); ab = await j.arrayBuffer(); }
     if (!ab) throw new Error('слишком долго — попробуй ещё раз');
     CLOUD.blob = new Blob([ab], { type: 'audio/mpeg' }); if (CLOUD.url) URL.revokeObjectURL(CLOUD.url); CLOUD.url = URL.createObjectURL(CLOUD.blob);
     const au = $('#cloudAudio'); au.src = CLOUD.url; au.hidden = false; $('#cloudActs').hidden = false; au.play().catch(() => { });

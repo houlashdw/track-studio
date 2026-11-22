@@ -127,7 +127,7 @@ for _, t in ipairs(P.tracks) do
     local sat = addfx(tr, 'JS: Saturation'); if sat then setv(tr, sat, 'Amount', P.drive * 100) end
     comp(tr, -20, 4, 1, 120)
   elseif nm == 'mel' or nm == 'mel2' then   -- петля мелодии из пака: низ освобождаем под 808, чуть плотнее
-    eq(tr, {{0, 140, -10}, {0, 350, -2, 1.5}, {0, 3000, 0.5, 1}, {0, 10000, 0}}); comp(tr, -20, 2, 15, 150)
+    eq(tr, {{0, 140, -10}, {0, 350, -2, 1.5}, P.vox and {0, 2200, -3, 1.4} or {0, 3000, 0.5, 1}, {0, 10000, 0}}); comp(tr, -20, 2, 15, 150)   -- с вокалом: «карман» 1.5–3 кГц под голос
   elseif nm == 'drumloop' then   -- живые барабаны: панч и воздух, чуть склеить
     eq(tr, {{0, 60, 1.5}, {0, 400, -2, 1.5}, {0, 4000, 1, 1}, {0, 11000, 1.5}}); comp(tr, -16, 2.5, 8, 90)
   elseif nm == 'bassloop' then
@@ -135,7 +135,7 @@ for _, t in ipairs(P.tracks) do
     local sat = addfx(tr, 'JS: Saturation'); if sat then setv(tr, sat, 'Amount', P.drive * 60) end
     comp(tr, -20, 3, 3, 120)
   elseif nm == 'vox' then   -- вокалоид: воздух 5–8 кГц, придавить 2–3 кГц, мягкий компрессор (релиз ≈ 1/8 такта), без гула (срез 120 Гц сделан до Reaper)
-    eq(tr, {{0, 110, -3}, {0, 2800, -2.5, 1.2}, {0, 5200, -3.5, 1.2}, {0, 10000, 0.8}}); comp(tr, -24, 2.5, 15, math.min(500, 60000 / P.bpm * 0.5))
+    eq(tr, {{0, 110, -3}, {0, 2800, -2.5, 1.2}, {0, 5200, -3.5, 1.2}, {0, 12500, -2.5}}); comp(tr, -24, 2.5, 15, math.min(500, 60000 / P.bpm * 0.5))
   elseif nm == 'voxstk' then   -- дубли-стак на хуках: без низа и плотной середины, больше воздуха, плотнее сжаты — «обнимают» главный голос по краям
     eq(tr, {{0, 260, -12}, {0, 800, -2, 1}, {0, 2800, -3, 1.2}, {0, 9000, 2.5}}); comp(tr, -28, 4, 10, 100)
   elseif nm == 'voxdbl' then   -- октавный дубль голоса: только воздух, без низа
@@ -151,7 +151,7 @@ for _, t in ipairs(P.tracks) do
   end
   -- посылы
   local function send(dst, dbv) local s = reaper.CreateTrackSend(tr, dst); reaper.SetTrackSendInfo_Value(tr, 0, s, 'D_VOL', db(dbv)) end
-  if nm == 'vox' then send(room, -13); send(plate, -12); send(vdl, -16); send(vdr, -19) elseif nm == 'voxhook' then send(plate, -17); send(vdl, -22)
+  if nm == 'vox' then send(room, -12); send(plate, -10); send(vdl, -14); send(vdr, -17) elseif nm == 'voxhook' then send(plate, -17); send(vdl, -22)
   elseif nm == 'voxdbl' then send(room, -14); send(vdr, -16) elseif nm == 'voxstk' then send(room, -15); send(plate, -18) elseif nm == 'voxthrow' then send(vdl, -4); send(vdr, -7); send(plate, -9) elseif nm == 'fx' then send(rev, -14) elseif nm == 'mel' or nm == 'mel2' then send(rev, -16) elseif nm == 'melody' then send(rev, -10); send(dly, -14) elseif nm == 'pad' then send(rev, -8) elseif nm == 'clap' or nm == 'snare' then send(rev, -18) end
   if P.vox and room and (nm == 'mel' or nm == 'mel2' or nm == 'snare' or nm == 'clap' or nm == 'hat' or nm == 'drumloop') then send(room, -19) end   -- общая комната: голос и бит в одном пространстве
 end

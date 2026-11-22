@@ -45,7 +45,7 @@ def project(pack_dir, genre, seed, smp, wav, lua, drums='kit', vox=None, voxvol=
     open(lua, 'w').write('return ' + packmod.to_lua(R) + '\n'); return R
 
 
-def fader(bpre, vpre, want=-3.5):
+def fader(bpre, vpre, want=-4.5):
     SR = 22050; H = int(.4 * SR); ld = lambda f: librosa.load(f, sr=SR, mono=True)[0]
     def wr(x): k = len(x) // H; return np.sqrt((x[:k * H].reshape(k, H) ** 2).mean(1) + 1e-12)
     rb, rv = wr(ld(bpre)), wr(ld(vpre))
@@ -211,7 +211,7 @@ def make_track(pack_dir, genre, seed, work, sing, smp, drums='kit', target=-10.0
     subprocess.run(['ffmpeg', '-v', 'error', '-y', '-i', W('vpre.wav'), '-b:a', '160k', W('vox_fx.mp3')], check=False)
     # 4) сведение и мастер
     project(pack_dir, genre, seed, smp, W('mix.wav'), W('mix.lua'), drums, W('vox.wav'), vv, secgain=SG); reaper_render(W('mix.lua'), W('mix.wav'), W('mix.log'))
-    g = target - lufs(W('mix.wav'))
-    subprocess.run(['ffmpeg', '-v', 'error', '-y', '-i', W('mix.wav'), '-af', 'aresample=176400,volume=%.2fdB,alimiter=limit=0.89:attack=1:release=80:level=disabled,aresample=44100,afade=t=in:d=0.08,afade=t=out:st=%.2f:d=3.5' % (g, max(0, R['total'] - 3.6)), '-b:a', '192k', W('mix.mp3')], check=True); tick('мастер')
+    g = target - lufs(W('mix.wav'))   # громкость; затухание — на всё аутро (3 такта + хвост), не только последние секунды
+    subprocess.run(['ffmpeg', '-v', 'error', '-y', '-i', W('mix.wav'), '-af', 'aresample=176400,volume=%.2fdB,alimiter=limit=0.89:attack=1:release=80:level=disabled,aresample=44100,afade=t=in:d=0.08,afade=t=out:st=%.2f:d=%.2f' % (g, max(0, R['total'] - 2.5 - 3 * 240 / bpm), 3 * 240 / bpm + 2.5), '-b:a', '192k', W('mix.mp3')], check=True); tick('мастер')
     info = dict(R['info'], genre=R.get('genre', genre), sec_before=lv0, sec_gain=[round(g, 1) for g in SG], vox=vinfo, fader=round(vv, 1), loud=round(lufs(W('mix.mp3')), 1), t=T)
     return open(W('mix.mp3'), 'rb').read(), info
