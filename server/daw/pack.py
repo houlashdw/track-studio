@@ -177,6 +177,8 @@ def build(pack_dir, genre, seed, smp, out_wav, drums='kit', vox=None, voxvol=0.0
             for q in range(4):
                 mels.setdefault(mf, []).append(dict(t=t0 + nb * BAR - T + q * S16, d=S16 * .92, v=sec['mel'] * (.6 + .15 * q), rate=it['rate'], pp=True, pitch=pitch, fi=.002, fo=.012, loop=False, off=it.get('off', 0)))
         mels.setdefault(mf, []).append(it)
+        if genre in ('rage', 'phonk') and sec['name'] == 'hook' and not sec['layer']:   # рейдж/фонк: мелодия на хуке ярче — та же петля октавой выше поверх
+            lay.append((mf, dict(t=t0, d=it['d'], v=.42, rate=it['rate'], pp=True, pitch=pitch + 12, fi=.05, fo=.05, loop=True, off=it.get('off', 0))))
         if sec['layer'] and len(MEL) > 1:   # слой: вторая петля тихо поверх на большом хуке
             L2 = MEL[-1] if MEL[-1] is not M else MEL[1]; lay.append((os.path.abspath(os.path.join(pack_dir, L2['files']['mel'])),
                 dict(t=t0, d=nb * BAR, v=.55, rate=bpm / L2['bpm'], pp=True, pitch=shift + semis(A['key'], L2['key']) + (12 if R.random() < .3 else 0), fi=.2, fo=.05, loop=True)))

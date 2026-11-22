@@ -326,15 +326,29 @@ def lyrics_for(sections, V, seed):
     return '\n\n'.join(out)
 
 
+# голос под жанр: тембр (+ верх f0), сила автотюна, перегруз голоса. Бит агрессивный — и голос должен быть таким же, иначе «бит один, голос другой»
+GENRE_VOX = {
+    'rage': [('energetic aggressive rage vocal, hyper, punchy, intense, bright, heavy auto-tune, confident, shouty melodic flow', 400, 1.0, .55),
+             ('hyperpop rage female vocal, loud, glitchy, bright, hard auto-tune, energetic, defiant', 400, 1.0, .5)],
+    'phonk': [('dark gritty aggressive vocal, low register, hazy, menacing, confident, rhythmic', 330, .8, .45),
+              ('cold detached dark vocal, low and breathy-free, hypnotic, rhythmic chant', 330, .8, .35)],
+    'drill': [('dark cold confident melodic drill vocal, sharp, rhythmic, mid-low register, sliding notes', 350, .85, .2),
+              ('moody menacing melodic vocal, tight rhythm, confident, auto-tuned, dark', 350, .9, .25)],
+    'trap': [('melodic auto-tuned trap vocal, emotional, smooth, confident, catchy', 370, .95, .15),
+             ('confident vibrant melodic trap vocal, clear, full-bodied, auto-tune, energetic', 370, .95, .15)],
+    'plugg': [('dreamy sweet melodic plugg vocal, airy, playful, light auto-tune, bouncy', 380, .9, 0),
+              ('soft floaty melodic vocal, sweet, laid-back, light auto-tune, warm', 360, .9, 0)]}
+
+
 def pick_vocal(seed, lang, genre='auto'):
     """тембр, язык, текст, сила голоса и сид вокала — детерминированно из сида трека (каждый новый сид — новое сочетание)"""
     import random
     R = random.Random(seed * 7919 + 13)
     if lang not in ('ja', 'ru'): lang = 'ja' if R.random() < .7 else 'ru'
-    pool = TIMBRES if genre not in ('rage', 'phonk', 'drill', 'trap') else [TIMBRES[i] for i in (2, 3, 4)]   # тёмные жанры — холоднее и ближе, без «конфетных» тембров
-    tim, f0max = R.choice(pool); v, c = R.choice(LYR_BANK[lang]); V = v.split('|'); C = c.split('|'); R.shuffle(V) if R.random() < .35 else None
+    tim, f0max, tune, vdrive = R.choice(GENRE_VOX[genre]) if genre in GENRE_VOX else R.choice(TIMBRES) + (.85, 0)
+    tim += ', female anime vocaloid voice'; v, c = R.choice(LYR_BANK[lang]); V = v.split('|'); C = c.split('|'); R.shuffle(V) if R.random() < .35 else None
     lyr = '[Verse]\n' + '\n'.join(V) + '\n\n[Chorus]\n' + '\n'.join(C) + '\n\n[Verse]\n' + '\n'.join(R.sample(V, len(V))) + '\n\n[Chorus]\n' + '\n'.join(C)
-    return dict(lang=lang, timbre=tim, f0max=f0max, lyrics=lyr, vlines=V, clines=C, vseed=R.randrange(1, 99999), voice=round(R.uniform(.75, 1.0), 2))
+    return dict(lang=lang, timbre=tim, f0max=f0max, tune=tune, vdrive=vdrive, lyrics=lyr, vlines=V, clines=C, vseed=R.randrange(1, 99999), voice=round(R.uniform(.75, 1.0), 2))
 
 
 # ---- Трек целиком: бит из пака в Reaper → ACE-вокал → сведение и мастер (CPU-контейнер с Reaper) ----
@@ -365,9 +379,12 @@ class Mixer:
         sys.path.insert(0, '/app/daw')
         os.environ['TS_BUILD_LUA'] = '/app/reaper/build.lua'
         import track
-        g = q.get('genre', 'auto'); seed = int(q.get('seed', 1)); V = pick_vocal(seed, q.get('lang', 'auto'), g)
+        import random as _r
+        seed = int(q.get('seed', 1)); g = q.get('genre', 'auto')
+        if g not in track.packmod.GENRES: g = _r.Random(seed).choice(track.packmod.GENRES)   # жанр решаем ДО голоса, чтобы голос был под бит
+        V = pick_vocal(seed, q.get('lang', 'auto'), g)
         if q.get('lyrics') and V['lang'] == 'ru': V['lyrics'] = q['lyrics']
-        print('голос:', json.dumps({k: V[k] for k in ('lang', 'timbre', 'f0max', 'vseed', 'voice')}, ensure_ascii=False), flush=True)
+        print('голос:', json.dumps({k: V[k] for k in ('lang', 'timbre', 'f0max', 'tune', 'vdrive', 'vseed', 'voice')}, ensure_ascii=False), flush=True)
 
         def sing(beat_mp3, bpm, key=None, sections=None):
             lyr = V['lyrics'] if (q.get('lyrics') or not sections) else lyrics_for(sections, V, seed)
@@ -376,7 +393,7 @@ class Mixer:
                       seed=V['vseed'], voice=float(q.get('voice', V['voice'])), sex='f', steps=int(q.get('steps', 30)), f0max=float(V['f0max']), tries=3)
             return AceLego().lego.remote(qq)
         work = tempfile.mkdtemp(prefix='trk')
-        mp3, info = track.make_track(f'{VOL}/pack/{PACK}', g, seed, work, sing, '/app/smp', q.get('drums', 'kit'), log=lambda m: print(m, flush=True))
+        mp3, info = track.make_track(f'{VOL}/pack/{PACK}', g, seed, work, sing, '/app/smp', q.get('drums', 'kit'), vstyle=dict(tune=V['tune'], drive=V['vdrive']), log=lambda m: print(m, flush=True))
         print('трек:', json.dumps(info, ensure_ascii=False), flush=True)
         if q.get('debug'):   # для проверки: стемы и замеры в том /dbg/s<seed>
             import shutil
