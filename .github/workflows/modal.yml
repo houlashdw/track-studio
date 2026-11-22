@@ -105,7 +105,7 @@ jobs:
           git add -A && git commit -q -m ep && git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" modal-out
       - name: Проба /track (как приложение)
         if: inputs.cmd == 'tracktest'
-        env: { P: '${{ secrets.KEYSTORE_PASS }}', TSK: '${{ secrets.TS_KEY }}' }
+        env: { P: '${{ secrets.KEYSTORE_PASS }}', TSK: '${{ secrets.TS_KEY }}', GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}', SEEDS: '${{ inputs.ksrc }}' }
         run: |
           K="$TSK"; [ -n "$K" ] || K=$(printf %s "$P" | sha256sum | cut -c1-32)
           U=https://fantasydrawingart--track-studio-ace-ace-web.us-east.modal.run; mkdir -p o /tmp/tt
@@ -115,7 +115,9 @@ jobs:
             ID=$(python3 -c "import json; print(json.load(open('/tmp/r$S.json'))['id'])") || return
             for i in $(seq 1 200); do C=$(curl -s -o /tmp/tt/track_s$S.mp3 -w "%{http_code}" "$U/job/$ID" -H "X-Key: $K" --max-time 120); [ "$C" = 202 ] || break; sleep 4; done
             echo "seed $S: код $C, $(stat -c %s /tmp/tt/track_s$S.mp3) байт, $(( $(date +%s) - T0 )) с"; }
-          for S in ${SEEDS:-101 102 103}; do one $S & done; wait
+          [ -n "$SEEDS" ] && [ -z "${SEEDS//[0-9 ]/}" ] || SEEDS="101 102 103"
+          for S in $SEEDS; do one $S & done; wait
+          if [ -n "$GEMINI_API_KEY" ]; then pip install -q google-genai && python3 tools/listen_track.py /tmp/tt || echo "уши: ошибка"; fi
           bash tools/enc_out.sh /tmp/tt o
           cd o && git init -q -b modal-out && git config user.name gha && git config user.email gha@users.noreply.github.com
           git add -A && git commit -q -m "track test" && git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" modal-out

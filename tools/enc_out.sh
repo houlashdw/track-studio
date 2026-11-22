@@ -4,5 +4,5 @@
 set -e; S="$1"; O="$2"; mkdir -p "$O"
 K=$(openssl rand -hex 32); export K
 printf %s "$K" | openssl pkeyutl -encrypt -pubin -inkey "$(dirname "$0")/../server/out_pub.pem" -pkeyopt rsa_padding_mode:oaep -out "$O/key.bin"
-find "$S" \( -name "*.mp3" -o -name "*.log" -o -name "*.json" \) | while read -r f; do openssl enc -aes-256-cbc -pbkdf2 -iter 200000 -salt -in "$f" -out "$O/$(basename "$f").enc" -pass env:K; done
+find "$S" \( -name "*.mp3" -o -name "*.log" -o -name "*.json" -o -name "*.md" \) | while read -r f; do openssl enc -aes-256-cbc -pbkdf2 -iter 200000 -salt -in "$f" -out "$O/$(basename "$f").enc" -pass env:K; done
 ls "$O"
