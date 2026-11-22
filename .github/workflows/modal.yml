@@ -103,15 +103,26 @@ jobs:
           bash tools/enc_out.sh /tmp/ep o
           cd o && git init -q -b modal-out && git config user.name gha && git config user.email gha@users.noreply.github.com
           git add -A && git commit -q -m ep && git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" modal-out
+      - name: Ключ для входных данных (свой текст песни шифруется им, расшифровка — только внутри прогона)
+        if: inputs.cmd == 'inkey'
+        run: |
+          umask 077; openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:3072 -out /tmp/in.pem 2>/dev/null
+          modal volume put --force ts-ace /tmp/in.pem /keys/in.pem
+          mkdir -p o && openssl pkey -in /tmp/in.pem -pubout -out o/in_pub.pem && rm -f /tmp/in.pem
+          cd o && git init -q -b in-key && git config user.name gha && git config user.email gha@users.noreply.github.com
+          git add -A && git commit -q -m key && git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" in-key
       - name: Проба /track (как приложение)
         if: inputs.cmd == 'tracktest'
-        env: { P: '${{ secrets.KEYSTORE_PASS }}', TSK: '${{ secrets.TS_KEY }}', GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}', SEEDS: '${{ inputs.ksrc }}' }
+        env: { P: '${{ secrets.KEYSTORE_PASS }}', TSK: '${{ secrets.TS_KEY }}', GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}', SEEDS: '${{ inputs.ksrc }}', LYR_ENC: '${{ inputs.tenv }}' }
         run: |
+          if [ -n "$LYR_ENC" ]; then umask 077; modal volume get ts-ace /keys/in.pem /tmp/in.pem >/dev/null
+            python3 -c "import os,base64,subprocess as S; k,e=os.environ['LYR_ENC'].split(':'); open('/tmp/lk','wb').write(base64.b64decode(k)); open('/tmp/le','wb').write(base64.b64decode(e)); p=S.run(['openssl','pkeyutl','-decrypt','-inkey','/tmp/in.pem','-pkeyopt','rsa_padding_mode:oaep','-in','/tmp/lk'],capture_output=True,check=True).stdout; S.run(['openssl','enc','-d','-aes-256-cbc','-pbkdf2','-iter','200000','-in','/tmp/le','-out','/tmp/lyr.txt','-pass','pass:'+p.decode()],check=True)"
+            rm -f /tmp/in.pem /tmp/lk; echo "свой текст: $(wc -l < /tmp/lyr.txt) строк"; fi
           K="$TSK"; [ -n "$K" ] || K=$(printf %s "$P" | sha256sum | cut -c1-32)
           U=https://fantasydrawingart--track-studio-ace-ace-web.us-east.modal.run; mkdir -p o /tmp/tt
           for i in $(seq 1 40); do [ "$(curl -s -L -o /dev/null -w "%{http_code}" "$U/ping" --max-time 200)" = 200 ] && break; sleep 5; done; echo "сервер проснулся"
           T0=$(date +%s)
-          one() { S=$1; for a in 1 2 3; do curl -s -o /tmp/r$S.json -X POST "$U/track" -H "Content-Type: application/json" -H "X-Key: $K" -d "{\"genre\":\"auto\",\"lang\":\"auto\",\"seed\":$S,\"debug\":true}" --max-time 120; grep -q '"id"' /tmp/r$S.json && break; sleep 5; done
+          one() { S=$1; for a in 1 2 3; do python3 -c "import json,os,sys; d=dict(genre='auto',lang='auto',seed=int(sys.argv[1]),debug=True); f='/tmp/lyr.txt'; d.update(lyrics=open(f).read()) if os.path.exists(f) else 0; print(json.dumps(d))" $S > /tmp/b$S.json; curl -s -o /tmp/r$S.json -X POST "$U/track" -H "Content-Type: application/json" -H "X-Key: $K" -d @/tmp/b$S.json --max-time 120; grep -q '"id"' /tmp/r$S.json && break; sleep 5; done
             ID=$(python3 -c "import json; print(json.load(open('/tmp/r$S.json'))['id'])") || { echo "seed $S: POST не дал id: $(head -c 300 /tmp/r$S.json)"; return; }
             for i in $(seq 1 320); do C=$(curl -s -o /tmp/j$S -w "%{http_code}" "$U/job/$ID" -H "X-Key: $K" --max-time 120 || true); [ "$C" = 202 ] || [ "$C" = 000 ] || break; sleep 4; done; mv /tmp/j$S /tmp/tt/track_s$S.mp3
             echo "seed $S: код $C, $(stat -c %s /tmp/tt/track_s$S.mp3) байт, $(( $(date +%s) - T0 )) с"; }

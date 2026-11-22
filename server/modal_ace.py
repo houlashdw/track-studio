@@ -308,30 +308,52 @@ LYR_BANK = {
            ('Цифровой рассвет в экране|Я проснулась в шуме волн|Все слова теряют вес|Но я слышу только тебя', 'Свети, мой далёкий сигнал|Мы навсегда на одной волне|Пой со мной, пока горит свет|Мелодия не умрёт')]}
 
 
-def lyrics_for(sections, V, seed):
+def parse_own(text):
+    """свой текст пользователя → (язык, строки куплета, строки хука). Теги [Verse]/[Chorus] уважаем; без тегов хук — повторяющиеся строки"""
+    import re
+    lang = 'ja' if re.search(r'[\u3040-\u30ff\u4e00-\u9fff]', text) else 'ru' if re.search(r'[А-Яа-яЁё]', text) else 'en'
+    if re.search(r'\[(chorus|hook|припев)', text, re.I):
+        v, c, cur = [], [], None
+        for ln in text.splitlines():
+            ln = ln.strip()
+            if not ln: continue
+            m = re.match(r'\[(.*?)\]', ln)
+            if m: cur = 'c' if re.search(r'chorus|hook|припев', m.group(1), re.I) else 'v'; continue
+            (c if cur == 'c' else v).append(ln)
+        return lang, v or c, c or v
+    L = [x.strip() for x in text.splitlines() if x.strip() and not re.fullmatch(r'\[.*\]', x.strip())]
+    st = len(L)   # первая строфа = до первого повтора первой строки
+    for i in range(1, len(L)):
+        if L[i].lower() == L[0].lower(): st = i; break
+    S = L[:st]; rp = [i for i in range(1, len(S)) if S[i].lower() == S[i - 1].lower()]
+    if rp: h0 = rp[0] - 1; return lang, S[:h0] or S[:2], S[h0:]
+    k = max(2, len(S) * 2 // 3); return lang, S[:k], S[k:] or S[-2:]
+
+
+def lyrics_for(sections, V, seed, dense=False, own=False):
     """текст под форму бита: интро/аутро без слов, куплет — строки куплета (строка на 2 такта), хук — припев, брейк — 2 строки припева тихо.
     Так ACE поёт там же, где бит развивается, а не сплошняком поверх всего."""
     import random
     R = random.Random(seed * 17 + 3); v = V['vlines'][:]; c = V['clines']; out = []; vi = 0
     for nm, bars in sections:
-        n = max(2, bars // 2)
+        n = len(V['vlines']) if own else max(2, bars if dense else bars // 2)   # rage/drill/trap — строка на такт (быстрый флоу); свой текст — куплет целиком
         if nm == 'intro': out.append('[Intro]')
         elif nm == 'outro': out.append('[Outro]')
         elif nm == 'verse':
-            L = [v[(vi + i) % len(v)] for i in range(n)]; vi += n
+            L = V['vlines'] if own else [v[(vi + i) % len(v)] for i in range(n)]; vi += n   # свой текст — строки по порядку
             if vi >= len(v): R.shuffle(v); vi = 0
             out.append('[Verse]\n' + '\n'.join(L))
-        elif nm == 'hook': out.append('[Chorus]\n' + '\n'.join(c[i % len(c)] for i in range(n)))
+        elif nm == 'hook': out.append('[Chorus]\n' + '\n'.join(c if own else [c[i % len(c)] for i in range(n)]))
         elif nm == 'break': out.append('[Bridge]\n' + '\n'.join(c[:2]))
     return '\n\n'.join(out)
 
 
 # голос под жанр: тембр (+ верх f0), сила автотюна, перегруз голоса. Бит агрессивный — и голос должен быть таким же, иначе «бит один, голос другой»
 GENRE_VOX = {
-    'rage': [('energetic aggressive rage vocal, hyper, punchy, intense, bright, heavy auto-tune, confident, shouty melodic flow', 400, 1.0, .55),
-             ('hyperpop rage female vocal, loud, glitchy, bright, hard auto-tune, energetic, defiant', 400, 1.0, .5)],
-    'phonk': [('dark gritty aggressive vocal, low register, hazy, menacing, confident, rhythmic', 330, .8, .45),
-              ('cold detached dark vocal, low and breathy-free, hypnotic, rhythmic chant', 330, .8, .35)],
+    'rage': [('energetic aggressive rage vocal, hyper, punchy, intense, bright, heavy auto-tune, confident, shouty melodic flow', 400, 1.0, .28),
+             ('hyperpop rage female vocal, loud, glitchy, bright, hard auto-tune, energetic, defiant', 400, 1.0, .25)],
+    'phonk': [('dark gritty aggressive vocal, low register, hazy, menacing, confident, rhythmic', 330, .8, .25),
+              ('cold detached dark vocal, low and breathy-free, hypnotic, rhythmic chant', 330, .8, .2)],
     'drill': [('dark cold confident melodic drill vocal, sharp, rhythmic, mid-low register, sliding notes', 350, .85, .2),
               ('moody menacing melodic vocal, tight rhythm, confident, auto-tuned, dark', 350, .9, .25)],
     'trap': [('melodic auto-tuned trap vocal, emotional, smooth, confident, catchy', 370, .95, .15),
@@ -383,13 +405,14 @@ class Mixer:
         seed = int(q.get('seed', 1)); g = q.get('genre', 'auto')
         if g not in track.packmod.GENRES: g = _r.Random(seed).choice(track.packmod.GENRES)   # жанр решаем ДО голоса, чтобы голос был под бит
         V = pick_vocal(seed, q.get('lang', 'auto'), g)
-        if q.get('lyrics') and V['lang'] == 'ru': V['lyrics'] = q['lyrics']
+        own = bool((q.get('lyrics') or '').strip()) and q['lyrics'].strip() != '[Instrumental]'
+        if own: V['lang'], V['vlines'], V['clines'] = parse_own(q['lyrics']); V['lyrics'] = q['lyrics']   # свой текст: язык по письму, куплет/хук разложены по секциям бита
         print('голос:', json.dumps({k: V[k] for k in ('lang', 'timbre', 'f0max', 'tune', 'vdrive', 'vseed', 'voice')}, ensure_ascii=False), flush=True)
 
         def sing(beat_mp3, bpm, key=None, sections=None):
-            lyr = V['lyrics'] if (q.get('lyrics') or not sections) else lyrics_for(sections, V, seed)
+            lyr = V['lyrics'] if not sections else lyrics_for(sections, V, seed, g in ('rage', 'drill', 'trap') and not own, own)
             print('текст:', lyr.replace('\n', ' / ')[:300], '| тональность:', key, flush=True)
-            qq = dict(beat_b64=base64.b64encode(beat_mp3).decode(), bpm=bpm, key=key or '', lang=V['lang'], lyrics=lyr, caption='%s song, female vocal in %s, %s' % (g, {'ja': 'Japanese', 'ru': 'Russian'}[V['lang']], V['timbre']) + (', J-pop' if g == 'plugg' else ''),
+            qq = dict(beat_b64=base64.b64encode(beat_mp3).decode(), bpm=bpm, key=key or '', lang=V['lang'], lyrics=lyr, caption='%s song, female vocal in %s, %s' % (g, {'ja': 'Japanese', 'ru': 'Russian', 'en': 'English'}.get(V['lang'], 'English'), V['timbre']) + (', fast rhythmic flow, short staccato phrases, on-beat' if g in ('rage', 'drill', 'trap') else '') + (', J-pop' if g == 'plugg' else ''),
                       seed=V['vseed'], voice=float(q.get('voice', V['voice'])), sex='f', steps=int(q.get('steps', 30)), f0max=float(V['f0max']), tries=3)
             return AceLego().lego.remote(qq)
         work = tempfile.mkdtemp(prefix='trk')
