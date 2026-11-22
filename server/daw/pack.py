@@ -58,6 +58,42 @@ def fx_wavs(dirn, BAR, R):
 def seed_tag(R): return '%x' % (id(R) & 0xffff)
 
 
+# ---- генератор барабанов по жанру: идиоматичные кик/снейр и хэты с роллами (1/32, триоли 1/16T и 1/8T). Формат как у разметки пака:
+# k/s — [[шаг 0..127 (1/16 на 8 тактов), сила]], h — [[позиция в 1/32 (может быть дробной — триоли), сила, скорость сэмпла]]
+KICKB = {'trap': [[0, 7, 10], [0, 6, 10, 11], [0, 3, 10], [0, 10, 14], [0, 7, 11, 14]],
+         'drill': [[0, 6, 10], [0, 3, 6, 10], [0, 11], [0, 6, 13], [0, 10, 11]],
+         'rage': [[0, 3, 6, 10, 11], [0, 2, 6, 10, 14], [0, 6, 7, 10, 13], [0, 3, 8, 10]],
+         'plugg': [[0, 10], [0, 7, 10], [0, 3, 10], [0, 11, 14]],
+         'phonk': [[0, 6, 10], [0, 3, 6, 10], [0, 7, 10, 11], [0, 2, 10]]}
+
+
+def gen_drums(genre, R):
+    g = genre if genre in KICKB else 'trap'; KB = KICKB[g]; a, b = R.sample(KB, 2); k, sn, h = [], [], []
+    hb = R.choice({'trap': [2, 4, 4], 'drill': [4], 'rage': [2, 2, 4], 'plugg': [4, 4, 2], 'phonk': [2, 4]}[g])   # основа хэтов: 2 = 1/16, 4 = 1/8 (в 1/32)
+    for bar in range(8):
+        kb = a if bar % 2 == 0 else (b if bar % 4 == 3 or R.random() < .5 else a)
+        for st in kb: k.append([bar * 16 + st, 1.0 if st == 0 else R.uniform(.75, .95)])
+        if g == 'drill':   # дрилл: снейр на 3-й доле, во втором такте пары — ещё и на «4-и», плюс тихие призраки
+            sn.append([bar * 16 + 8, 1.0])
+            if bar % 2 == 1: sn.append([bar * 16 + R.choice([14, 15, 11]), .85])
+            if R.random() < .4: sn.append([bar * 16 + R.choice([3, 5, 13]), .35])
+        elif g == 'phonk' and R.random() < .5: sn += [[bar * 16 + 4, .95], [bar * 16 + 12, 1.0]]
+        else:
+            sn.append([bar * 16 + 8, 1.0])
+            if g == 'plugg' and R.random() < .25: sn.append([bar * 16 + 15, .5])
+        # хэты: ровная основа + 1–2 ролла на такт в случайных долях (в конце такта чаще)
+        base = [j for j in range(0, 32, hb)]; rolls = {}
+        for beat in range(4):
+            if R.random() < (.12 + .25 * (beat == 3) + (.15 if g in ('trap', 'drill', 'rage') else 0)):
+                rolls[beat] = R.choice(['32', 't16', 't16', 't8'] if g != 'drill' else ['t16', 't8', 't8'])
+        for j in base:
+            if j // 8 not in rolls: h.append([bar * 32 + j, .85 if j % 8 == 0 else .6, 1.0])
+        for beat, kind in rolls.items():
+            n, stp = {'32': (8, 1.0), 't16': (6, 8 / 6), 't8': (3, 8 / 3)}[kind]; up = R.random() < .5
+            for q in range(n): h.append([bar * 32 + beat * 8 + q * stp, .45 + .45 * q / max(1, n - 1), 1.0 + (.18 * q / max(1, n - 1) if up else 0)])
+    return dict(k=k, s=sn, h=sorted(h), gen=True)
+
+
 def make_form(R, genre):
     """случайная структура: список секций (имя, такты, барабаны, 808, мелодия, вокал, слой); интро/хуки/куплеты разной длины, иногда брейк и билд"""
     S = lambda name, bars, **k: dict(name=name, bars=bars, drums=k.get('drums', 'full'), b808=k.get('b808', True), mel=k.get('mel', 1.0), vox=k.get('vox', False), layer=k.get('layer', False), loop=k.get('loop', 0), hv=k.get('hv', 'A'))
@@ -109,6 +145,16 @@ def build(pack_dir, genre, seed, smp, out_wav, drums='kit', vox=None, voxvol=0.0
     first = sorted(A['b808'])[0][2] if A['b808'] else 36; pa = [m if m is not None else first for m in pa]
     N808 = [[i, ln, pa[i]] for i, ln, m in B['b808']] if drums == 'loop' and B is not A and len(B['b808']) >= 4 else A['b808']
     HAT = {'A': A['steps']['h'], 'B': B['steps']['h']}
+    # битсвитч: паттерн барабанов на секцию — разметка пака или два сгенерированных под жанр; второй куплет — другой, чем первый
+    PATS = [dict(k=K, s=SN, h=None, gen=False), gen_drums(genre, R), gen_drums(genre, R)]
+    for P_ in PATS[1:]:
+        ss_ = {i for i, _ in P_['s']}; P_['k'] = [x for x in P_['k'] if x[0] not in ss_]
+        ks_ = sorted(i for i, _ in P_['k']); P_['n8'] = [[i, max(1, min(8, (ks_[q + 1] if q + 1 < len(ks_) else 128) - i)), pa[i]] for q, i in enumerate(ks_)]   # 808 по кику своего паттерна
+    order = R.sample(range(3), 3); secpat = {}; nv = 0
+    for si_, sec_ in enumerate(FM):
+        if sec_['name'] == 'verse': secpat[si_] = order[0] if nv == 0 else order[2]; nv += 1
+        elif sec_['name'] in ('hook', 'outro'): secpat[si_] = order[1]
+        else: secpat[si_] = order[0]
     fxw = fx_wavs(os.path.dirname(os.path.abspath(out_wav)) or '.', BAR, R)
     mels = {}; lay = []; dl = []; fxi = []; bl = []; vitems = []; hooks = []; dbl = []
     drumloop = os.path.abspath(os.path.join(pack_dir, B['files']['drums'])); rateB = bpm / B['bpm']
@@ -119,12 +165,17 @@ def build(pack_dir, genre, seed, smp, out_wav, drums='kit', vox=None, voxvol=0.0
         if sec['vox']: vitems.append((t0, nb * BAR, sec['name']))
         # мелодия: петля нужной секции (loop → индекс в MEL, если петель меньше — берём A); ключ и темп подгоняем
         M = MEL[min(sec['loop'], len(MEL) - 1)] if sec['name'] not in ('hook', 'break') else MEL[0]
-        stop = nxt == 'hook' and R.random() < .85
+        trn = R.choice(['stop', 'stop', 'stutter', 'stutter', 'none']) if nxt == 'hook' else 'none'; stop = trn == 'stop'
+        PT = PATS[secpat[si]]
         if sec['name'] == 'hook' and nh == 1 and len(MEL) > 1 and R.random() < .4: M = MEL[1]   # второй хук иногда на другой петле
         pitch = shift + (semis(A['key'], M['key']) if M is not A else 0)
         mf = os.path.abspath(os.path.join(pack_dir, M['files']['mel']))
         it = dict(t=t0, d=nb * BAR, v=sec['mel'], rate=bpm / M['bpm'], pp=True, pitch=pitch, fi=(nb * BAR * .2 if sec['name'] == 'intro' else .01), fo=(nb * BAR * .8 if sec['name'] == 'outro' else .02), loop=True, off=(R.choice([0, 0, 4 * 4 * (60 / M['bpm'])]) if sec['name'] != 'hook' else 0))
         if stop: it['d'] -= 2 * T   # мелодия тоже замолкает на последние 2 доли перед хуком
+        if trn == 'stutter':   # заикание мелодии: последняя доля перед хуком — 4 повтора первой шестнадцатой петли, громче к удару
+            it['d'] -= T
+            for q in range(4):
+                mels.setdefault(mf, []).append(dict(t=t0 + nb * BAR - T + q * S16, d=S16 * .92, v=sec['mel'] * (.6 + .15 * q), rate=it['rate'], pp=True, pitch=pitch, fi=.002, fo=.012, loop=False, off=it.get('off', 0)))
         mels.setdefault(mf, []).append(it)
         if sec['layer'] and len(MEL) > 1:   # слой: вторая петля тихо поверх на большом хуке
             L2 = MEL[-1] if MEL[-1] is not M else MEL[1]; lay.append((os.path.abspath(os.path.join(pack_dir, L2['files']['mel'])),
@@ -144,10 +195,11 @@ def build(pack_dir, genre, seed, smp, out_wav, drums='kit', vox=None, voxvol=0.0
                 phrase_end = (b % 4 == 3) or last
                 fill = phrase_end and sec['drums'] in ('full', 'light') and (last or R.random() < .55)
                 drop = pre and b == nb - 1 and stop   # последний такт перед хуком: стоп-тайм — бит замолкает на 2 доли, потом удар хука
-                kicks = [(i % 16, v) for i, v in K if i // 16 == lb]; sns = [(i % 16, v) for i, v in SN if i // 16 == lb]
-                hh = [(i % 32, v) for i, v in HAT[sec['hv'] if sec['hv'] in HAT else 'A'] if i // 32 == lb]
+                kicks = [(i % 16, v) for i, v in PT['k'] if i // 16 == lb]; sns = [(i % 16, v) for i, v in PT['s'] if i // 16 == lb]
+                if PT['gen']: hh = [(x[0] % 32, x[1], x[2]) for x in PT['h'] if int(x[0] // 32) == lb]
+                else: hh = [(i % 32, v, 1.0) for i, v in HAT[sec['hv'] if sec['hv'] in HAT else 'A'] if i // 32 == lb]
                 if sec['hv'] == 'sparse': hh = [x for x in hh if x[0] % 4 == 0 or R.random() < .35]
-                if sec['hv'] == 'roll' and b % 2 == 1: hh += [(j, .5 + .4 * (j - 24) / 8) for j in range(24, 32) if R.random() < .85]
+                if sec['hv'] == 'roll' and b % 2 == 1 and not PT['gen']: hh += [(j, .5 + .4 * (j - 24) / 8, 1.0) for j in range(24, 32) if R.random() < .85]
                 if sec['drums'] == 'kick': sns = []; hh = []
                 if sec['drums'] == 'hats': kicks = []; sns = []
                 if sec['drums'] == 'light': sns = [x for x in sns]; kicks = [x for x in kicks if x[0] % 16 < 12 or R.random() < .5]
@@ -156,7 +208,7 @@ def build(pack_dir, genre, seed, smp, out_wav, drums='kit', vox=None, voxvol=0.0
                     kicks = [x for x in kicks if x[0] < 12]
                     if kind == 'roll': sns = [x for x in sns if x[0] < 12] + [(s, .55 + .15 * (s - 12)) for s in (12, 13, 14, 15)]
                     elif kind == 'double': sns = [x for x in sns if x[0] < 8] + [(s, .7 + .05 * k_) for k_, s in enumerate((8, 10, 12, 13, 14, 15))]
-                    else: hh = [x for x in hh if x[0] < 16] + [(j, .45 + .5 * (j - 16) / 16) for j in range(16, 32)]
+                    else: hh = [x for x in hh if x[0] < 16] + [(j, .45 + .5 * (j - 16) / 16, 1.0 + .2 * (j - 16) / 16) for j in range(16, 32)]
                 if drop: kicks = [x for x in kicks if x[0] < 8]; sns = [x for x in sns if x[0] < 8]; hh = [x for x in hh if x[0] < 16]
                 if sec['name'] == 'hook' and R.random() < .3 and not drop:   # призрачный кик в хуке
                     g = R.choice([3, 6, 7, 11, 14]);
@@ -164,13 +216,12 @@ def build(pack_dir, genre, seed, smp, out_wav, drums='kit', vox=None, voxvol=0.0
                 for i, v in kicks:
                     hit('kick', tb + i * S16 + (sw if i % 2 and i not in (0, 4, 8, 12) else 0), v * R.uniform(.92, 1.05))
                 for i, v in sns: hit('snare', tb + i * S16 + R.uniform(-.002, .004), v * R.uniform(.9, 1.0))
-                for j, v in hh:
-                    off = (j % 2) * S16 / 2 + (j // 2) * S16 * 0   # 1/32 внутри шестнадцатой
+                for j, v, hr in hh:
                     tt = tb + (j / 2) * S16 + (sw if (j // 2) % 2 and j % 2 == 0 else 0) + R.uniform(-.004, .004)
-                    hit('hat', tt, (.55 + .45 * v) * R.uniform(.82, 1.0) * (.85 if sec['drums'] == 'light' else 1))
+                    hit('hat', tt, (.55 + .45 * v) * R.uniform(.82, 1.0) * (.85 if sec['drums'] == 'light' else 1), None, hr)
                 if sec['name'] == 'hook' and 'ohat' in kit and b % 2 == 1 and R.random() < .35 and not fill: hit('ohat', tb + 14 * S16, .7)
                 if sec['b808'] and not use_bassloop and sec['drums'] != 'hats':
-                    for i, ln, m in N808:
+                    for i, ln, m in (PT['n8'] if PT['gen'] else N808):
                         if i // 16 != lb: continue
                         m += shift
                         while m > 50: m -= 12
