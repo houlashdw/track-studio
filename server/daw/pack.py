@@ -75,7 +75,7 @@ def make_form(R, genre):
     return F
 
 
-def build(pack_dir, genre, seed, smp, out_wav, drums='kit', vox=None, voxvol=0.0):
+def build(pack_dir, genre, seed, smp, out_wav, drums='kit', vox=None, voxvol=0.0, secgain=None):
     R = random.Random(seed)
     if genre == 'auto': genre = R.choice(GENRES)
     P = json.load(open(os.path.join(pack_dir, 'pack.json')))
@@ -223,6 +223,12 @@ def build(pack_dir, genre, seed, smp, out_wav, drums='kit', vox=None, voxvol=0.0
         if t['name'] in ('vox', 'voxhook', 'voxdbl', 'voxstk'): continue
         r = arms(t['file'], None if t['name'] in ('mel', 'mel2', 'bassloop', 'drumloop', 'fx') else .35)
         t['vol'] = float(np.clip(t['lvl'] - 20 * np.log10(r + 1e-9), -40, 18))
+    if secgain:   # энергетическая кривая формы: поправка громкости бита по секциям (дБ, из замера первого рендера)
+        ed = np.cumsum([0] + [x['bars'] for x in FM]) * BAR
+        for t in tracks:
+            if t['name'] in ('vox', 'voxhook', 'voxdbl', 'voxstk'): continue
+            for it in t['items']:
+                i = int(np.clip(np.searchsorted(ed, it['t'] + 1e-3, 'right') - 1, 0, len(FM) - 1)); it['v'] = it.get('v', 1.0) * 10 ** (secgain[i] / 20)
     struct = ' '.join('%s%d%s' % (x['name'][0] + ('H' if x['name'] == 'hook' else ''), x['bars'], '+' if x['layer'] else '') for x in FM)
     info = dict(drums=drums, genre=genre, A=A['id'], B=B['id'], mels=[m_['id'] for m_ in MEL], bpm=bpm, key=A['key'] + ' ' + A['mode'], shift=shift, swing=round(sw / S16, 2), form=struct, kit={c: kit[c]['f'] for c in kit}, bassloop=use_bassloop)
     return dict(genre=genre, bpm=bpm, total=total, out=out_wav, tracks=tracks, info=info,

@@ -39,8 +39,8 @@ def lufs(path):
     i = r.rfind('I:'); return float(r[i + 2:].split('LUFS')[0])
 
 
-def project(pack_dir, genre, seed, smp, wav, lua, drums='kit', vox=None, voxvol=0.0, solo=None):
-    R = packmod.build(pack_dir, genre, seed, smp, wav, drums, vox, voxvol)
+def project(pack_dir, genre, seed, smp, wav, lua, drums='kit', vox=None, voxvol=0.0, solo=None, secgain=None):
+    R = packmod.build(pack_dir, genre, seed, smp, wav, drums, vox, voxvol, secgain)
     if solo: R['tracks'] = [t for t in R['tracks'] if (t['name'] in ('vox', 'voxhook', 'voxdbl', 'voxstk')) == (solo == 'vox')]
     open(lua, 'w').write('return ' + packmod.to_lua(R) + '\n'); return R
 
@@ -99,11 +99,31 @@ def pshift(inp, out, semis):
         x, sr = sf.read(inp); sf.write(out, librosa.effects.pitch_shift(x.T if x.ndim > 1 else x, sr=sr, n_steps=semis).T, sr)
 
 
+TGT = {'intro': -4.0, 'verse': -2.5, 'hook': 0.0, 'break': -6.0, 'outro': -4.0}   # громкость секций относительно хука (дБ): подъём к припеву, провал в брейке
+
+
+def sec_gain(wav, sections, bpm, sr=22050):
+    """поправки громкости по секциям (дБ), чтобы бит шёл по кривой TGT; слоёный второй хук +0.5"""
+    x, _ = librosa.load(wav, sr=sr, mono=True); bar = 240 / bpm; t = 0; L = []
+    for nm, n in sections:
+        a, b = int(t * bar * sr), int((t + n) * bar * sr); L.append(10 * np.log10((x[a:b] ** 2).mean() + 1e-12)); t += n
+    hk = [l for (nm, _), l in zip(sections, L) if nm == 'hook']; ref = float(np.mean(hk)) if hk else max(L)
+    nh = 0; g = []
+    for (nm, _), l in zip(sections, L):
+        tg = TGT.get(nm, -2.0)
+        if nm == 'hook': tg += .5 * nh; nh += 1
+        g.append(float(np.clip(tg - (l - ref), -8, 6)))
+    return g, [round(l - ref, 1) for l in L]
+
+
 def make_track(pack_dir, genre, seed, work, sing, smp, drums='kit', target=-10.0, log=print):
     os.makedirs(work, exist_ok=True); W = lambda n: os.path.join(work, n); T = {}; t0 = time.time()
     tick = lambda k: (T.__setitem__(k, round(time.time() - t0, 1)), log('  ⏱ %s: %.0f с' % (k, time.time() - t0)))
     # 1) бит
     R = project(pack_dir, genre, seed, smp, W('beat.wav'), W('beat.lua'), drums); bpm = R['bpm']
+    reaper_render(W('beat.lua'), W('beat.wav'), W('beat.log'), nomaster=True)
+    SG, lv0 = sec_gain(W('beat.wav'), R['sections'], bpm); log('  секции до: %s → поправка %s' % (lv0, [round(g, 1) for g in SG]))
+    R = project(pack_dir, genre, seed, smp, W('beat.wav'), W('beat.lua'), drums, secgain=SG)
     reaper_render(W('beat.lua'), W('beat.wav'), W('beat.log')); subprocess.run(['ffmpeg', '-v', 'error', '-y', '-i', W('beat.wav'), '-b:a', '192k', W('beat.mp3')], check=True); tick('бит')
     # 2) голос
     chb = chroma(W('beat.wav')); k, md, ks = key_of(chb); key = '%s %s' % (NOTE[k], md); log('  тональность бита: %s (%.2f)' % (key, ks))
@@ -122,11 +142,11 @@ def make_track(pack_dir, genre, seed, work, sing, smp, drums='kit', target=-10.0
     tick('подгонка')
     # 3) баланс до мастера
     for nm, solo in (('bpre', 'beat'), ('vpre', 'vox')):
-        project(pack_dir, genre, seed, smp, W(nm + '.wav'), W(nm + '.lua'), drums, W('vox.wav'), 0.0, solo); reaper_render(W(nm + '.lua'), W(nm + '.wav'), W(nm + '.log'), nomaster=True)
+        project(pack_dir, genre, seed, smp, W(nm + '.wav'), W(nm + '.lua'), drums, W('vox.wav'), 0.0, solo, SG); reaper_render(W(nm + '.lua'), W(nm + '.wav'), W(nm + '.log'), nomaster=True)
     vv = fader(W('bpre.wav'), W('vpre.wav')); tick('баланс')
     # 4) сведение и мастер
-    project(pack_dir, genre, seed, smp, W('mix.wav'), W('mix.lua'), drums, W('vox.wav'), vv); reaper_render(W('mix.lua'), W('mix.wav'), W('mix.log'))
+    project(pack_dir, genre, seed, smp, W('mix.wav'), W('mix.lua'), drums, W('vox.wav'), vv, secgain=SG); reaper_render(W('mix.lua'), W('mix.wav'), W('mix.log'))
     g = target - lufs(W('mix.wav'))
     subprocess.run(['ffmpeg', '-v', 'error', '-y', '-i', W('mix.wav'), '-af', 'volume=%.2fdB,alimiter=limit=0.966:attack=3:release=60:level=disabled' % g, '-b:a', '192k', W('mix.mp3')], check=True); tick('мастер')
-    info = dict(R['info'], genre=R.get('genre', genre), vox=vinfo, fader=round(vv, 1), loud=round(lufs(W('mix.mp3')), 1), t=T)
+    info = dict(R['info'], genre=R.get('genre', genre), sec_before=lv0, sec_gain=[round(g, 1) for g in SG], vox=vinfo, fader=round(vv, 1), loud=round(lufs(W('mix.mp3')), 1), t=T)
     return open(W('mix.mp3'), 'rb').read(), info
