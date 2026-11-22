@@ -102,7 +102,7 @@ def make_form(R, genre):
     F.append(S('hook', 8, vox=True, hv=R.choice(['A', 'A', 'roll'])))
     # между хуками всегда что-то другое: второй куплет и/или брейк (два хука подряд = одна фраза 4 раза — скучно)
     mid = R.choice(['verse', 'verse', 'break+verse', 'break'])
-    if 'break' in mid: F.append(S('break', R.choice([2, 4]), drums='none', b808=False, mel=.9, vox=True, loop=0))
+    if 'break' in mid: F.append(S('break', R.choice([2, 4]), drums='hats', b808=True, mel=.95, vox=True, loop=0))
     if 'verse' in mid: F.append(S('verse', 8, drums='light', mel=.8, vox=True, loop=R.choice([1, 2]), hv=R.choice(['sparse', 'B', 'roll'])))
     if mid == 'break': F[-1]['bars'] = 4
     tot = lambda: sum(x['bars'] for x in F)
@@ -150,7 +150,7 @@ def build(pack_dir, genre, seed, smp, out_wav, drums='kit', vox=None, voxvol=0.0
     for P_ in PATS[1:]:
         ss_ = {i for i, _ in P_['s']}; P_['k'] = [x for x in P_['k'] if x[0] not in ss_]
         ks_ = sorted(i for i, _ in P_['k']); P_['n8'] = [[i, max(1, min(8, (ks_[q + 1] if q + 1 < len(ks_) else 128) - i)), pa[i]] for q, i in enumerate(ks_)]   # 808 по кику своего паттерна
-    order = R.sample(range(3), 3); secpat = {}; nv = 0
+    order = [R.choice([1, 1, 2, 0])] * 3; secpat = {}; nv = 0   # один грув на весь трек (битсвитч рвал связку); разнообразие — плотность, роллы, филлы
     for si_, sec_ in enumerate(FM):
         if sec_['name'] == 'verse': secpat[si_] = order[0] if nv == 0 else order[2]; nv += 1
         elif sec_['name'] in ('hook', 'outro'): secpat[si_] = order[1]
@@ -164,39 +164,36 @@ def build(pack_dir, genre, seed, smp, out_wav, drums='kit', vox=None, voxvol=0.0
         if sec['name'] == 'hook': hooks.append((t0, nb * BAR))
         if sec['vox']: vitems.append((t0, nb * BAR, sec['name']))
         # мелодия: петля нужной секции (loop → индекс в MEL, если петель меньше — берём A); ключ и темп подгоняем
-        M = MEL[min(sec['loop'], len(MEL) - 1)] if sec['name'] not in ('hook', 'break') else MEL[0]
-        trn = R.choice(['stop', 'stop', 'stutter', 'stutter', 'none']) if nxt == 'hook' else 'none'; stop = trn == 'stop'
+        M = MEL[0]   # одна петля мелодии на весь трек — иначе на стыке секций звучит как другой трек
+        trn = R.choice(['fill', 'fill', 'drop808', 'drop808', 'stop', 'stutter']) if nxt == 'hook' else 'none'; stop = trn == 'stop'   # чаще филл и короткий провал кика/808
         PT = PATS[secpat[si]]
-        if sec['name'] == 'hook' and nh == 1 and len(MEL) > 1 and R.random() < .4: M = MEL[1]   # второй хук иногда на другой петле
         pitch = shift + (semis(A['key'], M['key']) if M is not A else 0)
         mf = os.path.abspath(os.path.join(pack_dir, M['files']['mel']))
-        it = dict(t=t0, d=nb * BAR, v=sec['mel'], rate=bpm / M['bpm'], pp=True, pitch=pitch, fi=(nb * BAR * .2 if sec['name'] == 'intro' else .01), fo=(nb * BAR * .8 if sec['name'] == 'outro' else .02), loop=True, off=(R.choice([0, 0, 4 * 4 * (60 / M['bpm'])]) if sec['name'] != 'hook' else 0))
+        it = dict(t=t0, d=nb * BAR, v=sec['mel'], rate=bpm / M['bpm'], pp=True, pitch=pitch, fi=(T if sec['name'] == 'intro' else .01), fo=(nb * BAR * .8 if sec['name'] == 'outro' else .02), loop=True, off=(R.choice([0, 0, 4 * 4 * (60 / M['bpm'])]) if sec['name'] != 'hook' else 0))
         if stop: it['d'] -= 2 * T   # мелодия тоже замолкает на последние 2 доли перед хуком
         if trn == 'stutter':   # заикание мелодии: последняя доля перед хуком — 4 повтора первой шестнадцатой петли, громче к удару
             it['d'] -= T
             for q in range(4):
                 mels.setdefault(mf, []).append(dict(t=t0 + nb * BAR - T + q * S16, d=S16 * .92, v=sec['mel'] * (.6 + .15 * q), rate=it['rate'], pp=True, pitch=pitch, fi=.002, fo=.012, loop=False, off=it.get('off', 0)))
         mels.setdefault(mf, []).append(it)
-        if genre in ('rage', 'phonk') and sec['name'] == 'hook' and not sec['layer']:   # рейдж/фонк: мелодия на хуке ярче — та же петля октавой выше поверх
+        if genre in ('rage', 'phonk') and sec['name'] == 'hook' and not (sec['layer'] and len(MEL) > 1):   # рейдж/фонк: мелодия на хуке ярче — та же петля октавой выше поверх
             lay.append((mf, dict(t=t0, d=it['d'], v=.42, rate=it['rate'], pp=True, pitch=pitch + 12, fi=.05, fo=.05, loop=True, off=it.get('off', 0))))
         if sec['layer'] and len(MEL) > 1:   # слой: вторая петля тихо поверх на большом хуке
-            L2 = MEL[-1] if MEL[-1] is not M else MEL[1]; lay.append((os.path.abspath(os.path.join(pack_dir, L2['files']['mel'])),
-                dict(t=t0, d=nb * BAR, v=.55, rate=bpm / L2['bpm'], pp=True, pitch=shift + semis(A['key'], L2['key']) + (12 if R.random() < .3 else 0), fi=.2, fo=.05, loop=True)))
+            lay.append((mf, dict(t=t0, d=it['d'], v=.4, rate=it['rate'], pp=True, pitch=pitch + 12, fi=.05, fo=.05, loop=True, off=it.get('off', 0))))
         if sec['drums'] in ('full', 'light') and drums == 'loop':
             dl.append(dict(t=t0, d=nb * BAR, v=1.0 if sec['name'] == 'hook' else .9, rate=rateB, pp=True, fi=.003, fo=.02, loop=True))
         if use_bassloop and sec['b808']:
             bl.append(dict(t=t0, d=nb * BAR, v=1.0, rate=bpm / A['bpm'], pp=True, pitch=shift, fi=.005, fo=.02, loop=True))
         # переход перед хуком: райзер на 2 такта + дроп барабанов; удар на 1-й доле хука
-        if nxt in ('hook', 'verse') and nb >= 2: fxi.append(('riser', t0 + (nb - 2) * BAR, 2 * BAR))
         if sec['name'] == 'hook':
-            fxi.append(('impact', t0, 1.6)); nh += 1
+            nh += 1
             if 'ohat' in kit: hit('ohat', t0, .9)
         if sec['drums'] in ('full', 'light', 'kick', 'hats') and drums == 'kit':
             for b in range(nb):
                 lb = b % 8; tb = t0 + b * BAR; last = b == nb - 1; pre = nxt == 'hook' and b >= nb - 2
                 phrase_end = (b % 4 == 3) or last
                 fill = phrase_end and sec['drums'] in ('full', 'light') and (last or R.random() < .55)
-                drop = pre and b == nb - 1 and stop   # последний такт перед хуком: стоп-тайм — бит замолкает на 2 доли, потом удар хука
+                drop = pre and b == nb - 1 and stop; d808 = pre and b == nb - 1 and trn == 'drop808'   # последний такт перед хуком: стоп-тайм — бит замолкает на 2 доли, потом удар хука
                 kicks = [(i % 16, v) for i, v in PT['k'] if i // 16 == lb]; sns = [(i % 16, v) for i, v in PT['s'] if i // 16 == lb]
                 if PT['gen']: hh = [(x[0] % 32, x[1], x[2]) for x in PT['h'] if int(x[0] // 32) == lb]
                 else: hh = [(i % 32, v, 1.0) for i, v in HAT[sec['hv'] if sec['hv'] in HAT else 'A'] if i // 32 == lb]
@@ -211,6 +208,7 @@ def build(pack_dir, genre, seed, smp, out_wav, drums='kit', vox=None, voxvol=0.0
                     if kind == 'roll': sns = [x for x in sns if x[0] < 12] + [(s, .55 + .15 * (s - 12)) for s in (12, 13, 14, 15)]
                     elif kind == 'double': sns = [x for x in sns if x[0] < 8] + [(s, .7 + .05 * k_) for k_, s in enumerate((8, 10, 12, 13, 14, 15))]
                     else: hh = [x for x in hh if x[0] < 16] + [(j, .45 + .5 * (j - 16) / 16, 1.0 + .2 * (j - 16) / 16) for j in range(16, 32)]
+                if d808: kicks = [x for x in kicks if x[0] < 8]
                 if drop: kicks = [x for x in kicks if x[0] < 8]; sns = [x for x in sns if x[0] < 8]; hh = [x for x in hh if x[0] < 16]
                 if sec['name'] == 'hook' and R.random() < .3 and not drop:   # призрачный кик в хуке
                     g = R.choice([3, 6, 7, 11, 14]);
@@ -228,7 +226,7 @@ def build(pack_dir, genre, seed, smp, out_wav, drums='kit', vox=None, voxvol=0.0
                         m += shift
                         while m > 50: m -= 12
                         while m < 28: m += 12
-                        if (fill and i % 16 >= 12) or (drop and i % 16 >= 8): continue
+                        if (fill and i % 16 >= 12) or ((drop or d808) and i % 16 >= 8): continue
                         if sec['name'] == 'hook' and b % 4 == 3 and R.random() < .25 and m + 12 <= 52: m += 12   # октавный «поп» в хуке
                         r8 = 440 * 2 ** ((m - 69) / 12) / hz8; d = min(d8 / r8, ln * S16 + .04)
                         hit('808', tb + (i % 16) * S16, 1.0, d, r8)

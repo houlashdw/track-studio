@@ -163,7 +163,7 @@ def pshift(inp, out, semis):
         x, sr = sf.read(inp); sf.write(out, librosa.effects.pitch_shift(x.T if x.ndim > 1 else x, sr=sr, n_steps=semis).T, sr)
 
 
-TGT = {'intro': -4.0, 'verse': -2.5, 'hook': 0.0, 'break': -6.0, 'outro': -4.0}   # громкость секций относительно хука (дБ): подъём к припеву, провал в брейке
+TGT = {'intro': -2.0, 'verse': -1.2, 'hook': 0.0, 'break': -3.0, 'outro': -2.0}   # громкость секций относительно хука (дБ): подъём к припеву, провал в брейке
 
 
 def sec_gain(wav, sections, bpm, sr=22050):
@@ -175,7 +175,7 @@ def sec_gain(wav, sections, bpm, sr=22050):
     nh = 0; g = []
     for (nm, _), l in zip(sections, L):
         tg = TGT.get(nm, -2.0)
-        if nm == 'hook': tg += .5 * nh; nh += 1
+        if nm == 'hook': tg += .3 * nh; nh += 1
         g.append(float(np.clip(tg - (l - ref), -8, 6)))
     return g, [round(l - ref, 1) for l in L]
 
