@@ -117,7 +117,7 @@ jobs:
             echo "seed $S: код $C, $(stat -c %s /tmp/tt/track_s$S.mp3) байт, $(( $(date +%s) - T0 )) с"; }
           [ -n "$SEEDS" ] && [ -z "${SEEDS//[0-9 ]/}" ] || SEEDS="101 102 103"
           for S in $SEEDS; do one $S & done; wait
-          mkdir -p /tmp/tt/st; for S in $SEEDS; do rm -rf /tmp/dg; modal volume get ts-ace /dbg/s$S /tmp/dg >/dev/null 2>&1 || continue
+          mkdir -p /tmp/tt/st; for S in $SEEDS; do rm -rf /tmp/dg; mkdir -p /tmp/dg; for n in beat.mp3 vox_raw.mp3 info.json; do modal volume get ts-ace /dbg/s$S/$n /tmp/dg/$n >/dev/null 2>&1; done
             for f in $(find /tmp/dg -type f); do cp "$f" /tmp/tt/st/s${S}_$(basename "$f"); done; done; ls /tmp/tt/st
           if [ -n "$GEMINI_API_KEY" ]; then pip install -q google-genai && python3 tools/listen_track.py /tmp/tt || echo "уши: ошибка"; fi
           bash tools/enc_out.sh /tmp/tt o
