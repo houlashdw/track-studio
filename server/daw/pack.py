@@ -75,7 +75,7 @@ def make_form(R, genre):
     return F
 
 
-def build(pack_dir, genre, seed, smp, out_wav, drums='kit', vox=None, voxvol=0.0, secgain=None):
+def build(pack_dir, genre, seed, smp, out_wav, drums='kit', vox=None, voxvol=0.0, secgain=None, xshift=0):
     R = random.Random(seed)
     if genre == 'auto': genre = R.choice(GENRES)
     P = json.load(open(os.path.join(pack_dir, 'pack.json')))
@@ -90,6 +90,7 @@ def build(pack_dir, genre, seed, smp, out_wav, drums='kit', vox=None, voxvol=0.0
     MEL = [A] + Cs[:2]
     bpm = round(A['bpm'] * R.uniform(.95, 1.05)); T = 60 / bpm; S16 = T / 4; BAR = 4 * T
     shift = R.choice([-3, -2, -1, 0, 0, 1, 2, 3])   # общий сдвиг тональности (петли и 808)
+    shift += xshift; shift = shift - 12 if shift > 6 else shift + 12 if shift < -6 else shift   # бит подстраивается под тональность голоса (голос не трогаем — без «хомяка»)
     sw = R.choice(SWING.get(genre, [0, .05])) * S16 * 2   # на сколько запаздывают нечётные шестнадцатые (свинг)
     kit = pick_kit(smp, genre, R); f = lambda c: os.path.abspath(os.path.join(smp, kit[c]['f']))
     FM = make_form(R, genre)

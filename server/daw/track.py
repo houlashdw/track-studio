@@ -39,8 +39,8 @@ def lufs(path):
     i = r.rfind('I:'); return float(r[i + 2:].split('LUFS')[0])
 
 
-def project(pack_dir, genre, seed, smp, wav, lua, drums='kit', vox=None, voxvol=0.0, solo=None, secgain=None):
-    R = packmod.build(pack_dir, genre, seed, smp, wav, drums, vox, voxvol, secgain)
+def project(pack_dir, genre, seed, smp, wav, lua, drums='kit', vox=None, voxvol=0.0, solo=None, secgain=None, xshift=0):
+    R = packmod.build(pack_dir, genre, seed, smp, wav, drums, vox, voxvol, secgain, xshift)
     if solo: R['tracks'] = [t for t in R['tracks'] if (t['name'] in ('vox', 'voxhook', 'voxdbl', 'voxstk', 'voxthrow')) == (solo == 'vox')]
     open(lua, 'w').write('return ' + packmod.to_lua(R) + '\n'); return R
 
@@ -198,7 +198,10 @@ def make_track(pack_dir, genre, seed, work, sing, smp, drums='kit', target=-10.0
     sh0, c0, c1, pk = key_fix(W('vox.wav'), chb, k, md, ks)   # старая оценка по гамме — только в журнал
     sh, h0, h1 = chord_fix(W('beat.wav'), W('vox.wav')); vinfo.update(key=key, key_conf=round(ks, 2), scale_shift=sh0, shift=sh, chord_fit=h0, chord_fit_after=h1, vox_peak=pk)
     c0, c1 = h0, h1
-    if sh: pshift(W('vox.wav'), W('vox_k.wav'), sh); os.replace(W('vox_k.wav'), W('vox.wav')); log('  голос не в тональности: сдвиг %+d пт (%.2f → %.2f)' % (sh, c0, c1))
+    XS = -sh   # голос не сдвигаем (сдвиг вверх = «хомяк»), а транспонируем бит под голос: петли и 808 едут на −sh, барабаны не меняются
+    if XS:
+        k = (k + XS) % 12; chb = np.roll(chb, XS); key = '%s %s' % (NOTE[k], md); vinfo['beat_xshift'] = XS
+        log('  голос мимо аккордов бита: бит транспонирован на %+d пт (%.3f → %.3f)' % (XS, c0, c1))
     # тональность для автотюна: если бит читается плохо — выбираем ту, что лучше объясняет и бит, и голос вместе
     ka, ma = k, md
     if ks < .45:
@@ -222,12 +225,12 @@ def make_track(pack_dir, genre, seed, work, sing, smp, drums='kit', target=-10.0
     tick('подгонка')
     # 3) баланс до мастера
     for nm, solo in (('bpre', 'beat'), ('vpre', 'vox')):
-        project(pack_dir, genre, seed, smp, W(nm + '.wav'), W(nm + '.lua'), drums, W('vox.wav'), 0.0, solo, SG); reaper_render(W(nm + '.lua'), W(nm + '.wav'), W(nm + '.log'), nomaster=True)
+        project(pack_dir, genre, seed, smp, W(nm + '.wav'), W(nm + '.lua'), drums, W('vox.wav'), 0.0, solo, SG, XS); reaper_render(W(nm + '.lua'), W(nm + '.wav'), W(nm + '.log'), nomaster=True)
     vv = fader(W('bpre.wav'), W('vpre.wav')); tick('баланс')
     subprocess.run(['ffmpeg', '-v', 'error', '-y', '-i', W('vpre.wav'), '-b:a', '160k', W('vox_fx.mp3')], check=False)
     # 4) сведение и мастер
-    project(pack_dir, genre, seed, smp, W('mix.wav'), W('mix.lua'), drums, W('vox.wav'), vv, secgain=SG); reaper_render(W('mix.lua'), W('mix.wav'), W('mix.log'))
+    project(pack_dir, genre, seed, smp, W('mix.wav'), W('mix.lua'), drums, W('vox.wav'), vv, secgain=SG, xshift=XS); reaper_render(W('mix.lua'), W('mix.wav'), W('mix.log'))
     g = target - lufs(W('mix.wav'))   # громкость; затухание — на всё аутро (3 такта + хвост), не только последние секунды
-    subprocess.run(['ffmpeg', '-v', 'error', '-y', '-i', W('mix.wav'), '-af', 'aresample=176400,volume=%.2fdB,alimiter=limit=0.89:attack=1:release=80:level=disabled,aresample=44100,afade=t=in:d=0.08,afade=t=out:st=%.2f:d=%.2f' % (g, max(0, R['total'] - 2.5 - 3 * 240 / bpm), 3 * 240 / bpm + 2.5), '-b:a', '192k', W('mix.mp3')], check=True); tick('мастер')
+    subprocess.run(['ffmpeg', '-v', 'error', '-y', '-i', W('mix.wav'), '-af', 'aresample=176400,volume=%.2fdB,alimiter=limit=0.84:attack=1:release=80:level=disabled,aresample=44100,afade=t=in:d=0.08,afade=t=out:st=%.2f:d=%.2f' % (g, max(0, R['total'] - 2.5 - 3 * 240 / bpm), 3 * 240 / bpm + 2.5), '-b:a', '192k', W('mix.mp3')], check=True); tick('мастер')
     info = dict(R['info'], genre=R.get('genre', genre), sec_before=lv0, sec_gain=[round(g, 1) for g in SG], vox=vinfo, fader=round(vv, 1), loud=round(lufs(W('mix.mp3')), 1), t=T)
     return open(W('mix.mp3'), 'rb').read(), info
