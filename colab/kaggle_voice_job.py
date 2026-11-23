@@ -14,7 +14,7 @@ def sh(c, check=True):
 sh('nvidia-smi --query-gpu=name,memory.total --format=csv || true')
 if not os.path.isdir(R): sh(f'git clone -q --depth 1 https://github.com/ACE-Step/ACE-Step-1.5.git {R}')
 sh(f'{sys.executable} -m pip install -q uv'); sh(f'cd {R} && {sys.executable} -m uv sync -q')
-sh(f'cd {R} && {sys.executable} -m uv pip install -q demucs soundfile')
+sh(f'cd {R} && {sys.executable} -m uv pip install -q --python {R}/.venv/bin/python demucs soundfile')
 sh(f'wget -q -O {R}/lego_core.py {RAW}/server/lego_core.py')
 sh(f'wget -q -O /tmp/job.enc "{os.environ["JOB_URL"]}"')
 sh('openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -in /tmp/job.enc -out /tmp/job.tgz -pass env:JOB_PASS && mkdir -p /tmp/job && tar -xzf /tmp/job.tgz -C /tmp/job')
