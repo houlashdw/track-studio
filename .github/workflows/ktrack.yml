@@ -48,7 +48,7 @@ jobs:
         env: { PUSH_URL: 'https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git' }
         run: |
           mkdir -p /tmp/tt
-          for S in ${{ inputs.seeds }}; do T0=$(date +%s); python3 tools/ktrack.py "$PACK" /tmp/tt "$S" "${{ inputs.genre }}" /tmp/lyr.txt 2>&1 | grep -vE "^\s*$" | tail -60 || echo "seed $S: ошибка"; echo "seed $S: $(( $(date +%s) - T0 )) с"; done
+          for S in ${{ inputs.seeds }}; do T0=$(date +%s); python3 tools/ktrack.py "$PACK" /tmp/tt "$S" "${{ inputs.genre }}" /tmp/lyr.txt 2>&1 | grep -vE "^\s*$" | grep -vE "QUEUED|RUNNING" | tail -120 || echo "seed $S: ошибка"; echo "seed $S: $(( $(date +%s) - T0 )) с"; done
           ls -la /tmp/tt
       - name: Уши (Gemini)
         if: inputs.listen == '1'

@@ -30,14 +30,17 @@ def kaggle_lego_many(qs):
     json.dump({'id': KREF, 'title': 'ts-voice', 'code_file': 'main.py', 'language': 'python', 'kernel_type': 'script', 'is_private': True,
                'enable_gpu': True, 'enable_internet': True, 'accelerator': 'NvidiaTeslaT4', 'dataset_sources': [KU + '/ts-adapters'],
                'competition_sources': [], 'kernel_sources': []}, open(k + '/kernel-metadata.json', 'w'))
-    try: print(run(['kaggle', 'kernels', 'push', '-p', k, '--accelerator', 'NvidiaTeslaT4'])[-300:], flush=True)
-    except subprocess.CalledProcessError: print(run(['kaggle', 'kernels', 'push', '-p', k])[-300:], flush=True)
-    time.sleep(30); st = ''
+    def push():
+        try: print(run(['kaggle', 'kernels', 'push', '-p', k, '--accelerator', 'NvidiaTeslaT4'])[-300:], flush=True)
+        except subprocess.CalledProcessError: print(run(['kaggle', 'kernels', 'push', '-p', k])[-300:], flush=True)
+    push(); time.sleep(30); st = ''; tq = time.time(); repushed = 0
     while time.time() - t0 < 40 * 60:
         try: st = run(['kaggle', 'kernels', 'status', KREF]).strip().splitlines()[-1]
         except subprocess.CalledProcessError as e: st = 'status? ' + (e.stdout or '')[-100:]
         print('%4.0f с  %s' % (time.time() - t0, st), flush=True)
         if any(x in st.lower() for x in ('complete', 'error', 'cancel')): break
+        if 'queued' in st.lower() and time.time() - tq > 360 and repushed < 2: print('очередь затянулась — отправляю ноутбук заново', flush=True); push(); tq = time.time(); repushed += 1
+        elif 'queued' not in st.lower(): tq = time.time()
         time.sleep(20)
     o = d + '/out'; os.makedirs(o); subprocess.run(['kaggle', 'kernels', 'output', KREF, '-p', o], capture_output=True, text=True)
     for lg in glob.glob(o + '/*.log'): print(open(lg, errors='replace').read()[-2500:], flush=True)
