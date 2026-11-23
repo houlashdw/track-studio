@@ -103,6 +103,16 @@ jobs:
           bash tools/enc_out.sh /tmp/ep o
           cd o && git init -q -b modal-out && git config user.name gha && git config user.email gha@users.noreply.github.com
           git add -A && git commit -q -m ep && git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" modal-out
+      - name: Пак лупов → приватный датасет Kaggle (переезд с Modal)
+        if: inputs.cmd == 'packexport'
+        env: { KU: '${{ secrets.KAGGLE_USERNAME }}', KK: '${{ secrets.KAGGLE_KEY }}' }
+        run: |
+          pip install -q -U kaggle; export KAGGLE_USERNAME="$KU" KAGGLE_KEY="$KK"; case "$KK" in KGAT*) export KAGGLE_API_TOKEN="$KK";; esac
+          mkdir -p pk && modal volume get ts-ace /pack/pack1 pk/ >/dev/null && du -sh pk && find pk -maxdepth 2 | head -5
+          D=$(dirname "$(find pk -name pack.json | head -1)"); echo "пак: $D, файлов $(ls "$D" | wc -l)"
+          python3 -c "import json,sys; json.dump({'title':'ts-pack1','id':'$KU/ts-pack1','licenses':[{'name':'other'}]}, open(sys.argv[1]+'/dataset-metadata.json','w'))" "$D"
+          kaggle datasets create -p "$D" -q 2>&1 | tail -2 || true
+          kaggle datasets status "$KU/ts-pack1" 2>&1 | tail -1
       - name: Ключ для входных данных (свой текст песни шифруется им, расшифровка — только внутри прогона)
         if: inputs.cmd == 'inkey'
         run: |
