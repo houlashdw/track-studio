@@ -30,11 +30,10 @@ def kaggle_lego_many(qs):
     k = d + '/k'; os.makedirs(k)
     open(k + '/main.py', 'w').write('import os; os.environ.update(JOB_URL=%r, JOB_PASS=%r)\n' % (url, P) + open(os.path.join(ROOT, 'colab', 'kaggle_voice_job.py')).read())
     json.dump({'id': KREF, 'title': 'ts-voice', 'code_file': 'main.py', 'language': 'python', 'kernel_type': 'script', 'is_private': True,
-               'enable_gpu': True, 'enable_internet': True, 'accelerator': 'NvidiaTeslaT4', 'dataset_sources': [],
+               'enable_gpu': True, 'enable_internet': True, 'dataset_sources': [],
                'competition_sources': [], 'kernel_sources': []}, open(k + '/kernel-metadata.json', 'w'))
     def push():
-        try: print(run(['kaggle', 'kernels', 'push', '-p', k, '--accelerator', 'NvidiaTeslaT4'])[-300:], flush=True)
-        except subprocess.CalledProcessError: print(run(['kaggle', 'kernels', 'push', '-p', k])[-300:], flush=True)
+        print(run(['kaggle', 'kernels', 'push', '-p', k])[-300:], flush=True)   # GPU по умолчанию (явный тип T4 висел в очереди)
     push(); time.sleep(30); st = ''; tq = time.time(); repushed = 0
     while time.time() - t0 < 40 * 60:
         try: st = run(['kaggle', 'kernels', 'status', KREF]).strip().splitlines()[-1]
