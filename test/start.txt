@@ -1,0 +1,7 @@
+Starting: Intent { cmp=com.trackstudio.app/.MainActivity }
+Status: ok
+LaunchState: COLD
+Activity: com.trackstudio.app/.MainActivity
+TotalTime: 1405
+WaitTime: 1406
+Complete
