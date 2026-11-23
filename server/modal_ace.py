@@ -401,30 +401,15 @@ class Mixer:
         sys.path.insert(0, '/app/daw')
         os.environ['TS_BUILD_LUA'] = '/app/reaper/build.lua'
         import track
-        import random as _r
-        seed = int(q.get('seed', 1)); g = q.get('genre', 'auto')
-        if g not in track.packmod.GENRES: g = _r.Random(seed).choice(track.packmod.GENRES)   # жанр решаем ДО голоса, чтобы голос был под бит
-        V = pick_vocal(seed, q.get('lang', 'auto'), g)
-        own = bool((q.get('lyrics') or '').strip()) and q['lyrics'].strip() != '[Instrumental]'
-        if own: V['lang'], V['vlines'], V['clines'] = parse_own(q['lyrics']); V['lyrics'] = q['lyrics']   # свой текст: язык по письму, куплет/хук разложены по секциям бита
-        print('голос:', json.dumps({k: V[k] for k in ('lang', 'timbre', 'f0max', 'tune', 'vdrive', 'vseed', 'voice')}, ensure_ascii=False), flush=True)
 
-        def sing(beat_mp3, bpm, key=None, sections=None, takes=1):
-            lyr = V['lyrics'] if not sections else lyrics_for(sections, V, seed, g in ('rage', 'drill', 'trap') and not own, own)
-            print('текст:', lyr.replace('\n', ' / ')[:300], '| тональность:', key, flush=True)
-            qq = dict(beat_b64=base64.b64encode(beat_mp3).decode(), bpm=bpm, key=key or '', lang=V['lang'], lyrics=lyr, caption='%s song, female vocal in %s, %s' % (g, {'ja': 'Japanese', 'ru': 'Russian', 'en': 'English'}.get(V['lang'], 'English'), V['timbre']) + (', fast rhythmic flow, short staccato phrases, on-beat' if g in ('rage', 'drill', 'trap') else '') + (', J-pop' if g == 'plugg' else ''),
-                      seed=V['vseed'], voice=float(q.get('voice', V['voice'])), sex='f', steps=int(q.get('steps', 30)), f0max=float(V['f0max']), tries=3)
-            if takes <= 1: return AceLego().lego.remote(qq)
-            calls = [AceLego().lego.spawn(dict(qq, seed=V['vseed'] + 7919 * i)) for i in range(takes)]   # дубли голоса параллельно, выберем лучший по созвучию с битом
-            out = []
+        def lego_many(qs):   # дубли голоса параллельно на разных GPU
+            calls = [AceLego().lego.spawn(x) for x in qs]; out = []
             for c in calls:
                 try: out.append(c.get())
                 except Exception as e: print('дубль голоса упал:', str(e)[:200], flush=True)
-            if not out: raise RuntimeError('все дубли голоса упали')
             return out
         work = tempfile.mkdtemp(prefix='trk')
-        mp3, info = track.make_track(f'{VOL}/pack/{PACK}', g, seed, work, sing, '/app/smp', q.get('drums', 'kit'), vstyle=dict(tune=V['tune'], drive=V['vdrive']), log=lambda m: print(m, flush=True))
-        print('трек:', json.dumps(info, ensure_ascii=False), flush=True)
+        mp3, info, V, seed = build_track(q, lego_many, f'{VOL}/pack/{PACK}', '/app/smp', work, track)
         if q.get('debug'):   # для проверки: стемы и замеры в том /dbg/s<seed>
             import shutil
             dd = f'{VOL}/dbg/s{seed}'; shutil.rmtree(dd, ignore_errors=True); os.makedirs(dd)
@@ -432,6 +417,31 @@ class Mixer:
                 if os.path.exists(os.path.join(work, n)): shutil.copy(os.path.join(work, n), dd)
             json.dump(dict(info, voice=V['timbre'], lang=V['lang']), open(dd + '/info.json', 'w'), ensure_ascii=False, indent=1); vol.commit()
         return mp3
+
+
+def build_track(q, lego_many, pack_dir, smp, work, track, log=lambda m: print(m, flush=True)):
+    """общая сборка трека: жанр → голос под жанр → бит (Reaper) → дубли голоса через lego_many(список заданий) → сведение.
+    lego_many(qs) → список mp3 голоса (по одному на задание). Работает и в Modal, и на раннере GitHub с голосом на Kaggle."""
+    import random as _r
+    seed = int(q.get('seed', 1)); g = q.get('genre', 'auto')
+    if g not in track.packmod.GENRES: g = _r.Random(seed).choice(track.packmod.GENRES)   # жанр решаем ДО голоса, чтобы голос был под бит
+    V = pick_vocal(seed, q.get('lang', 'auto'), g)
+    own = bool((q.get('lyrics') or '').strip()) and q['lyrics'].strip() != '[Instrumental]'
+    if own: V['lang'], V['vlines'], V['clines'] = parse_own(q['lyrics']); V['lyrics'] = q['lyrics']   # свой текст: язык по письму, куплет/хук разложены по секциям бита
+    log('голос: ' + json.dumps({k: V[k] for k in ('lang', 'timbre', 'f0max', 'tune', 'vdrive', 'vseed', 'voice')}, ensure_ascii=False))
+
+    def sing(beat_mp3, bpm, key=None, sections=None, takes=1):
+        lyr = V['lyrics'] if not sections else lyrics_for(sections, V, seed, g in ('rage', 'drill', 'trap') and not own, own)
+        log('текст: %s | тональность: %s' % (lyr.replace('\n', ' / ')[:300], key))
+        qq = dict(beat_b64=base64.b64encode(beat_mp3).decode(), bpm=bpm, key=key or '', lang=V['lang'], lyrics=lyr,
+                  caption='%s song, female vocal in %s, %s' % (g, {'ja': 'Japanese', 'ru': 'Russian', 'en': 'English'}.get(V['lang'], 'English'), V['timbre']) + (', fast rhythmic flow, short staccato phrases, on-beat' if g in ('rage', 'drill', 'trap') else '') + (', J-pop' if g == 'plugg' else ''),
+                  seed=V['vseed'], voice=float(q.get('voice', V['voice'])), sex='f', steps=int(q.get('steps', 30)), f0max=float(V['f0max']), tries=3)
+        out = lego_many([dict(qq, seed=V['vseed'] + 7919 * i) for i in range(max(1, takes))])
+        if not out: raise RuntimeError('все дубли голоса упали')
+        return out if takes > 1 else out[0]
+    mp3, info = track.make_track(pack_dir, g, seed, work, sing, smp, q.get('drums', 'kit'), vstyle=dict(tune=V['tune'], drive=V['vdrive']), log=log)
+    log('трек: ' + json.dumps(info, ensure_ascii=False))
+    return mp3, info, V, seed
 
 
 web_image = modal.Image.debian_slim(python_version='3.11').pip_install('fastapi[standard]')

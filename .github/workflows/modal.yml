@@ -110,9 +110,19 @@ jobs:
           pip install -q -U kaggle six; export KAGGLE_USERNAME="$KU" KAGGLE_KEY="$KK"; case "$KK" in KGAT*) export KAGGLE_API_TOKEN="$KK";; esac
           mkdir -p pk && modal volume get ts-ace /pack/pack1 pk/ >/dev/null && du -sh pk && find pk -maxdepth 2 | head -5
           D=$(dirname "$(find pk -name pack.json | head -1)"); echo "пак: $D, файлов $(ls "$D" | wc -l)"
-          python3 -c "import json,sys; json.dump({'title':'ts-pack1','id':'$KU/ts-pack1','licenses':[{'name':'other'}]}, open(sys.argv[1]+'/dataset-metadata.json','w'))" "$D"
-          kaggle datasets create -p "$D" -q 2>&1 | tail -2 || true
+          mkdir -p up && tar -cf up/pack1.tar -C "$(dirname "$D")" "$(basename "$D")" && ls -la up
+          python3 -c "import json; json.dump({'title':'ts-pack1','id':'$KU/ts-pack1','licenses':[{'name':'other'}]}, open('up/dataset-metadata.json','w'))"
+          kaggle datasets create -p up 2>&1 | tail -3 || true
           kaggle datasets status "$KU/ts-pack1" 2>&1 | tail -1
+      - name: Адаптер голоса → приватный датасет Kaggle
+        if: inputs.cmd == 'adexport'
+        env: { KU: '${{ secrets.KAGGLE_USERNAME }}', KK: '${{ secrets.KAGGLE_KEY }}' }
+        run: |
+          pip install -q -U kaggle six; export KAGGLE_USERNAME="$KU" KAGGLE_KEY="$KK"; case "$KK" in KGAT*) export KAGGLE_API_TOKEN="$KK";; esac
+          mkdir -p ad && modal volume ls ts-ace /adapters/base && modal volume get ts-ace /adapters/base ad/ >/dev/null && du -sh ad && find ad -name adapter_config.json
+          python3 -c "import json; json.dump({'title':'ts-adapters','id':'$KU/ts-adapters','licenses':[{'name':'other'}]}, open('ad/dataset-metadata.json','w'))"
+          mkdir -p up2 && tar -cf up2/adapters.tar -C ad . && python3 -c "import json; json.dump({'title':'ts-adapters','id':'$KU/ts-adapters','licenses':[{'name':'other'}]}, open('up2/dataset-metadata.json','w'))"
+          kaggle datasets create -p up2 2>&1 | tail -3 || true
       - name: Ключ для входных данных (свой текст песни шифруется им, расшифровка — только внутри прогона)
         if: inputs.cmd == 'inkey'
         run: |

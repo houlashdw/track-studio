@@ -1,0 +1,63 @@
+name: ktrack
+# трек без Modal: бит и сведение на раннере (Reaper), голос ACE — на бесплатной T4 Kaggle. Результат зашифрован → ветка ktrack-out
+on:
+  workflow_dispatch:
+    inputs:
+      seeds: { description: 'сиды через пробел', default: '101' }
+      genre: { description: 'auto / rage / drill / trap / plugg / phonk', default: 'auto' }
+      lyr: { description: 'свой текст, зашифрованный ключом in-key (как в tracktest)', default: '' }
+      listen: { description: 'разбор Gemini: 1/0', default: '1' }
+permissions:
+  contents: write
+concurrency: { group: ktrack, cancel-in-progress: false }   # ноутбук Kaggle один — запуски по очереди
+jobs:
+  r:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      KAGGLE_USERNAME: '${{ secrets.KAGGLE_USERNAME }}'
+      KAGGLE_KEY: '${{ secrets.KAGGLE_KEY }}'
+      MODAL_TOKEN_ID: '${{ secrets.MODAL_TOKEN_ID }}'
+      MODAL_TOKEN_SECRET: '${{ secrets.MODAL_TOKEN_SECRET }}'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - name: Reaper и зависимости
+        run: |
+          sudo apt-get -qq update && (sudo apt-get -qq install -y xvfb ffmpeg rubberband-cli libgtk-3-0 libasound2t64 >/dev/null || sudo apt-get -qq install -y xvfb ffmpeg rubberband-cli libgtk-3-0 libasound2 >/dev/null)
+          pip install -q numpy scipy soundfile librosa modal kaggle six google-genai
+          case "$KAGGLE_KEY" in KGAT*) echo "KAGGLE_API_TOKEN=$KAGGLE_KEY" >> $GITHUB_ENV;; esac
+          U=$(curl -sL https://www.reaper.fm/download.php | grep -oE 'files/[0-9.x]+/reaper[0-9a-z_]+_linux_x86_64\.tar\.xz' | head -1); echo "архив: $U"
+          curl -sL "https://www.reaper.fm/$U" -o /tmp/r.tar.xz && mkdir -p /tmp/rp && tar xf /tmp/r.tar.xz -C /tmp/rp
+          D=$(dirname "$(find /tmp/rp -name install-reaper.sh | head -1)"); sudo "$D/install-reaper.sh" --install /opt --quiet || true
+          mkdir -p ~/.config/REAPER && printf '[REAPER]\nsplashwnd=0\nverchk=0\n' > ~/.config/REAPER/reaper.ini
+      - name: Пак лупов (приватный датасет Kaggle)
+        run: |
+          mkdir -p /tmp/pk && kaggle datasets download "$KAGGLE_USERNAME/ts-pack1" -p /tmp/pk --unzip -q
+          for t in /tmp/pk/*.tar; do [ -f "$t" ] && tar xf "$t" -C /tmp/pk; done
+          P=$(dirname "$(find /tmp/pk -name pack.json | head -1)"); echo "PACK=$P" >> $GITHUB_ENV; echo "пак: $P, файлов $(ls "$P" | wc -l)"
+      - name: Свой текст (расшифровка ключом из тома)
+        if: inputs.lyr != ''
+        env: { LYR_ENC: '${{ inputs.lyr }}' }
+        run: |
+          umask 077; modal volume get ts-ace /keys/in.pem /tmp/in.pem >/dev/null
+          python3 -c "import os,base64,subprocess as S; k,e=os.environ['LYR_ENC'].split(':'); open('/tmp/lk','wb').write(base64.b64decode(k)); open('/tmp/le','wb').write(base64.b64decode(e)); p=S.run(['openssl','pkeyutl','-decrypt','-inkey','/tmp/in.pem','-pkeyopt','rsa_padding_mode:oaep','-in','/tmp/lk'],capture_output=True,check=True).stdout; S.run(['openssl','enc','-d','-aes-256-cbc','-pbkdf2','-iter','200000','-in','/tmp/le','-out','/tmp/lyr.txt','-pass','pass:'+p.decode()],check=True)"
+          rm -f /tmp/in.pem /tmp/lk; echo "свой текст: $(wc -l < /tmp/lyr.txt) строк"
+      - name: Треки
+        env: { PUSH_URL: 'https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git' }
+        run: |
+          mkdir -p /tmp/tt
+          for S in ${{ inputs.seeds }}; do T0=$(date +%s); python3 tools/ktrack.py "$PACK" /tmp/tt "$S" "${{ inputs.genre }}" /tmp/lyr.txt 2>&1 | grep -vE "^\s*$" | tail -60 || echo "seed $S: ошибка"; echo "seed $S: $(( $(date +%s) - T0 )) с"; done
+          ls -la /tmp/tt
+      - name: Уши (Gemini)
+        if: inputs.listen == '1'
+        env: { GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}' }
+        run: |
+          python3 tools/listen_track.py /tmp/tt || echo "уши - ошибка"
+      - name: Шифрование и выдача
+        run: |
+          cp -r /tmp/tt/st/. /tmp/tt/ 2>/dev/null || true; rm -rf /tmp/tt/st
+          bash tools/enc_out.sh /tmp/tt o
+          cd o && git init -q -b ktrack-out && git config user.name gha && git config user.email gha@users.noreply.github.com
+          git add -A && git commit -q -m "ktrack" && git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" ktrack-out
