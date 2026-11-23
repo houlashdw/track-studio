@@ -26,7 +26,7 @@ jobs:
       - name: Reaper и зависимости
         run: |
           sudo apt-get -qq update && (sudo apt-get -qq install -y xvfb ffmpeg rubberband-cli libgtk-3-0 libasound2t64 >/dev/null || sudo apt-get -qq install -y xvfb ffmpeg rubberband-cli libgtk-3-0 libasound2 >/dev/null)
-          pip install -q numpy scipy soundfile librosa modal kaggle six google-genai
+          pip install -q numpy scipy soundfile librosa modal kaggle six google-genai fastapi
           case "$KAGGLE_KEY" in KGAT*) echo "KAGGLE_API_TOKEN=$KAGGLE_KEY" >> $GITHUB_ENV;; esac
           U=$(curl -sL https://www.reaper.fm/download.php | grep -oE 'files/[0-9.x]+/reaper[0-9a-z_]+_linux_x86_64\.tar\.xz' | head -1); echo "архив: $U"
           curl -sL "https://www.reaper.fm/$U" -o /tmp/r.tar.xz && mkdir -p /tmp/rp && tar xf /tmp/r.tar.xz -C /tmp/rp
