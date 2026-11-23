@@ -23,7 +23,7 @@ jobs:
         env: { KU: '${{ secrets.KAGGLE_USERNAME }}', KK: '${{ secrets.KAGGLE_KEY }}' }
         run: |
           [ -n "$KU" ] && [ -n "$KK" ] || { echo "::error::нет секретов KAGGLE_USERNAME / KAGGLE_KEY"; exit 1; }
-          pip install -q -U kaggle
+          pip install -q -U kaggle six
           echo "KAGGLE_USERNAME=$KU" >> $GITHUB_ENV; echo "KAGGLE_KEY=$KK" >> $GITHUB_ENV
           case "$KK" in KGAT*) echo "KAGGLE_API_TOKEN=$KK" >> $GITHUB_ENV;; esac
       - name: Отправка ноутбука
