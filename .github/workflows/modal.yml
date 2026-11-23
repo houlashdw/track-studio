@@ -107,7 +107,7 @@ jobs:
         if: inputs.cmd == 'packexport'
         env: { KU: '${{ secrets.KAGGLE_USERNAME }}', KK: '${{ secrets.KAGGLE_KEY }}' }
         run: |
-          pip install -q -U kaggle; export KAGGLE_USERNAME="$KU" KAGGLE_KEY="$KK"; case "$KK" in KGAT*) export KAGGLE_API_TOKEN="$KK";; esac
+          pip install -q -U kaggle six; export KAGGLE_USERNAME="$KU" KAGGLE_KEY="$KK"; case "$KK" in KGAT*) export KAGGLE_API_TOKEN="$KK";; esac
           mkdir -p pk && modal volume get ts-ace /pack/pack1 pk/ >/dev/null && du -sh pk && find pk -maxdepth 2 | head -5
           D=$(dirname "$(find pk -name pack.json | head -1)"); echo "пак: $D, файлов $(ls "$D" | wc -l)"
           python3 -c "import json,sys; json.dump({'title':'ts-pack1','id':'$KU/ts-pack1','licenses':[{'name':'other'}]}, open(sys.argv[1]+'/dataset-metadata.json','w'))" "$D"
