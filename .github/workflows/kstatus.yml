@@ -3,6 +3,7 @@ on:
   workflow_dispatch:
     inputs:
       slug: { default: 'emethscacute/ts-lego' }
+      delete: { description: '1 — удалить ноутбук (снимает зависшие сессии GPU)', default: '0' }
 permissions:
   contents: write
 jobs:
@@ -13,6 +14,7 @@ jobs:
         env: { KAGGLE_USERNAME: '${{ secrets.KAGGLE_USERNAME }}', KK: '${{ secrets.KAGGLE_KEY }}' }
         run: |
           pip install -q -U kaggle six; export KAGGLE_KEY="$KK"; case "$KK" in KGAT*) export KAGGLE_API_TOKEN="$KK";; esac
+          [ "${{ inputs.delete }}" = 1 ] && { kaggle kernels delete "${{ inputs.slug }}" -y 2>&1 | tail -2 || true; exit 0; }
           kaggle kernels status "${{ inputs.slug }}"; kaggle kernels list --mine --page-size 10 2>&1 | head -12 || true
           mkdir o; kaggle kernels output "${{ inputs.slug }}" -p o >/dev/null 2>&1 || true; ls -la o; tail -c 3000 o/*.log 2>/dev/null | tr -d '\r' | grep -v "it/s\|token/s" | tail -25 || true
       - name: Выход в ветку kaggle-out (зашифровано)
