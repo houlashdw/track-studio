@@ -37,6 +37,9 @@ jobs:
           mkdir -p /tmp/pk && kaggle datasets download "$KAGGLE_USERNAME/ts-pack1" -p /tmp/pk --unzip -q
           for t in /tmp/pk/*.tar; do [ -f "$t" ] && tar xf "$t" -C /tmp/pk; done
           P=$(dirname "$(find /tmp/pk -name pack.json | head -1)"); echo "PACK=$P" >> $GITHUB_ENV; echo "пак: $P, файлов $(ls "$P" | wc -l)"
+      - name: Адаптер голоса (из тома)
+        run: |
+          mkdir -p /tmp/ad && modal volume get ts-ace /adapters/base /tmp/ad/ >/dev/null && tar -cf /tmp/adapters.tar -C /tmp/ad . && ls -la /tmp/adapters.tar || echo "адаптера нет — голос без него"
       - name: Свой текст (расшифровка ключом из тома)
         if: inputs.lyr != ''
         env: { LYR_ENC: '${{ inputs.lyr }}' }

@@ -18,7 +18,9 @@ def kaggle_lego_many(qs):
     t0 = time.time(); d = tempfile.mkdtemp()
     open(d + '/beat.mp3', 'wb').write(base64.b64decode(qs[0]['beat_b64']))
     json.dump([{k: v for k, v in q.items() if k != 'beat_b64'} for q in qs], open(d + '/job.json', 'w'), ensure_ascii=False)
-    run(['tar', '-czf', d + '/job.tgz', '-C', d, 'beat.mp3', 'job.json'])
+    fl = ['beat.mp3', 'job.json']
+    if os.path.exists('/tmp/adapters.tar'): shutil.copy('/tmp/adapters.tar', d); fl.append('adapters.tar')   # адаптер голоса едет внутри задания (датасет к ноутбуку подвешивал очередь)
+    run(['tar', '-czf', d + '/job.tgz', '-C', d] + fl)
     P = secrets.token_hex(24)   # пароль задания живёт только в коде приватного ноутбука и в памяти этого процесса
     run(['openssl', 'enc', '-aes-256-cbc', '-pbkdf2', '-iter', '200000', '-salt', '-in', d + '/job.tgz', '-out', d + '/job.enc', '-pass', 'pass:' + P])
     g = d + '/git'; os.makedirs(g); shutil.copy(d + '/job.enc', g)
@@ -28,7 +30,7 @@ def kaggle_lego_many(qs):
     k = d + '/k'; os.makedirs(k)
     open(k + '/main.py', 'w').write('import os; os.environ.update(JOB_URL=%r, JOB_PASS=%r)\n' % (url, P) + open(os.path.join(ROOT, 'colab', 'kaggle_voice_job.py')).read())
     json.dump({'id': KREF, 'title': 'ts-voice', 'code_file': 'main.py', 'language': 'python', 'kernel_type': 'script', 'is_private': True,
-               'enable_gpu': True, 'enable_internet': True, 'accelerator': 'NvidiaTeslaT4', 'dataset_sources': [KU + '/ts-adapters'],
+               'enable_gpu': True, 'enable_internet': True, 'accelerator': 'NvidiaTeslaT4', 'dataset_sources': [],
                'competition_sources': [], 'kernel_sources': []}, open(k + '/kernel-metadata.json', 'w'))
     def push():
         try: print(run(['kaggle', 'kernels', 'push', '-p', k, '--accelerator', 'NvidiaTeslaT4'])[-300:], flush=True)

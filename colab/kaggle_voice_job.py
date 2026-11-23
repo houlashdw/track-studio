@@ -16,9 +16,9 @@ if not os.path.isdir(R): sh(f'git clone -q --depth 1 https://github.com/ACE-Step
 sh(f'{sys.executable} -m pip install -q uv'); sh(f'cd {R} && {sys.executable} -m uv sync -q')
 sh(f'cd {R} && {sys.executable} -m uv pip install -q demucs soundfile')
 sh(f'wget -q -O {R}/lego_core.py {RAW}/server/lego_core.py')
-sh('mkdir -p /tmp/ad && for t in $(find /kaggle/input -name adapters.tar); do tar xf $t -C /tmp/ad; done; find /tmp/ad -name adapter_config.json || true', check=False)
 sh(f'wget -q -O /tmp/job.enc "{os.environ["JOB_URL"]}"')
 sh('openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -in /tmp/job.enc -out /tmp/job.tgz -pass env:JOB_PASS && mkdir -p /tmp/job && tar -xzf /tmp/job.tgz -C /tmp/job')
+sh('mkdir -p /tmp/ad && for t in $(find /kaggle/input /tmp/job -name adapters.tar 2>/dev/null); do tar xf $t -C /tmp/ad; done; find /tmp/ad -name adapter_config.json || true', check=False)
 print('установка %.0f с' % (time.time() - T0), flush=True)
 
 RUN = r'''
