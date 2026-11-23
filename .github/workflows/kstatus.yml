@@ -12,8 +12,8 @@ jobs:
       - name: Статус и выход
         env: { KAGGLE_USERNAME: '${{ secrets.KAGGLE_USERNAME }}', KK: '${{ secrets.KAGGLE_KEY }}' }
         run: |
-          pip install -q -U kaggle; export KAGGLE_KEY="$KK"; case "$KK" in KGAT*) export KAGGLE_API_TOKEN="$KK";; esac
-          kaggle kernels status "${{ inputs.slug }}"
+          pip install -q -U kaggle six; export KAGGLE_KEY="$KK"; case "$KK" in KGAT*) export KAGGLE_API_TOKEN="$KK";; esac
+          kaggle kernels status "${{ inputs.slug }}"; kaggle kernels list --mine --page-size 10 2>&1 | head -12 || true
           mkdir o; kaggle kernels output "${{ inputs.slug }}" -p o >/dev/null 2>&1 || true; ls -la o; tail -c 3000 o/*.log 2>/dev/null | tr -d '\r' | grep -v "it/s\|token/s" | tail -25 || true
       - name: Выход в ветку kaggle-out (зашифровано)
         env: { P: '${{ secrets.KEYSTORE_PASS }}' }
