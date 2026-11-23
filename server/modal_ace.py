@@ -436,11 +436,11 @@ def build_track(q, lego_many, pack_dir, smp, work, track, log=lambda m: print(m,
         qq = dict(beat_b64=base64.b64encode(beat_mp3).decode(), bpm=bpm, key=key or '', lang=V['lang'], lyrics=lyr,
                   caption='%s song, female vocal in %s, %s' % (g, {'ja': 'Japanese', 'ru': 'Russian', 'en': 'English'}.get(V['lang'], 'English'), V['timbre']) + (', fast rhythmic flow, short staccato phrases, on-beat' if g in ('rage', 'drill', 'trap') else '') + (', J-pop' if g == 'plugg' else ''),
                   seed=V['vseed'], voice=float(q.get('voice', V['voice'])), sex='f', steps=int(q.get('steps', 30)), f0max=float(V['f0max']), tries=3)
-        out = lego_many([dict(qq, seed=V['vseed'] + 7919 * i) for i in range(max(1, takes))])
+        out = lego_many([dict(qq, seed=V['vseed'] + 7919 * i, tries=1 if takes > 1 else 3) for i in range(max(1, takes))])   # с дублями — без пересъёмки каждого
         if not out: raise RuntimeError('все дубли голоса упали')
         return out if takes > 1 else out[0]
     mp3, info = track.make_track(pack_dir, g, seed, work, sing, smp, q.get('drums', 'kit'), vstyle=dict(tune=V['tune'], drive=V['vdrive']), log=log)
-    log('трек: ' + json.dumps(info, ensure_ascii=False))
+    log('трек: ' + json.dumps(info, ensure_ascii=False, default=float))
     return mp3, info, V, seed
 
 

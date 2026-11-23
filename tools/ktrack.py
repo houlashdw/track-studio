@@ -60,5 +60,5 @@ if __name__ == '__main__':
     os.makedirs(out + '/st', exist_ok=True)
     for n in ('beat.mp3', 'vox_raw.mp3', 'vox_fx.mp3', 'mix.log'):
         if os.path.exists(os.path.join(work, n)): shutil.copy(os.path.join(work, n), f'{out}/st/s{seed}_{n}')
-    json.dump(dict(info, voice=V['timbre'], lang=V['lang']), open(f'{out}/st/s{seed}_info.json', 'w'), ensure_ascii=False, indent=1)
+    json.dump(dict(info, voice=V['timbre'], lang=V['lang']), open(f'{out}/st/s{seed}_info.json', 'w'), ensure_ascii=False, indent=1, default=float)
     print('готово:', f'{out}/track_s{seed}.mp3', flush=True)
