@@ -197,10 +197,16 @@ def make_track(pack_dir, genre, seed, work, sing, smp, drums='kit', target=-10.0
     reaper_render(W('beat.lua'), W('beat.wav'), W('beat.log')); subprocess.run(['ffmpeg', '-v', 'error', '-y', '-i', W('beat.wav'), '-b:a', '192k', W('beat.mp3')], check=True); tick('бит')
     # 2) голос
     chb = chroma(W('beat.wav')); k, md, ks = key_of(chb); key = '%s %s' % (NOTE[k], md); log('  тональность бита: %s (%.2f)' % (key, ks))
-    try: raw = sing(open(W('beat.mp3'), 'rb').read(), bpm, key=key, sections=R.get('sections'))
-    except TypeError: raw = sing(open(W('beat.mp3'), 'rb').read(), bpm)
-    open(W('vox_raw.mp3'), 'wb').write(raw); tick('голос')
-    x, _ = librosa.load(W('vox_raw.mp3'), sr=voxprep.SR, mono=True); y, vinfo = voxprep.prep(x, bpm, raw=True); sf.write(W('vox.wav'), y, voxprep.SR, subtype='PCM_24')
+    try: raws = sing(open(W('beat.mp3'), 'rb').read(), bpm, key=key, sections=R.get('sections'), takes=2)
+    except TypeError: raws = sing(open(W('beat.mp3'), 'rb').read(), bpm)
+    if isinstance(raws, (bytes, bytearray)): raws = [raws]
+    tick('голос'); takes = []
+    for i, raw in enumerate(raws):   # каждый дубль: созвучие с аккордами бита (с учётом возможной транспозиции бита) — берём лучший
+        open(W('vox_raw%d.mp3' % i), 'wb').write(raw); x, _ = librosa.load(W('vox_raw%d.mp3' % i), sr=voxprep.SR, mono=True)
+        y, vi_ = voxprep.prep(x, bpm, raw=True); sf.write(W('vox%d.wav' % i), y, voxprep.SR, subtype='PCM_24')
+        sh_, a_, b_ = chord_fix(W('beat.wav'), W('vox%d.wav' % i)); takes.append((b_ - .006 * abs(sh_), i, vi_, round(b_, 3)))
+    _, bi, vinfo, _ = max(takes); vinfo['takes'] = [t[3] for t in takes]; vinfo['take'] = bi
+    shutil.copy(W('vox_raw%d.mp3' % bi), W('vox_raw.mp3')); shutil.copy(W('vox%d.wav' % bi), W('vox.wav')); log('  дубли голоса (созвучие): %s → беру %d' % (vinfo['takes'], bi))
     sh0, c0, c1, pk = key_fix(W('vox.wav'), chb, k, md, ks)   # старая оценка по гамме — только в журнал
     sh, h0, h1 = chord_fix(W('beat.wav'), W('vox.wav')); vinfo.update(key=key, key_conf=round(ks, 2), scale_shift=sh0, shift=sh, chord_fit=h0, chord_fit_after=h1, vox_peak=pk)
     c0, c1 = h0, h1

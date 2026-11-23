@@ -409,12 +409,19 @@ class Mixer:
         if own: V['lang'], V['vlines'], V['clines'] = parse_own(q['lyrics']); V['lyrics'] = q['lyrics']   # свой текст: язык по письму, куплет/хук разложены по секциям бита
         print('голос:', json.dumps({k: V[k] for k in ('lang', 'timbre', 'f0max', 'tune', 'vdrive', 'vseed', 'voice')}, ensure_ascii=False), flush=True)
 
-        def sing(beat_mp3, bpm, key=None, sections=None):
+        def sing(beat_mp3, bpm, key=None, sections=None, takes=1):
             lyr = V['lyrics'] if not sections else lyrics_for(sections, V, seed, g in ('rage', 'drill', 'trap') and not own, own)
             print('текст:', lyr.replace('\n', ' / ')[:300], '| тональность:', key, flush=True)
             qq = dict(beat_b64=base64.b64encode(beat_mp3).decode(), bpm=bpm, key=key or '', lang=V['lang'], lyrics=lyr, caption='%s song, female vocal in %s, %s' % (g, {'ja': 'Japanese', 'ru': 'Russian', 'en': 'English'}.get(V['lang'], 'English'), V['timbre']) + (', fast rhythmic flow, short staccato phrases, on-beat' if g in ('rage', 'drill', 'trap') else '') + (', J-pop' if g == 'plugg' else ''),
                       seed=V['vseed'], voice=float(q.get('voice', V['voice'])), sex='f', steps=int(q.get('steps', 30)), f0max=float(V['f0max']), tries=3)
-            return AceLego().lego.remote(qq)
+            if takes <= 1: return AceLego().lego.remote(qq)
+            calls = [AceLego().lego.spawn(dict(qq, seed=V['vseed'] + 7919 * i)) for i in range(takes)]   # дубли голоса параллельно, выберем лучший по созвучию с битом
+            out = []
+            for c in calls:
+                try: out.append(c.get())
+                except Exception as e: print('дубль голоса упал:', str(e)[:200], flush=True)
+            if not out: raise RuntimeError('все дубли голоса упали')
+            return out
         work = tempfile.mkdtemp(prefix='trk')
         mp3, info = track.make_track(f'{VOL}/pack/{PACK}', g, seed, work, sing, '/app/smp', q.get('drums', 'kit'), vstyle=dict(tune=V['tune'], drive=V['vdrive']), log=lambda m: print(m, flush=True))
         print('трек:', json.dumps(info, ensure_ascii=False), flush=True)
